@@ -213,30 +213,37 @@ function SummaryWidget({ students, rateHistory }) {
 
   const weeklyGross = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
   const annualGross = weeklyGross * 40;
-  const weeklyNet  = Math.round(weeklyGross * 0.6);
-  const annualNet  = Math.round(annualGross * 0.6);
 
-  const fmt = n => n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${n}`;
+  // Cash students: full rate is take-home. Non-cash: 60% after 40% tax.
+  const weeklyNet = active.reduce((sum, s) => {
+    const rate = getCurrentRate(s.id, rateHistory);
+    return sum + (s.pays_in_cash ? rate : rate * 0.6);
+  }, 0);
+  const annualNet = weeklyNet * 40;
+
+  const fmt = n => n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
+
+  const stats = [
+    { label: 'students',   value: active.length,            accent: false },
+    { label: 'gross/week', value: fmt(weeklyGross),          accent: false },
+    { label: 'net/week',   value: fmt(weeklyNet),            accent: true  },
+    { label: 'gross/year', value: fmt(annualGross),          accent: false },
+    { label: 'net/year',   value: fmt(annualNet),            accent: true  },
+  ];
 
   return (
     <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'14px 16px',marginBottom:16}}>
       <div style={{fontSize:'0.72rem',textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--muted)',marginBottom:10}}>Weekly snapshot</div>
       <div style={{display:'flex',gap:0,flexWrap:'wrap'}}>
-        {[
-          {label:'students',    gross: active.length, net: null,          unit:''},
-          {label:'gross/week',  gross: fmt(weeklyGross), net: null,       unit:''},
-          {label:'net/week',    gross: null, net: fmt(weeklyNet),         unit:''},
-          {label:'gross/year',  gross: fmt(annualGross), net: null,       unit:''},
-          {label:'net/year',    gross: null, net: fmt(annualNet),         unit:''},
-        ].map(({label, gross, net}) => (
+        {stats.map(({label, value, accent}) => (
           <div key={label} style={{flex:'1 1 80px',minWidth:70,marginBottom:8}}>
-            <div style={{fontSize:'1.3rem',fontWeight:700,color: net ? 'var(--accent)' : 'var(--ink)'}}>{gross ?? net}</div>
+            <div style={{fontSize:'1.3rem',fontWeight:700,color:accent?'var(--accent)':'var(--ink)'}}>{value}</div>
             <div style={{fontSize:'0.72rem',color:'var(--muted)'}}>{label}</div>
           </div>
         ))}
       </div>
       <div style={{fontSize:'0.72rem',color:'var(--muted)',borderTop:'1px solid var(--line)',paddingTop:8,marginTop:4}}>
-        Assumes all {active.length} student{active.length !== 1 ? 's' : ''} teach every week · 40 lessons/year · net = 60% after 40% tax
+        40 lessons/year per student · cash = full rate · bank transfer = 60% after tax
       </div>
     </div>
   );
@@ -267,6 +274,7 @@ function StudentFormModal({ student, onClose, onSaved }) {
     exam_board_custom: initPreset === 'other' ? existingBoard : '',
     exam_tier: student?.exam_tier || '',
     has_extra_time: student?.has_extra_time || false,
+    pays_in_cash: student?.pays_in_cash || false,
     general_notes: student?.general_notes || '',
     calendar_title_pattern: student?.calendar_title_pattern || '',
     active: student?.active !== undefined ? student.active : true,
@@ -312,6 +320,7 @@ function StudentFormModal({ student, onClose, onSaved }) {
       exam_board: exam_board || null,
       exam_tier: form.exam_tier || null,
       has_extra_time: form.has_extra_time,
+      pays_in_cash: form.pays_in_cash,
       general_notes: form.general_notes,
       calendar_title_pattern: form.calendar_title_pattern,
       active: form.active,
@@ -399,6 +408,10 @@ function StudentFormModal({ student, onClose, onSaved }) {
         <div className="field checkbox-row">
           <input type="checkbox" checked={form.has_extra_time} onChange={e => setForm({...form, has_extra_time: e.target.checked})} />
           <label style={{marginBottom: 0}}>Has extra time (25%)</label>
+        </div>
+        <div className="field checkbox-row">
+          <input type="checkbox" checked={form.pays_in_cash} onChange={e => setForm({...form, pays_in_cash: e.target.checked})} />
+          <label style={{marginBottom: 0}}>Pays in cash (take-home = full rate, no tax deducted)</label>
         </div>
         <div className="field">
           <label>Student's name in your calendar</label>
