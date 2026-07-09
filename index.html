@@ -712,7 +712,7 @@ function MoreToolsSheet({ student, onClose, onTrackCash }) {
   );
 }
 
-function StudentCard({ student, lessons, payments, bundles, allStudents, onEdit, onDataChanged }) {
+function StudentCard({ student, lessons, payments, bundles, allStudents, rateHistory, onEdit, onDataChanged }) {
   const [open, setOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [showMoreTools, setShowMoreTools] = useState(false);
@@ -762,6 +762,9 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, onEdit,
   const referredBy = student.referred_by_student_id ? allStudents.find(s => s.id === student.referred_by_student_id) : null;
   const referrals = allStudents.filter(s => s.referred_by_student_id === student.id);
 
+  const currentRate = getCurrentRate(student.id, rateHistory);
+  const unpaidCount = balance > 0 && currentRate > 0 ? Math.ceil(balance / currentRate) : 0;
+
   const studentFirstName = student.name.split(' ')[0];
   const parentFirstName = (student.parent_name || '').split(' ')[0];
   const greeting = parentFirstName ? `Hi ${parentFirstName}!` : 'Hi!';
@@ -770,6 +773,10 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, onEdit,
     ? `${greeting} Just a friendly reminder we have an outstanding balance of £${balance.toFixed(2)} for ${studentFirstName}'s maths lessons. Let me know when's good to sort payment. Thanks!`
     : `${greeting} Just checking in about ${studentFirstName}'s next maths lesson.`;
   const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}` : null;
+  const paymentMsg = `${greeting} Just a note that we have ${unpaidCount} outstanding session${unpaidCount !== 1 ? 's' : ''} totalling £${balance.toFixed(2)}. Could you let me know when's convenient to settle up? Thanks!`;
+  const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
+  const bundleMsg = bundleRemaining !== null ? `${greeting} Just to let you know, there's ${bundleRemaining} session${bundleRemaining !== 1 ? 's' : ''} left in ${studentFirstName}'s current bundle. When you get a chance, it'd be great to sort another bundle. Thanks!` : '';
+  const bundleWaLink = phone && bundleRemaining !== null && bundleRemaining <= 1 ? `https://wa.me/${phone}?text=${encodeURIComponent(bundleMsg)}` : null;
 
   return (
     <div className="card">
@@ -818,7 +825,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, onEdit,
           )}
 
           <div className="section-label">Recent lessons</div>
-          {studentLessons.slice(0, 8).map(l => (
+          {studentLessons.slice(0, Math.max(10, unpaidCount)).map(l => (
             <div className="lesson-row" key={l.id}>
               <span className="lesson-date">{new Date(l.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               <div style={{display:'flex', alignItems:'center', gap:6}}>
@@ -836,7 +843,9 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, onEdit,
           {studentLessons.length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>No lessons logged yet.</div>}
 
           <div className="actions">
-            {waLink && <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener">WhatsApp parent</a>}
+            {paymentWaLink && <a className="btn whatsapp" href={paymentWaLink} target="_blank" rel="noopener">💷 Request payment</a>}
+            {bundleWaLink && <a className="btn" href={bundleWaLink} target="_blank" rel="noopener" style={{background:'#128C7E'}}>🔔 Bundle low</a>}
+            {waLink && <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener">WhatsApp</a>}
             {student.spreadsheet_url && (
               <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener" style={{background:'#1a7f4b', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}>📈</a>
             )}
@@ -927,7 +936,7 @@ function App() {
 
       {!loading && activeStudents.map(s => (
         <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
-          allStudents={students} onEdit={setEditingStudent} onDataChanged={loadAll} />
+          allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
       ))}
 
       {!loading && inactiveStudents.length > 0 && (
@@ -935,12 +944,12 @@ function App() {
           <div className="section-label" style={{ marginTop: 24 }}>Inactive</div>
           {inactiveStudents.map(s => (
             <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
-              allStudents={students} onEdit={setEditingStudent} onDataChanged={loadAll} />
+              allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
           ))}
         </React.Fragment>
       )}
 
-      {!loading && <div className="version-tag">v1.0</div>}
+      {!loading && <div className="version-tag">v1.1</div>}
 
       {showAddModal && (
         <StudentFormModal
