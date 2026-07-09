@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tutoring — Bower OS</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  :root {
+    --ink: #1a1a1a;
+    --paper: #faf9f7;
+    --card: #ffffff;
+    --line: #e4e2de;
+    --accent: #2f5233;
+    --accent-light: #e8f0e9;
+    --warn: #b3532a;
+    --warn-light: #fbeee6;
+    --muted: #6b6862;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+  }
+  #root { max-width: 720px; margin: 0 auto; padding: 16px; padding-bottom: 80px; }
+  h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 14px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+  }
+  .card-header:active { background: #f5f4f1; }
+  .student-name { font-weight: 600; font-size: 1.02rem; }
+  .status-row { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .pill {
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-weight: 500;
+  }
+  .pill.ok { background: var(--accent-light); color: var(--accent); }
+  .pill.warn { background: var(--warn-light); color: var(--warn); }
+  .pill.neutral { background: #f0efec; color: var(--muted); }
+  .chevron { font-size: 1.2rem; color: var(--muted); transition: transform 0.15s; }
+  .chevron.open { transform: rotate(90deg); }
+  .card-body { padding: 0 16px 16px; border-top: 1px solid var(--line); }
+  .section-label {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 14px 0 6px;
+  }
+  .lesson-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 0.88rem;
+    border-bottom: 1px solid #f0efec;
+  }
+  .lesson-row:last-child { border-bottom: none; }
+  .lesson-date { color: var(--muted); }
+  .lesson-status { font-size: 0.78rem; }
+  .lesson-status.completed { color: var(--accent); }
+  .lesson-status.scheduled { color: var(--muted); }
+  .lesson-status.missed { color: var(--warn); }
+  .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .btn {
+    flex: 1;
+    min-width: 100px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: none;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    color: white;
+  }
+  .btn.whatsapp { background: #25D366; }
+  .btn.notes { background: var(--muted); }
+  .notes-box {
+    font-size: 0.85rem;
+    color: #444;
+    background: #f7f6f4;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-top: 8px;
+    line-height: 1.4;
+    display: none;
+  }
+  .notes-box.visible { display: block; }
+  .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 0.9rem; }
+  .loading { text-align: center; color: var(--muted); padding: 40px 20px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+function daysBetween(dateStr) {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return Math.floor((now - d) / (1000 * 60 * 60 * 24));
+}
+
+function StudentCard({ student, lessons, payments, bundles }) {
+  const [open, setOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
+
+  const studentLessons = lessons.filter(l => l.student_id === student.id)
+    .sort((a, b) => new Date(b.lesson_date) - new Date(a.lesson_date));
+  const studentPayments = payments.filter(p => p.student_id === student.id);
+  const studentBundles = bundles.filter(b => b.student_id === student.id);
+
+  const completedLessons = studentLessons.filter(l => l.status === 'completed');
+  const totalOwed = completedLessons.reduce((sum, l) => sum + (parseFloat(l.rate_charged) || 0), 0);
+  const totalPaid = studentPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+  const balance = totalOwed - totalPaid;
+
+  const lastPaymentDate = studentPayments.length > 0
+    ? studentPayments.sort((a, b) => new Date(b.date_paid) - new Date(a.date_paid))[0].date_paid
+    : null;
+
+  const daysSinceLastPayment = lastPaymentDate ? daysBetween(lastPaymentDate) : null;
+  const isOverdue = balance > 0 && (daysSinceLastPayment === null || daysSinceLastPayment > 2);
+
+  const nextLesson = studentLessons.filter(l => l.status === 'scheduled')
+    .sort((a, b) => new Date(a.lesson_date) - new Date(b.lesson_date))[0];
+
+  const activeBundle = studentBundles.find(b => {
+    const used = studentLessons.filter(l => l.bundle_id === b.id && l.status === 'completed').length;
+    return used < b.number_of_sessions;
+  });
+
+  let bundleRemaining = null;
+  if (activeBundle) {
+    const used = studentLessons.filter(l => l.bundle_id === activeBundle.id && l.status === 'completed').length;
+    bundleRemaining = activeBundle.number_of_sessions - used;
+  }
+
+  const firstName = student.name.split(' ')[0];
+  const phone = (student.parent_phone || '').replace(/\D/g, '');
+  const waMessage = balance > 0
+    ? `Hi! Just a friendly reminder we have an outstanding balance of £${balance.toFixed(2)} for ${firstName}'s maths lessons. Let me know when's good to sort payment. Thanks!`
+    : `Hi! Just checking in about ${firstName}'s next maths lesson.`;
+  const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}` : null;
+
+  return (
+    <div className="card">
+      <div className="card-header" onClick={() => setOpen(!open)}>
+        <div>
+          <div className="student-name">{student.name}{!student.active && ' (inactive)'}</div>
+          <div className="status-row">
+            {balance > 0 && (
+              <span className={`pill ${isOverdue ? 'warn' : 'neutral'}`}>
+                {isOverdue ? `Overdue £${balance.toFixed(2)}` : `Owes £${balance.toFixed(2)}`}
+              </span>
+            )}
+            {balance <= 0 && <span className="pill ok">Paid up</span>}
+            {bundleRemaining !== null && bundleRemaining <= 1 && (
+              <span className="pill warn">{bundleRemaining} session left</span>
+            )}
+            {nextLesson && (
+              <span className="pill neutral">Next: {new Date(nextLesson.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+            )}
+          </div>
+        </div>
+        <span className={`chevron ${open ? 'open' : ''}`}>›</span>
+      </div>
+
+      {open && (
+        <div className="card-body">
+          {student.school && (
+            <div className="section-label">Details</div>
+          )}
+          {student.school && (
+            <div style={{ fontSize: '0.85rem', color: '#444' }}>
+              {student.school}{student.year_group ? `, ${student.year_group}` : ''}{student.set_class ? ` (${student.set_class})` : ''}
+            </div>
+          )}
+
+          <div className="section-label">Recent lessons</div>
+          {studentLessons.slice(0, 8).map(l => (
+            <div className="lesson-row" key={l.id}>
+              <span className="lesson-date">{new Date(l.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              <span className={`lesson-status ${l.status}`}>{l.status}{l.rate_charged ? ` · £${l.rate_charged}` : ''}</span>
+            </div>
+          ))}
+          {studentLessons.length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>No lessons logged yet.</div>}
+
+          <div className="actions">
+            {waLink && <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener">WhatsApp {firstName}'s parent</a>}
+            {student.general_notes && (
+              <button className="btn notes" onClick={() => setNotesOpen(!notesOpen)}>
+                {notesOpen ? 'Hide notes' : 'View notes'}
+              </button>
+            )}
+          </div>
+
+          {student.general_notes && (
+            <div className={`notes-box ${notesOpen ? 'visible' : ''}`}>{student.general_notes}</div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function App() {
+  const [students, setStudents] = useState([]);
+  const [lessons, setLessons] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [bundles, setBundles] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const [s, l, p, b] = await Promise.all([
+        supabase.from('tutoring_students').select('*').order('active', { ascending: false }).order('name'),
+        supabase.from('tutoring_lessons').select('*'),
+        supabase.from('tutoring_payments').select('*'),
+        supabase.from('tutoring_bundles').select('*')
+      ]);
+      setStudents(s.data || []);
+      setLessons(l.data || []);
+      setPayments(p.data || []);
+      setBundles(b.data || []);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const activeStudents = students.filter(s => s.active);
+  const inactiveStudents = students.filter(s => !s.active);
+
+  return (
+    <div>
+      <h1>Maths Tutoring</h1>
+      <div className="subtitle">{activeStudents.length} active student{activeStudents.length !== 1 ? 's' : ''}</div>
+
+      {loading && <div className="loading">Loading…</div>}
+
+      {!loading && activeStudents.length === 0 && inactiveStudents.length === 0 && (
+        <div className="empty">No students yet.</div>
+      )}
+
+      {!loading && activeStudents.map(s => (
+        <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles} />
+      ))}
+
+      {!loading && inactiveStudents.length > 0 && (
+        <React.Fragment>
+          <div className="section-label" style={{ marginTop: 24 }}>Inactive</div>
+          {inactiveStudents.map(s => (
+            <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles} />
+          ))}
+        </React.Fragment>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
