@@ -66,9 +66,20 @@
   .pill.ok { background: var(--accent-light); color: var(--accent); }
   .pill.warn { background: var(--warn-light); color: var(--warn); }
   .pill.neutral { background: #f0efec; color: var(--muted); }
-  .chevron { font-size: 1.2rem; color: var(--muted); transition: transform 0.15s; }
+  .chevron { font-size: 1.2rem; color: var(--muted); transition: transform 0.25s cubic-bezier(0.4,0,0.2,1); }
   .chevron.open { transform: rotate(90deg); }
-  .card-body { padding: 0 16px 16px; border-top: 1px solid var(--line); }
+  .card-body {
+    padding: 0 16px;
+    border-top: 1px solid var(--line);
+    overflow: hidden;
+    max-height: 0;
+    padding-bottom: 0;
+    transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), padding-bottom 0.25s;
+  }
+  .card-body.open {
+    max-height: 2400px;
+    padding-bottom: 16px;
+  }
   .section-label {
     font-size: 0.72rem;
     text-transform: uppercase;
@@ -122,10 +133,13 @@
   .loading { text-align: center; color: var(--muted); padding: 40px 20px; }
 
   /* Modal / sheet */
+  @keyframes overlayIn { from { background: rgba(0,0,0,0); } to { background: rgba(0,0,0,0.4); } }
+  @keyframes sheetUp { from { transform: translateY(48px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   .overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.4);
     display: flex; align-items: flex-end; justify-content: center;
     z-index: 100;
+    animation: overlayIn 0.2s ease forwards;
   }
   .sheet {
     background: var(--card);
@@ -134,6 +148,7 @@
     padding: 20px;
     max-height: 88vh;
     overflow-y: auto;
+    animation: sheetUp 0.28s cubic-bezier(0.4,0,0.2,1) forwards;
   }
   .sheet h2 { font-size: 1.15rem; margin: 0 0 16px; }
   .field { margin-bottom: 14px; }
@@ -766,8 +781,7 @@ function StudentCard({ student, lessons, payments, bundles, onEdit, onDataChange
         <span className={`chevron ${open ? 'open' : ''}`}>›</span>
       </div>
 
-      {open && (
-        <div className="card-body">
+      <div className={`card-body${open ? ' open' : ''}`}>
           {(student.school || displayYear) && (
             <React.Fragment>
               <div className="section-label">Details</div>
@@ -810,7 +824,7 @@ function StudentCard({ student, lessons, payments, bundles, onEdit, onDataChange
             <div className={`notes-box ${notesOpen ? 'visible' : ''}`}>{student.general_notes}</div>
           )}
         </div>
-      )}
+      </div>
 
       {showMoreTools && (
         <MoreToolsSheet
