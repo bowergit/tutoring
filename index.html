@@ -196,9 +196,22 @@ function currentSchoolYear(baseYear, asOfDate) {
   return Math.min(baseYear + bumps, 13);
 }
 
+const PRESET_BOARDS = ['Edexcel AQA', 'Edexcel IGCSE'];
+
+function normaliseUKPhone(raw) {
+  const digits = (raw || '').replace(/\D/g, '');
+  if (!digits) return '';
+  if (digits.startsWith('44')) return digits;
+  if (digits.startsWith('0')) return '44' + digits.slice(1);
+  return '44' + digits;
+}
+
 // ---------- Add/Edit Student Modal ----------
 function StudentFormModal({ student, onClose, onSaved }) {
   const isEdit = !!student;
+  const existingBoard = student?.exam_board || '';
+  const initPreset = PRESET_BOARDS.includes(existingBoard) ? existingBoard : (existingBoard ? 'other' : '');
+
   const [form, setForm] = useState({
     name: student?.name || '',
     parent_name: student?.parent_name || '',
@@ -206,7 +219,8 @@ function StudentFormModal({ student, onClose, onSaved }) {
     address: student?.address || '',
     school: student?.school || '',
     school_year: student?.school_year || '',
-    exam_board: student?.exam_board || '',
+    exam_board_preset: initPreset,
+    exam_board_custom: initPreset === 'other' ? existingBoard : '',
     exam_tier: student?.exam_tier || '',
     has_extra_time: student?.has_extra_time || false,
     general_notes: student?.general_notes || '',
@@ -217,11 +231,23 @@ function StudentFormModal({ student, onClose, onSaved }) {
 
   async function handleSave() {
     setSaving(true);
+    const exam_board = form.exam_board_preset === 'other'
+      ? form.exam_board_custom
+      : form.exam_board_preset;
     const payload = {
-      ...form,
+      name: form.name,
+      parent_name: form.parent_name,
+      parent_phone: form.parent_phone,
+      address: form.address,
+      school: form.school,
       school_year: form.school_year ? parseInt(form.school_year) : null,
       school_year_as_of_date: form.school_year ? new Date().toISOString().slice(0, 10) : null,
+      exam_board: exam_board || null,
       exam_tier: form.exam_tier || null,
+      has_extra_time: form.has_extra_time,
+      general_notes: form.general_notes,
+      calendar_title_pattern: form.calendar_title_pattern,
+      active: form.active,
     };
     if (isEdit) {
       await supabase.from('tutoring_students').update(payload).eq('id', student.id);
@@ -246,8 +272,8 @@ function StudentFormModal({ student, onClose, onSaved }) {
           <input type="text" value={form.parent_name} onChange={e => setForm({...form, parent_name: e.target.value})} />
         </div>
         <div className="field">
-          <label>Parent phone (for WhatsApp — include country code, e.g. 447...)</label>
-          <input type="text" value={form.parent_phone} onChange={e => setForm({...form, parent_phone: e.target.value})} />
+          <label>Parent's mobile number</label>
+          <input type="text" value={form.parent_phone} onChange={e => setForm({...form, parent_phone: e.target.value})} placeholder="07700 900000" />
         </div>
         <div className="field">
           <label>Address</label>
@@ -263,7 +289,17 @@ function StudentFormModal({ student, onClose, onSaved }) {
         </div>
         <div className="field">
           <label>Exam board</label>
-          <input type="text" value={form.exam_board} onChange={e => setForm({...form, exam_board: e.target.value})} placeholder="e.g. AQA, Edexcel" />
+          <select value={form.exam_board_preset} onChange={e => setForm({...form, exam_board_preset: e.target.value})}>
+            <option value="">—</option>
+            <option value="Edexcel AQA">Edexcel AQA</option>
+            <option value="Edexcel IGCSE">Edexcel IGCSE</option>
+            <option value="other">Other</option>
+          </select>
+          {form.exam_board_preset === 'other' && (
+            <input type="text" style={{marginTop: 6}} value={form.exam_board_custom}
+              onChange={e => setForm({...form, exam_board_custom: e.target.value})}
+              placeholder="e.g. OCR, Cambridge" />
+          )}
         </div>
         <div className="field">
           <label>Exam tier</label>
@@ -279,8 +315,13 @@ function StudentFormModal({ student, onClose, onSaved }) {
           <label style={{marginBottom: 0}}>Has extra time (25%)</label>
         </div>
         <div className="field">
-          <label>Calendar title pattern (regex used to match calendar events, e.g. "saskia")</label>
-          <input type="text" value={form.calendar_title_pattern} onChange={e => setForm({...form, calendar_title_pattern: e.target.value})} />
+          <label>Student's name in your calendar</label>
+          <input type="text" value={form.calendar_title_pattern}
+            onChange={e => setForm({...form, calendar_title_pattern: e.target.value})}
+            placeholder="e.g. Saskia" />
+          <div style={{fontSize: '0.78rem', color: 'var(--muted)', marginTop: 4}}>
+            The word that appears in your Google Calendar event titles for this student's lessons.
+          </div>
         </div>
         <div className="field">
           <label>Notes</label>
@@ -307,17 +348,31 @@ function CashPaymentModal({ student, upcomingLessons, onClose, onSaved }) {
   const [datePaid, setDatePaid] = useState(new Date().toISOString().slice(0, 10));
   const [numSessions, setNumSessions] = useState(1);
   const [selectedLessonIds, setSelectedLessonIds] = useState([]);
+  const [rate, setRate] = useState(90);
   const [saving, setSaving] = useState(false);
-
-  const suggested = upcomingLessons.slice(0, Math.max(numSessions, upcomingLessons.length > 0 ? 1 : 0));
 
   useEffect(() => {
     setSelectedLessonIds(upcomingLessons.slice(0, numSessions).map(l => l.id));
   }, [numSessions]);
 
+  useEffect(() => {
+    async function fetchRate() {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from('tutoring_rate_history')
+        .select('rate')
+        .eq('student_id', student.id)
+        .lte('effective_from_date', today)
+        .order('effective_from_date', { ascending: false })
+        .limit(1)
+        .single();
+      if (data) setRate(parseFloat(data.rate));
+    }
+    fetchRate();
+  }, [student.id]);
+
   async function handleSave() {
     setSaving(true);
-    const rate = 90; // fallback; ideally pulled from rate history
     const amount = rate * numSessions;
 
     const { data: bundle } = await supabase.from('tutoring_bundles').insert({
@@ -360,6 +415,9 @@ function CashPaymentModal({ student, upcomingLessons, onClose, onSaved }) {
         <div className="field">
           <label>Number of sessions this covers</label>
           <input type="number" min="1" value={numSessions} onChange={e => setNumSessions(parseInt(e.target.value) || 1)} />
+          <div style={{fontSize: '0.78rem', color: 'var(--muted)', marginTop: 4}}>
+            Rate: £{rate}/session · Total: £{(rate * numSessions).toFixed(2)}
+          </div>
         </div>
 
         {upcomingLessons.length > 0 ? (
@@ -459,11 +517,13 @@ function StudentCard({ student, lessons, payments, bundles, onEdit, onDataChange
 
   const displayYear = currentSchoolYear(student.school_year, student.school_year_as_of_date);
 
-  const firstName = student.name.split(' ')[0];
-  const phone = (student.parent_phone || '').replace(/\D/g, '');
+  const studentFirstName = student.name.split(' ')[0];
+  const parentFirstName = (student.parent_name || '').split(' ')[0];
+  const greeting = parentFirstName ? `Hi ${parentFirstName}!` : 'Hi!';
+  const phone = normaliseUKPhone(student.parent_phone);
   const waMessage = balance > 0
-    ? `Hi! Just a friendly reminder we have an outstanding balance of £${balance.toFixed(2)} for ${firstName}'s maths lessons. Let me know when's good to sort payment. Thanks!`
-    : `Hi! Just checking in about ${firstName}'s next maths lesson.`;
+    ? `${greeting} Just a friendly reminder we have an outstanding balance of £${balance.toFixed(2)} for ${studentFirstName}'s maths lessons. Let me know when's good to sort payment. Thanks!`
+    : `${greeting} Just checking in about ${studentFirstName}'s next maths lesson.`;
   const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}` : null;
 
   return (
