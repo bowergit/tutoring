@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Tutoring — Bower OS</title> 
+<title>Tutoring — Bower OS</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -11,7 +11,7 @@
 <style>
   :root {
     --ink: #1a1a1a;
-    --paper: #faf9f7; 
+    --paper: #faf9f7;
     --card: #ffffff;
     --line: #e4e2de;
     --accent: #2f5233;
@@ -29,7 +29,17 @@
   }
   #root { max-width: 720px; margin: 0 auto; padding: 16px; padding-bottom: 80px; }
   h1 { font-size: 1.4rem; margin: 8px 0 4px; }
-  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; }
+  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .add-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
   .card {
     background: var(--card);
     border: 1px solid var(--line);
@@ -95,6 +105,8 @@
   }
   .btn.whatsapp { background: #25D366; }
   .btn.notes { background: var(--muted); }
+  .btn.more { background: #3a3a3a; }
+  .btn.edit { background: #8a8578; }
   .notes-box {
     font-size: 0.85rem;
     color: #444;
@@ -108,6 +120,51 @@
   .notes-box.visible { display: block; }
   .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 0.9rem; }
   .loading { text-align: center; color: var(--muted); padding: 40px 20px; }
+
+  /* Modal / sheet */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    display: flex; align-items: flex-end; justify-content: center;
+    z-index: 100;
+  }
+  .sheet {
+    background: var(--card);
+    width: 100%; max-width: 720px;
+    border-radius: 16px 16px 0 0;
+    padding: 20px;
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+  .sheet h2 { font-size: 1.15rem; margin: 0 0 16px; }
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 0.78rem; color: var(--muted);
+    margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .field input[type="text"], .field input[type="date"], .field input[type="number"], .field select, .field textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line);
+    border-radius: 8px; font-size: 0.95rem; font-family: inherit; background: #fff;
+  }
+  .field textarea { min-height: 70px; resize: vertical; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; }
+  .checkbox-row input { width: 18px; height: 18px; }
+  .btn-row { display: flex; gap: 10px; margin-top: 18px; }
+  .btn-row .btn { color: white; }
+  .btn.cancel { background: #ddd; color: #333; }
+  .btn.save { background: var(--accent); }
+  .session-list { margin: 10px 0; }
+  .session-pick-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid #f0efec; font-size: 0.9rem;
+  }
+  .session-pick-row input { width: 18px; height: 18px; }
+  .tools-menu {
+    display: flex; flex-direction: column; gap: 8px; margin-top: 4px;
+  }
+  .tools-menu button {
+    text-align: left; padding: 12px 14px; border-radius: 8px;
+    border: 1px solid var(--line); background: #fff; font-size: 0.9rem; cursor: pointer;
+  }
 </style>
 </head>
 <body>
@@ -125,14 +182,255 @@ function daysBetween(dateStr) {
   return Math.floor((now - d) / (1000 * 60 * 60 * 24));
 }
 
-function StudentCard({ student, lessons, payments, bundles }) {
+function currentSchoolYear(baseYear, asOfDate) {
+  if (baseYear == null || !asOfDate) return null;
+  const ref = new Date(asOfDate);
+  const now = new Date();
+  let bumps = 0;
+  let cursor = new Date(ref.getFullYear(), 7, 1); // 1 August of ref's year
+  if (ref >= cursor) cursor.setFullYear(cursor.getFullYear() + 1);
+  while (cursor <= now) {
+    bumps++;
+    cursor.setFullYear(cursor.getFullYear() + 1);
+  }
+  return Math.min(baseYear + bumps, 13);
+}
+
+// ---------- Add/Edit Student Modal ----------
+function StudentFormModal({ student, onClose, onSaved }) {
+  const isEdit = !!student;
+  const [form, setForm] = useState({
+    name: student?.name || '',
+    parent_name: student?.parent_name || '',
+    parent_phone: student?.parent_phone || '',
+    address: student?.address || '',
+    school: student?.school || '',
+    school_year: student?.school_year || '',
+    exam_board: student?.exam_board || '',
+    exam_tier: student?.exam_tier || '',
+    has_extra_time: student?.has_extra_time || false,
+    general_notes: student?.general_notes || '',
+    calendar_title_pattern: student?.calendar_title_pattern || '',
+    active: student?.active !== undefined ? student.active : true,
+  });
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    const payload = {
+      ...form,
+      school_year: form.school_year ? parseInt(form.school_year) : null,
+      school_year_as_of_date: form.school_year ? new Date().toISOString().slice(0, 10) : null,
+      exam_tier: form.exam_tier || null,
+    };
+    if (isEdit) {
+      await supabase.from('tutoring_students').update(payload).eq('id', student.id);
+    } else {
+      await supabase.from('tutoring_students').insert(payload);
+    }
+    setSaving(false);
+    onSaved();
+  }
+
+  return (
+    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sheet">
+        <h2>{isEdit ? 'Edit student' : 'Add student'}</h2>
+
+        <div className="field">
+          <label>Name</label>
+          <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+        </div>
+        <div className="field">
+          <label>Parent name</label>
+          <input type="text" value={form.parent_name} onChange={e => setForm({...form, parent_name: e.target.value})} />
+        </div>
+        <div className="field">
+          <label>Parent phone (for WhatsApp — include country code, e.g. 447...)</label>
+          <input type="text" value={form.parent_phone} onChange={e => setForm({...form, parent_phone: e.target.value})} />
+        </div>
+        <div className="field">
+          <label>Address</label>
+          <input type="text" value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
+        </div>
+        <div className="field">
+          <label>School</label>
+          <input type="text" value={form.school} onChange={e => setForm({...form, school: e.target.value})} />
+        </div>
+        <div className="field">
+          <label>School year (7–13, as of today)</label>
+          <input type="number" min="7" max="13" value={form.school_year} onChange={e => setForm({...form, school_year: e.target.value})} />
+        </div>
+        <div className="field">
+          <label>Exam board</label>
+          <input type="text" value={form.exam_board} onChange={e => setForm({...form, exam_board: e.target.value})} placeholder="e.g. AQA, Edexcel" />
+        </div>
+        <div className="field">
+          <label>Exam tier</label>
+          <select value={form.exam_tier} onChange={e => setForm({...form, exam_tier: e.target.value})}>
+            <option value="">—</option>
+            <option value="foundation">Foundation</option>
+            <option value="higher">Higher</option>
+            <option value="not_sure">Not sure yet</option>
+          </select>
+        </div>
+        <div className="field checkbox-row">
+          <input type="checkbox" checked={form.has_extra_time} onChange={e => setForm({...form, has_extra_time: e.target.checked})} />
+          <label style={{marginBottom: 0}}>Has extra time (25%)</label>
+        </div>
+        <div className="field">
+          <label>Calendar title pattern (regex used to match calendar events, e.g. "saskia")</label>
+          <input type="text" value={form.calendar_title_pattern} onChange={e => setForm({...form, calendar_title_pattern: e.target.value})} />
+        </div>
+        <div className="field">
+          <label>Notes</label>
+          <textarea value={form.general_notes} onChange={e => setForm({...form, general_notes: e.target.value})} />
+        </div>
+        <div className="field checkbox-row">
+          <input type="checkbox" checked={form.active} onChange={e => setForm({...form, active: e.target.checked})} />
+          <label style={{marginBottom: 0}}>Active student</label>
+        </div>
+
+        <div className="btn-row">
+          <button className="btn cancel" onClick={onClose}>Cancel</button>
+          <button className="btn save" onClick={handleSave} disabled={saving || !form.name}>
+            {saving ? 'Saving…' : 'Save'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Cash Payment Modal ----------
+function CashPaymentModal({ student, upcomingLessons, onClose, onSaved }) {
+  const [datePaid, setDatePaid] = useState(new Date().toISOString().slice(0, 10));
+  const [numSessions, setNumSessions] = useState(1);
+  const [selectedLessonIds, setSelectedLessonIds] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  const suggested = upcomingLessons.slice(0, Math.max(numSessions, upcomingLessons.length > 0 ? 1 : 0));
+
+  useEffect(() => {
+    setSelectedLessonIds(upcomingLessons.slice(0, numSessions).map(l => l.id));
+  }, [numSessions]);
+
+  async function handleSave() {
+    setSaving(true);
+    const rate = 65; // fallback; ideally pulled from rate history
+    const amount = rate * numSessions;
+
+    const { data: bundle } = await supabase.from('tutoring_bundles').insert({
+      student_id: student.id,
+      number_of_sessions: numSessions,
+      payment_timing: 'prepaid',
+      rate_per_session: rate,
+      total_cost: amount,
+      date_created: datePaid,
+      notes: 'Cash payment logged via app'
+    }).select().single();
+
+    await supabase.from('tutoring_payments').insert({
+      student_id: student.id,
+      bundle_id: bundle?.id,
+      amount: amount,
+      date_paid: datePaid,
+      method: 'cash'
+    });
+
+    if (bundle && selectedLessonIds.length > 0) {
+      for (const lessonId of selectedLessonIds) {
+        await supabase.from('tutoring_lessons').update({ bundle_id: bundle.id }).eq('id', lessonId);
+      }
+    }
+
+    setSaving(false);
+    onSaved();
+  }
+
+  return (
+    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sheet">
+        <h2>Track cash payment — {student.name}</h2>
+
+        <div className="field">
+          <label>Date paid</label>
+          <input type="date" value={datePaid} onChange={e => setDatePaid(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Number of sessions this covers</label>
+          <input type="number" min="1" value={numSessions} onChange={e => setNumSessions(parseInt(e.target.value) || 1)} />
+        </div>
+
+        {upcomingLessons.length > 0 ? (
+          <div className="field">
+            <label>Sessions this payment covers (pre-filled from calendar — untick any that don't apply)</label>
+            <div className="session-list">
+              {upcomingLessons.slice(0, Math.max(numSessions, 5)).map(l => (
+                <div className="session-pick-row" key={l.id}>
+                  <input
+                    type="checkbox"
+                    checked={selectedLessonIds.includes(l.id)}
+                    onChange={e => {
+                      if (e.target.checked) setSelectedLessonIds([...selectedLessonIds, l.id]);
+                      else setSelectedLessonIds(selectedLessonIds.filter(id => id !== l.id));
+                    }}
+                  />
+                  <span>{new Date(l.lesson_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{fontSize: '0.78rem', color: 'var(--muted)'}}>
+              As each date passes, the calendar sync will mark it completed automatically.
+            </div>
+          </div>
+        ) : (
+          <div style={{fontSize: '0.85rem', color: 'var(--muted)', margin: '10px 0'}}>
+            No upcoming scheduled lessons found for this student — sessions can be matched up later once they're on the calendar.
+          </div>
+        )}
+
+        <div className="btn-row">
+          <button className="btn cancel" onClick={onClose}>Cancel</button>
+          <button className="btn save" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving…' : 'Save payment'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- More Tools Sheet ----------
+function MoreToolsSheet({ student, onClose, onTrackCash }) {
+  return (
+    <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="sheet">
+        <h2>More tools — {student.name}</h2>
+        <div className="tools-menu">
+          <button onClick={onTrackCash}>💵 Track cash payment</button>
+        </div>
+        <div className="btn-row">
+          <button className="btn cancel" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StudentCard({ student, lessons, payments, bundles, onEdit, onDataChanged }) {
   const [open, setOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
+  const [showMoreTools, setShowMoreTools] = useState(false);
+  const [showCashModal, setShowCashModal] = useState(false);
 
   const studentLessons = lessons.filter(l => l.student_id === student.id)
     .sort((a, b) => new Date(b.lesson_date) - new Date(a.lesson_date));
   const studentPayments = payments.filter(p => p.student_id === student.id);
   const studentBundles = bundles.filter(b => b.student_id === student.id);
+
+  const upcomingLessons = studentLessons.filter(l => l.status === 'scheduled')
+    .sort((a, b) => new Date(a.lesson_date) - new Date(b.lesson_date));
 
   const completedLessons = studentLessons.filter(l => l.status === 'completed');
   const totalOwed = completedLessons.reduce((sum, l) => sum + (parseFloat(l.rate_charged) || 0), 0);
@@ -146,8 +444,7 @@ function StudentCard({ student, lessons, payments, bundles }) {
   const daysSinceLastPayment = lastPaymentDate ? daysBetween(lastPaymentDate) : null;
   const isOverdue = balance > 0 && (daysSinceLastPayment === null || daysSinceLastPayment > 2);
 
-  const nextLesson = studentLessons.filter(l => l.status === 'scheduled')
-    .sort((a, b) => new Date(a.lesson_date) - new Date(b.lesson_date))[0];
+  const nextLesson = upcomingLessons[0];
 
   const activeBundle = studentBundles.find(b => {
     const used = studentLessons.filter(l => l.bundle_id === b.id && l.status === 'completed').length;
@@ -159,6 +456,8 @@ function StudentCard({ student, lessons, payments, bundles }) {
     const used = studentLessons.filter(l => l.bundle_id === activeBundle.id && l.status === 'completed').length;
     bundleRemaining = activeBundle.number_of_sessions - used;
   }
+
+  const displayYear = currentSchoolYear(student.school_year, student.school_year_as_of_date);
 
   const firstName = student.name.split(' ')[0];
   const phone = (student.parent_phone || '').replace(/\D/g, '');
@@ -185,6 +484,8 @@ function StudentCard({ student, lessons, payments, bundles }) {
             {nextLesson && (
               <span className="pill neutral">Next: {new Date(nextLesson.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
             )}
+            {displayYear && <span className="pill neutral">Y{displayYear}</span>}
+            {student.has_extra_time && <span className="pill neutral">+25% time</span>}
           </div>
         </div>
         <span className={`chevron ${open ? 'open' : ''}`}>›</span>
@@ -192,13 +493,13 @@ function StudentCard({ student, lessons, payments, bundles }) {
 
       {open && (
         <div className="card-body">
-          {student.school && (
-            <div className="section-label">Details</div>
-          )}
-          {student.school && (
-            <div style={{ fontSize: '0.85rem', color: '#444' }}>
-              {student.school}{student.year_group ? `, ${student.year_group}` : ''}{student.set_class ? ` (${student.set_class})` : ''}
-            </div>
+          {(student.school || displayYear) && (
+            <React.Fragment>
+              <div className="section-label">Details</div>
+              <div style={{ fontSize: '0.85rem', color: '#444' }}>
+                {student.school}{displayYear ? `, Year ${displayYear}` : ''}{student.exam_board ? ` · ${student.exam_board}` : ''}{student.exam_tier && student.exam_tier !== 'not_sure' ? ` (${student.exam_tier})` : ''}
+              </div>
+            </React.Fragment>
           )}
 
           <div className="section-label">Recent lessons</div>
@@ -211,10 +512,12 @@ function StudentCard({ student, lessons, payments, bundles }) {
           {studentLessons.length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>No lessons logged yet.</div>}
 
           <div className="actions">
-            {waLink && <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener">WhatsApp {firstName}'s parent</a>}
+            {waLink && <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener">WhatsApp parent</a>}
+            <button className="btn edit" onClick={() => onEdit(student)}>Edit</button>
+            <button className="btn more" onClick={() => setShowMoreTools(true)}>More tools</button>
             {student.general_notes && (
               <button className="btn notes" onClick={() => setNotesOpen(!notesOpen)}>
-                {notesOpen ? 'Hide notes' : 'View notes'}
+                {notesOpen ? 'Hide notes' : 'Notes'}
               </button>
             )}
           </div>
@@ -223,6 +526,23 @@ function StudentCard({ student, lessons, payments, bundles }) {
             <div className={`notes-box ${notesOpen ? 'visible' : ''}`}>{student.general_notes}</div>
           )}
         </div>
+      )}
+
+      {showMoreTools && (
+        <MoreToolsSheet
+          student={student}
+          onClose={() => setShowMoreTools(false)}
+          onTrackCash={() => { setShowMoreTools(false); setShowCashModal(true); }}
+        />
+      )}
+
+      {showCashModal && (
+        <CashPaymentModal
+          student={student}
+          upcomingLessons={upcomingLessons}
+          onClose={() => setShowCashModal(false)}
+          onSaved={() => { setShowCashModal(false); onDataChanged(); }}
+        />
       )}
     </div>
   );
@@ -234,49 +554,72 @@ function App() {
   const [payments, setPayments] = useState([]);
   const [bundles, setBundles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingStudent, setEditingStudent] = useState(null);
 
-  useEffect(() => {
-    async function load() {
-      const [s, l, p, b] = await Promise.all([
-        supabase.from('tutoring_students').select('*').order('active', { ascending: false }).order('name'),
-        supabase.from('tutoring_lessons').select('*'),
-        supabase.from('tutoring_payments').select('*'),
-        supabase.from('tutoring_bundles').select('*')
-      ]);
-      setStudents(s.data || []);
-      setLessons(l.data || []);
-      setPayments(p.data || []);
-      setBundles(b.data || []);
-      setLoading(false);
-    }
-    load();
-  }, []);
+  async function loadAll() {
+    const [s, l, p, b] = await Promise.all([
+      supabase.from('tutoring_students').select('*').order('active', { ascending: false }).order('name'),
+      supabase.from('tutoring_lessons').select('*'),
+      supabase.from('tutoring_payments').select('*'),
+      supabase.from('tutoring_bundles').select('*')
+    ]);
+    setStudents(s.data || []);
+    setLessons(l.data || []);
+    setPayments(p.data || []);
+    setBundles(b.data || []);
+    setLoading(false);
+  }
+
+  useEffect(() => { loadAll(); }, []);
 
   const activeStudents = students.filter(s => s.active);
   const inactiveStudents = students.filter(s => !s.active);
 
   return (
     <div>
-      <h1>Maths Tutoring</h1>
-      <div className="subtitle">{activeStudents.length} active student{activeStudents.length !== 1 ? 's' : ''}</div>
+      <div className="subtitle">
+        <div>
+          <h1>Maths Tutoring</h1>
+          {activeStudents.length} active student{activeStudents.length !== 1 ? 's' : ''}
+        </div>
+        <button className="add-btn" onClick={() => setShowAddModal(true)}>+ Add student</button>
+      </div>
 
       {loading && <div className="loading">Loading…</div>}
 
       {!loading && activeStudents.length === 0 && inactiveStudents.length === 0 && (
-        <div className="empty">No students yet.</div>
+        <div className="empty">No students yet. Tap "+ Add student" to get started.</div>
       )}
 
       {!loading && activeStudents.map(s => (
-        <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles} />
+        <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
+          onEdit={setEditingStudent} onDataChanged={loadAll} />
       ))}
 
       {!loading && inactiveStudents.length > 0 && (
         <React.Fragment>
           <div className="section-label" style={{ marginTop: 24 }}>Inactive</div>
           {inactiveStudents.map(s => (
-            <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles} />
+            <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
+              onEdit={setEditingStudent} onDataChanged={loadAll} />
           ))}
         </React.Fragment>
+      )}
+
+      {showAddModal && (
+        <StudentFormModal
+          onClose={() => setShowAddModal(false)}
+          onSaved={() => { setShowAddModal(false); loadAll(); }}
+        />
+      )}
+
+      {editingStudent && (
+        <StudentFormModal
+          student={editingStudent}
+          onClose={() => setEditingStudent(null)}
+          onSaved={() => { setEditingStudent(null); loadAll(); }}
+        />
       )}
     </div>
   );
