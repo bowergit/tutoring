@@ -196,7 +196,51 @@ function currentSchoolYear(baseYear, asOfDate) {
   return Math.min(baseYear + bumps, 13);
 }
 
-const PRESET_BOARDS = ['Edexcel AQA', 'Edexcel IGCSE'];
+const PRESET_BOARDS = ['Edexcel', 'AQA', 'Edexcel IGCSE', 'OCR'];
+
+function getCurrentRate(studentId, rateHistory, fallback = 90) {
+  const today = new Date().toISOString().slice(0, 10);
+  const rows = (rateHistory || [])
+    .filter(r => r.student_id === studentId && r.effective_from_date <= today)
+    .sort((a, b) => b.effective_from_date.localeCompare(a.effective_from_date));
+  return rows.length > 0 ? parseFloat(rows[0].rate) : fallback;
+}
+
+// ---------- Summary Widget ----------
+function SummaryWidget({ students, rateHistory }) {
+  const active = students.filter(s => s.active);
+  if (active.length === 0) return null;
+
+  const weeklyGross = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
+  const annualGross = weeklyGross * 40;
+  const weeklyNet  = Math.round(weeklyGross * 0.6);
+  const annualNet  = Math.round(annualGross * 0.6);
+
+  const fmt = n => n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${n}`;
+
+  return (
+    <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'14px 16px',marginBottom:16}}>
+      <div style={{fontSize:'0.72rem',textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--muted)',marginBottom:10}}>Weekly snapshot</div>
+      <div style={{display:'flex',gap:0,flexWrap:'wrap'}}>
+        {[
+          {label:'students',    gross: active.length, net: null,          unit:''},
+          {label:'gross/week',  gross: fmt(weeklyGross), net: null,       unit:''},
+          {label:'net/week',    gross: null, net: fmt(weeklyNet),         unit:''},
+          {label:'gross/year',  gross: fmt(annualGross), net: null,       unit:''},
+          {label:'net/year',    gross: null, net: fmt(annualNet),         unit:''},
+        ].map(({label, gross, net}) => (
+          <div key={label} style={{flex:'1 1 80px',minWidth:70,marginBottom:8}}>
+            <div style={{fontSize:'1.3rem',fontWeight:700,color: net ? 'var(--accent)' : 'var(--ink)'}}>{gross ?? net}</div>
+            <div style={{fontSize:'0.72rem',color:'var(--muted)'}}>{label}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{fontSize:'0.72rem',color:'var(--muted)',borderTop:'1px solid var(--line)',paddingTop:8,marginTop:4}}>
+        Assumes all {active.length} student{active.length !== 1 ? 's' : ''} teach every week · 40 lessons/year · net = 60% after 40% tax
+      </div>
+    </div>
+  );
+}
 
 function normaliseUKPhone(raw) {
   const digits = (raw || '').replace(/\D/g, '');
@@ -227,7 +271,30 @@ function StudentFormModal({ student, onClose, onSaved }) {
     calendar_title_pattern: student?.calendar_title_pattern || '',
     active: student?.active !== undefined ? student.active : true,
   });
+  const [ratePerSession, setRatePerSession] = useState('');
+  const [originalRate, setOriginalRate] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isEdit || !student?.id) return;
+    async function fetchRate() {
+      const today = new Date().toISOString().slice(0, 10);
+      const { data } = await supabase
+        .from('tutoring_rate_history')
+        .select('rate')
+        .eq('student_id', student.id)
+        .lte('effective_from_date', today)
+        .order('effective_from_date', { ascending: false })
+        .limit(1)
+        .single();
+      if (data) {
+        const r = parseFloat(data.rate);
+        setRatePerSession(r.toString());
+        setOriginalRate(r);
+      }
+    }
+    fetchRate();
+  }, []);
 
   async function handleSave() {
     setSaving(true);
@@ -249,11 +316,24 @@ function StudentFormModal({ student, onClose, onSaved }) {
       calendar_title_pattern: form.calendar_title_pattern,
       active: form.active,
     };
+
+    let studentId = student?.id;
     if (isEdit) {
       await supabase.from('tutoring_students').update(payload).eq('id', student.id);
     } else {
-      await supabase.from('tutoring_students').insert(payload);
+      const { data: newStudent } = await supabase.from('tutoring_students').insert(payload).select().single();
+      studentId = newStudent?.id;
     }
+
+    const rateNum = parseFloat(ratePerSession);
+    if (studentId && ratePerSession && !isNaN(rateNum) && rateNum !== originalRate) {
+      await supabase.from('tutoring_rate_history').insert({
+        student_id: studentId,
+        rate: rateNum,
+        effective_from_date: new Date().toISOString().slice(0, 10),
+      });
+    }
+
     setSaving(false);
     onSaved();
   }
@@ -284,6 +364,10 @@ function StudentFormModal({ student, onClose, onSaved }) {
           <input type="text" value={form.school} onChange={e => setForm({...form, school: e.target.value})} />
         </div>
         <div className="field">
+          <label>Rate per session (£)</label>
+          <input type="number" min="0" step="5" value={ratePerSession} onChange={e => setRatePerSession(e.target.value)} placeholder="e.g. 90" />
+        </div>
+        <div className="field">
           <label>School year (7–13, as of today)</label>
           <input type="number" min="7" max="13" value={form.school_year} onChange={e => setForm({...form, school_year: e.target.value})} />
         </div>
@@ -291,8 +375,10 @@ function StudentFormModal({ student, onClose, onSaved }) {
           <label>Exam board</label>
           <select value={form.exam_board_preset} onChange={e => setForm({...form, exam_board_preset: e.target.value})}>
             <option value="">—</option>
-            <option value="Edexcel AQA">Edexcel AQA</option>
+            <option value="Edexcel">Edexcel</option>
+            <option value="AQA">AQA</option>
             <option value="Edexcel IGCSE">Edexcel IGCSE</option>
+            <option value="OCR">OCR</option>
             <option value="other">Other</option>
           </select>
           {form.exam_board_preset === 'other' && (
@@ -613,21 +699,24 @@ function App() {
   const [lessons, setLessons] = useState([]);
   const [payments, setPayments] = useState([]);
   const [bundles, setBundles] = useState([]);
+  const [rateHistory, setRateHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
 
   async function loadAll() {
-    const [s, l, p, b] = await Promise.all([
+    const [s, l, p, b, r] = await Promise.all([
       supabase.from('tutoring_students').select('*').order('active', { ascending: false }).order('name'),
       supabase.from('tutoring_lessons').select('*'),
       supabase.from('tutoring_payments').select('*'),
-      supabase.from('tutoring_bundles').select('*')
+      supabase.from('tutoring_bundles').select('*'),
+      supabase.from('tutoring_rate_history').select('*')
     ]);
     setStudents(s.data || []);
     setLessons(l.data || []);
     setPayments(p.data || []);
     setBundles(b.data || []);
+    setRateHistory(r.data || []);
     setLoading(false);
   }
 
@@ -645,6 +734,8 @@ function App() {
         </div>
         <button className="add-btn" onClick={() => setShowAddModal(true)}>+ Add student</button>
       </div>
+
+      {!loading && <SummaryWidget students={students} rateHistory={rateHistory} />}
 
       {loading && <div className="loading">Loading…</div>}
 
