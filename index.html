@@ -165,6 +165,21 @@
     text-align: left; padding: 12px 14px; border-radius: 8px;
     border: 1px solid var(--line); background: #fff; font-size: 0.9rem; cursor: pointer;
   }
+  .global-tools-btn {
+    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: var(--ink); color: white; border: none; border-radius: 24px;
+    padding: 12px 28px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.22); z-index: 50; white-space: nowrap;
+  }
+  .calc-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; font-size: 0.82rem; }
+  .calc-grid-cell { padding: 6px 4px; border-top: 1px solid #f0efec; }
+  .calc-grid-head { padding: 0 4px 6px; font-size: 0.72rem; color: var(--muted); }
+  .free-btn {
+    font-size: 0.68rem; padding: 2px 7px; border-radius: 10px;
+    border: 1px solid var(--line); cursor: pointer; white-space: nowrap;
+  }
+  .free-btn.active { background: var(--accent-light); color: var(--accent); border-color: var(--accent-light); }
+  .free-btn.inactive { background: #f0efec; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -255,6 +270,100 @@ function normaliseUKPhone(raw) {
   if (digits.startsWith('44')) return digits;
   if (digits.startsWith('0')) return '44' + digits.slice(1);
   return '44' + digits;
+}
+
+// ---------- Growth Calculator ----------
+function GrowthCalculator({ students, rateHistory }) {
+  const active = students.filter(s => s.active);
+  const avgRate = active.length > 0
+    ? Math.round(active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0) / active.length)
+    : 90;
+
+  const [extra, setExtra] = useState(4);
+  const [extraRate, setExtraRate] = useState(avgRate);
+  const [extraCash, setExtraCash] = useState(false);
+
+  const currGrossW = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
+  const currNetW   = active.reduce((sum, s) => {
+    const r = getCurrentRate(s.id, rateHistory);
+    return sum + (s.pays_in_cash ? r : r * 0.6);
+  }, 0);
+  const addGrossW = extra * extraRate;
+  const addNetW   = extra * extraRate * (extraCash ? 1 : 0.6);
+
+  const fmt = n => n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
+
+  const rows = [
+    { label: 'Students',  curr: active.length,    add: extra,      isCount: true },
+    { label: 'Gross/wk', curr: currGrossW,        add: addGrossW  },
+    { label: 'Net/wk',   curr: currNetW,          add: addNetW    },
+    { label: 'Gross/yr', curr: currGrossW * 40,   add: addGrossW * 40 },
+    { label: 'Net/yr',   curr: currNetW * 40,     add: addNetW * 40   },
+  ];
+
+  return (
+    <div>
+      <div style={{display:'flex', gap:10, marginBottom:12}}>
+        <div className="field" style={{flex:1, marginBottom:0}}>
+          <label>Extra students</label>
+          <input type="number" min="1" value={extra} onChange={e => setExtra(parseInt(e.target.value)||1)} />
+        </div>
+        <div className="field" style={{flex:1, marginBottom:0}}>
+          <label>Rate £/session</label>
+          <input type="number" min="0" step="5" value={extraRate} onChange={e => setExtraRate(parseInt(e.target.value)||0)} />
+        </div>
+      </div>
+      <div className="checkbox-row" style={{marginBottom:14}}>
+        <input type="checkbox" checked={extraCash} onChange={e => setExtraCash(e.target.checked)} />
+        <label style={{marginBottom:0, fontSize:'0.88rem'}}>Pay in cash</label>
+      </div>
+      <div className="calc-grid">
+        <div className="calc-grid-head"></div>
+        <div className="calc-grid-head">Now</div>
+        <div className="calc-grid-head">+{extra} more</div>
+        <div className="calc-grid-head">New total</div>
+        {rows.map(({ label, curr, add, isCount }) => (
+          <React.Fragment key={label}>
+            <div className="calc-grid-cell" style={{color:'var(--muted)'}}>{label}</div>
+            <div className="calc-grid-cell">{isCount ? curr : fmt(curr)}</div>
+            <div className="calc-grid-cell" style={{color:'var(--accent)'}}>+{isCount ? add : fmt(add)}</div>
+            <div className="calc-grid-cell" style={{fontWeight:600}}>{isCount ? curr+add : fmt(curr+add)}</div>
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ---------- Global Tools Sheet ----------
+function GlobalToolsSheet({ students, rateHistory, onClose }) {
+  const [tool, setTool] = useState(null);
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="sheet">
+        {!tool && (
+          <>
+            <h2>Tools</h2>
+            <div className="tools-menu">
+              <button onClick={() => setTool('growth')}>📈 Growth calculator — what if I had more students?</button>
+            </div>
+          </>
+        )}
+        {tool === 'growth' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+              <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1.1rem',padding:0}} onClick={() => setTool(null)}>←</button>
+              <h2 style={{margin:0}}>Growth calculator</h2>
+            </div>
+            <GrowthCalculator students={students} rateHistory={rateHistory} />
+          </>
+        )}
+        <div className="btn-row">
+          <button className="btn cancel" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ---------- Add/Edit Student Modal ----------
@@ -590,7 +699,9 @@ function StudentCard({ student, lessons, payments, bundles, onEdit, onDataChange
     .sort((a, b) => new Date(a.lesson_date) - new Date(b.lesson_date));
 
   const completedLessons = studentLessons.filter(l => l.status === 'completed');
-  const totalOwed = completedLessons.reduce((sum, l) => sum + (parseFloat(l.rate_charged) || 0), 0);
+  const totalOwed = completedLessons
+    .filter(l => !l.is_complimentary)
+    .reduce((sum, l) => sum + (parseFloat(l.rate_charged) || 0), 0);
   const totalPaid = studentPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
   const balance = totalOwed - totalPaid;
 
@@ -612,6 +723,11 @@ function StudentCard({ student, lessons, payments, bundles, onEdit, onDataChange
   if (activeBundle) {
     const used = studentLessons.filter(l => l.bundle_id === activeBundle.id && l.status === 'completed').length;
     bundleRemaining = activeBundle.number_of_sessions - used;
+  }
+
+  async function toggleComplimentary(lesson) {
+    await supabase.from('tutoring_lessons').update({ is_complimentary: !lesson.is_complimentary }).eq('id', lesson.id);
+    onDataChanged();
   }
 
   const displayYear = currentSchoolYear(student.school_year, student.school_year_as_of_date);
@@ -665,7 +781,16 @@ function StudentCard({ student, lessons, payments, bundles, onEdit, onDataChange
           {studentLessons.slice(0, 8).map(l => (
             <div className="lesson-row" key={l.id}>
               <span className="lesson-date">{new Date(l.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-              <span className={`lesson-status ${l.status}`}>{l.status}{l.rate_charged ? ` · £${l.rate_charged}` : ''}</span>
+              <div style={{display:'flex', alignItems:'center', gap:6}}>
+                <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={l.is_complimentary ? {color:'var(--accent)'} : {}}>
+                  {l.is_complimentary ? 'free lesson' : (l.status + (l.rate_charged ? ` · £${l.rate_charged}` : ''))}
+                </span>
+                {l.status === 'completed' && (
+                  <button className={`free-btn ${l.is_complimentary ? 'active' : 'inactive'}`} onClick={() => toggleComplimentary(l)}>
+                    {l.is_complimentary ? '✓ free' : 'mark free'}
+                  </button>
+                )}
+              </div>
             </div>
           ))}
           {studentLessons.length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>No lessons logged yet.</div>}
@@ -716,6 +841,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [showGlobalTools, setShowGlobalTools] = useState(false);
 
   async function loadAll() {
     const [s, l, p, b, r] = await Promise.all([
@@ -776,6 +902,12 @@ function App() {
           onClose={() => setShowAddModal(false)}
           onSaved={() => { setShowAddModal(false); loadAll(); }}
         />
+      )}
+
+      <button className="global-tools-btn" onClick={() => setShowGlobalTools(true)}>⚙ Tools</button>
+
+      {showGlobalTools && (
+        <GlobalToolsSheet students={students} rateHistory={rateHistory} onClose={() => setShowGlobalTools(false)} />
       )}
 
       {editingStudent && (
