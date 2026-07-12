@@ -177,7 +177,7 @@
   }
   .version-tag { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 60px 0 8px; }
   .global-tools-btn {
-    position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+    position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
     background: var(--ink); color: white; border: none; border-radius: 24px;
     padding: 12px 28px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
     box-shadow: 0 4px 16px rgba(0,0,0,0.22); z-index: 50; white-space: nowrap;
@@ -235,41 +235,66 @@ function getCurrentRate(studentId, rateHistory, fallback = 90) {
 // ---------- Summary Widget ----------
 function SummaryWidget({ students, rateHistory }) {
   const active = students.filter(s => s.active);
-  if (active.length === 0) return null;
 
   const weeklyGross = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
   const annualGross = weeklyGross * 40;
-
-  // Cash students: full rate is take-home. Non-cash: 60% after 40% tax.
   const weeklyNet = active.reduce((sum, s) => {
     const rate = getCurrentRate(s.id, rateHistory);
     return sum + (s.pays_in_cash ? rate : rate * 0.6);
   }, 0);
   const annualNet = weeklyNet * 40;
-
   const fmt = n => n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
 
+  const SEP_TARGET = 10;
+  const FULL_TARGET = 15;
+  const awayFromSep = Math.max(0, SEP_TARGET - active.length);
+  const awayFromFull = Math.max(0, FULL_TARGET - active.length);
+
   const stats = [
-    { label: 'students',   value: active.length,            accent: false },
-    { label: 'gross/week', value: fmt(weeklyGross),          accent: false },
-    { label: 'net/week',   value: fmt(weeklyNet),            accent: true  },
-    { label: 'gross/year', value: fmt(annualGross),          accent: false },
-    { label: 'net/year',   value: fmt(annualNet),            accent: true  },
+    { label: 'students',   value: active.length,   accent: false },
+    { label: 'gross/week', value: fmt(weeklyGross), accent: false },
+    { label: 'net/week',   value: fmt(weeklyNet),   accent: true  },
+    { label: 'gross/year', value: fmt(annualGross), accent: false },
+    { label: 'net/year',   value: fmt(annualNet),   accent: true  },
   ];
 
   return (
     <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'14px 16px',marginBottom:16}}>
       <div style={{fontSize:'0.72rem',textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--muted)',marginBottom:10}}>Weekly snapshot</div>
-      <div style={{display:'flex',gap:0,flexWrap:'wrap'}}>
-        {stats.map(({label, value, accent}) => (
-          <div key={label} style={{flex:'1 1 80px',minWidth:70,marginBottom:8}}>
-            <div style={{fontSize:'1.3rem',fontWeight:700,color:accent?'var(--accent)':'var(--ink)'}}>{value}</div>
-            <div style={{fontSize:'0.72rem',color:'var(--muted)'}}>{label}</div>
+      {active.length > 0 && (
+        <div style={{display:'flex',gap:0,flexWrap:'wrap',marginBottom:12}}>
+          {stats.map(({label, value, accent}) => (
+            <div key={label} style={{flex:'1 1 80px',minWidth:70,marginBottom:4}}>
+              <div style={{fontSize:'1.3rem',fontWeight:700,color:accent?'var(--accent)':'var(--ink)'}}>{value}</div>
+              <div style={{fontSize:'0.72rem',color:'var(--muted)'}}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{borderTop: active.length > 0 ? '1px solid var(--line)' : 'none', paddingTop: active.length > 0 ? 10 : 0}}>
+        <div style={{fontSize:'0.72rem',textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--muted)',marginBottom:8}}>Goal</div>
+        <div style={{marginBottom:8}}>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.8rem',marginBottom:4}}>
+            <span>10 students by September</span>
+            <span style={{color:awayFromSep===0?'var(--accent)':'var(--muted)',fontWeight:awayFromSep===0?600:400}}>
+              {awayFromSep===0?'✓ reached':`${awayFromSep} to go`}
+            </span>
           </div>
-        ))}
-      </div>
-      <div style={{fontSize:'0.72rem',color:'var(--muted)',borderTop:'1px solid var(--line)',paddingTop:8,marginTop:4}}>
-        40 lessons/year per student · cash = full rate · bank transfer = 60% after tax
+          <div style={{background:'var(--line)',borderRadius:4,height:6}}>
+            <div style={{background:'var(--accent)',width:`${Math.min(active.length/SEP_TARGET,1)*100}%`,height:'100%',borderRadius:4,transition:'width 0.5s'}}></div>
+          </div>
+        </div>
+        <div>
+          <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.8rem',marginBottom:4}}>
+            <span>15 fully booked</span>
+            <span style={{color:awayFromFull===0?'var(--accent)':'var(--muted)',fontWeight:awayFromFull===0?600:400}}>
+              {awayFromFull===0?'🎉 fully booked!':`${awayFromFull} to go`}
+            </span>
+          </div>
+          <div style={{background:'var(--line)',borderRadius:4,height:6}}>
+            <div style={{background:awayFromFull===0?'var(--accent)':'#8aab8e',width:`${Math.min(active.length/FULL_TARGET,1)*100}%`,height:'100%',borderRadius:4,transition:'width 0.5s'}}></div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -347,8 +372,19 @@ function GrowthCalculator({ students, rateHistory }) {
 }
 
 // ---------- Global Tools Sheet ----------
-function GlobalToolsSheet({ students, rateHistory, onClose }) {
+function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
   const [tool, setTool] = useState(null);
+  const archived = students.filter(s => !s.active);
+
+  async function unarchive(id) {
+    await supabase.from('tutoring_students').update({ active: true }).eq('id', id);
+    onDataChanged();
+  }
+
+  const backBtn = (
+    <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1.1rem',padding:0}} onClick={() => setTool(null)}>←</button>
+  );
+
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
@@ -357,19 +393,40 @@ function GlobalToolsSheet({ students, rateHistory, onClose }) {
             <h2>Tools</h2>
             <div className="tools-menu">
               <button onClick={() => setTool('growth')}>📈 Growth calculator — what if I had more students?</button>
+              <button onClick={() => setTool('archived')}>🗂 Archived students{archived.length > 0 ? ` (${archived.length})` : ''}</button>
             </div>
           </>
         )}
         {tool === 'growth' && (
           <>
             <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
-              <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1.1rem',padding:0}} onClick={() => setTool(null)}>←</button>
+              {backBtn}
               <h2 style={{margin:0}}>Growth calculator</h2>
             </div>
             <GrowthCalculator students={students} rateHistory={rateHistory} />
           </>
         )}
-        <div className="btn-row">
+        {tool === 'archived' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Archived students</h2>
+            </div>
+            {archived.length === 0 ? (
+              <div style={{color:'var(--muted)', fontSize:'0.88rem', padding:'10px 0'}}>No archived students.</div>
+            ) : (
+              archived.map(s => (
+                <div key={s.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--line)'}}>
+                  <span style={{fontSize:'0.95rem'}}>{s.name}</span>
+                  <button className="btn save" style={{flex:'0 0 auto',minWidth:'auto',padding:'6px 14px',fontSize:'0.82rem'}} onClick={() => unarchive(s.id)}>
+                    Unarchive
+                  </button>
+                </div>
+              ))
+            )}
+          </>
+        )}
+        <div className="btn-row" style={{marginTop:20}}>
           <button className="btn cancel" onClick={onClose}>Close</button>
         </div>
       </div>
@@ -696,13 +753,14 @@ function CashPaymentModal({ student, upcomingLessons, onClose, onSaved }) {
 }
 
 // ---------- More Tools Sheet ----------
-function MoreToolsSheet({ student, onClose, onTrackCash }) {
+function MoreToolsSheet({ student, onClose, onTrackCash, onArchive }) {
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
         <h2>More tools — {student.name}</h2>
         <div className="tools-menu">
           <button onClick={onTrackCash}>💵 Track cash payment</button>
+          <button onClick={onArchive} style={{color:'var(--warn)'}}>🗂 Archive student</button>
         </div>
         <div className="btn-row">
           <button className="btn cancel" onClick={onClose}>Close</button>
@@ -755,6 +813,12 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
 
   async function toggleComplimentary(lesson) {
     await supabase.from('tutoring_lessons').update({ is_complimentary: !lesson.is_complimentary }).eq('id', lesson.id);
+    onDataChanged();
+  }
+
+  async function archiveStudent() {
+    await supabase.from('tutoring_students').update({ active: false }).eq('id', student.id);
+    setShowMoreTools(false);
     onDataChanged();
   }
 
@@ -869,6 +933,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
           student={student}
           onClose={() => setShowMoreTools(false)}
           onTrackCash={() => { setShowMoreTools(false); setShowCashModal(true); }}
+          onArchive={archiveStudent}
         />
       )}
 
@@ -939,17 +1004,7 @@ function App() {
           allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
       ))}
 
-      {!loading && inactiveStudents.length > 0 && (
-        <React.Fragment>
-          <div className="section-label" style={{ marginTop: 24 }}>Inactive</div>
-          {inactiveStudents.map(s => (
-            <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
-              allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
-          ))}
-        </React.Fragment>
-      )}
-
-      {!loading && <div className="version-tag">v1.1</div>}
+      {!loading && <div className="version-tag">v1.2</div>}
 
       {showAddModal && (
         <StudentFormModal
@@ -962,7 +1017,7 @@ function App() {
       <button className="global-tools-btn" onClick={() => setShowGlobalTools(true)}>⚙ Tools</button>
 
       {showGlobalTools && (
-        <GlobalToolsSheet students={students} rateHistory={rateHistory} onClose={() => setShowGlobalTools(false)} />
+        <GlobalToolsSheet students={students} rateHistory={rateHistory} onClose={() => setShowGlobalTools(false)} onDataChanged={loadAll} />
       )}
 
       {editingStudent && (
