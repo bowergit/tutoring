@@ -24,7 +24,6 @@ The supplied PDF is the source of truth for copy and visual evidence. The site p
 - Student progress
 - Online lessons
 - About Daniel
-- FAQs
 - Final CTA
 - Footer
 
@@ -38,5 +37,4 @@ The supplied PDF is the source of truth for copy and visual evidence. The site p
 
 ## Remaining Input Needed
 
-- Direct WhatsApp number or `wa.me` URL.
 - Any extra review screenshots or lesson screenshots that should replace the PDF-derived assets.

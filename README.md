@@ -30,4 +30,4 @@ Use these settings:
 
 ## Notes
 
-WhatsApp buttons point to `https://wa.me/447407437292`.
+Booking uses `https://cal.com/bower/maths` and the homepage includes the inline Cal embed at the bottom.
