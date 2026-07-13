@@ -30,4 +30,4 @@ Use these settings:
 
 ## Notes
 
-The WhatsApp buttons currently point to `https://wa.me/` because no direct WhatsApp number was supplied. Replace both links with Daniel's full `wa.me` URL before launch.
+WhatsApp buttons point to `https://wa.me/447407437292`.
