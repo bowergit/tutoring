@@ -31,3 +31,5 @@ Use these settings:
 ## Notes
 
 Booking uses `https://cal.com/bower/maths` and the homepage includes the inline Cal embed at the bottom.
+
+The current homepage intentionally contains no image files. The original DOCX has 12 image placements; each is represented by an `image here` placeholder until final assets are supplied.

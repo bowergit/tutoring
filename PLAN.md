@@ -6,26 +6,18 @@ Build a polished, high-converting, mobile-first website for Daniel Bower GCSE Ma
 
 ## Content Source
 
-The supplied PDF is the source of truth for copy and visual evidence. The site preserves the main wording from the PDF and uses page-rendered assets for:
-
-- Daniel's portrait
-- Parent feedback
-- GCSE past paper tracker
-- Student progress examples
-- Online lesson examples
+The supplied DOCX is the current source of truth for text/image placement. Text is rebuilt as HTML, and the 12 image placements are represented as `image here` placeholders until final image assets are supplied.
 
 ## Site Structure
 
 - Hero
-- Trust and credentials
+- Hi, I'm Daniel
 - How GCSE Maths Support Works
-- What's included
 - Parent feedback
+- What's included
 - Student progress
 - Online lessons
-- About Daniel
-- Final CTA
-- Footer
+- The first lesson and booking embed
 
 ## Deployment Tasks
 
@@ -37,4 +29,4 @@ The supplied PDF is the source of truth for copy and visual evidence. The site p
 
 ## Remaining Input Needed
 
-- Any extra review screenshots or lesson screenshots that should replace the PDF-derived assets.
+- Final image files for the 12 `image here` placeholders.
