@@ -128,6 +128,13 @@ a {
   box-shadow: 0 18px 34px rgba(16, 51, 27, 0.24);
 }
 
+a:focus-visible,
+.book-link:focus-visible,
+.button:focus-visible {
+  outline: 3px solid rgba(40, 92, 150, 0.38);
+  outline-offset: 3px;
+}
+
 .section {
   position: relative;
   padding: 46px 0;
@@ -274,6 +281,14 @@ h2 span {
   vertical-align: 0.08em;
 }
 
+.heading-icon {
+  font-family: var(--font);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
 h3 {
   margin-bottom: 8px;
   font-size: 1.05rem;
@@ -315,7 +330,7 @@ li {
   border-color: var(--blue);
 }
 
-.placeholder {
+.media-placeholder {
   min-height: 220px;
   display: grid;
   place-items: center;
@@ -334,16 +349,24 @@ li {
   overflow: hidden;
 }
 
-.placeholder::before {
-  content: "";
+.media-placeholder::before {
+  content: attr(data-label);
   position: absolute;
-  inset: 18px;
+  left: 18px;
+  top: 18px;
+  max-width: calc(100% - 36px);
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 8px;
-  z-index: -1;
+  padding: 7px 10px;
+  background: rgba(255, 255, 255, 0.72);
+  color: rgba(16, 51, 27, 0.78);
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-transform: none;
+  z-index: 1;
 }
 
-.placeholder::after {
+.media-placeholder::after {
   content: "";
   position: absolute;
   right: -34px;
@@ -355,28 +378,38 @@ li {
   z-index: -1;
 }
 
-.placeholder.tall {
+.media-placeholder span {
+  width: min(70%, 250px);
+  border: 1px solid rgba(16, 51, 27, 0.12);
+  border-radius: 999px;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.68);
+  color: rgba(16, 51, 27, 0.62);
+  text-align: center;
+}
+
+.media-placeholder.tall {
   min-height: 420px;
 }
 
-.placeholder.portrait {
+.media-placeholder.portrait {
   min-height: 460px;
 }
 
-.placeholder.feedback-card,
-.placeholder.message {
+.media-placeholder.feedback-card,
+.media-placeholder.message {
   min-height: 180px;
   border-radius: 8px;
 }
 
-.placeholder.message {
+.media-placeholder.message {
   background:
     linear-gradient(135deg, #232323, #34312d),
     #252525;
   color: white;
 }
 
-.placeholder.message.light {
+.media-placeholder.message.light {
   border-color: rgba(150, 150, 150, 0.3);
   background:
     linear-gradient(135deg, #f5f5f5, #ebebe8),
@@ -384,19 +417,49 @@ li {
   color: #777;
 }
 
-.placeholder.message.wide,
-.placeholder.tracker,
-.placeholder.document {
+.media-placeholder.message.wide,
+.media-placeholder.tracker,
+.media-placeholder.document {
   min-height: 330px;
 }
 
-.placeholder.lesson {
+.media-placeholder.lesson {
   min-height: 250px;
 }
 
-.placeholder.compact {
+.media-placeholder.compact {
   min-height: 170px;
   margin: 28px 0;
+}
+
+.credibility-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.credibility-grid div {
+  border: 1px solid rgba(16, 51, 27, 0.11);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.76);
+  box-shadow: 0 10px 24px rgba(31, 29, 25, 0.055);
+}
+
+.credibility-grid strong,
+.credibility-grid span {
+  display: block;
+}
+
+.credibility-grid strong {
+  color: var(--green);
+  font-size: 1rem;
+}
+
+.credibility-grid span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 .steps {
@@ -512,6 +575,15 @@ li {
   background: linear-gradient(90deg, rgba(211, 184, 144, 0.18), transparent);
 }
 
+.lesson-callout {
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  padding: 16px 18px;
+  background: rgba(217, 231, 246, 0.54);
+  color: var(--ink);
+  font-weight: 700;
+}
+
 .cal-shell {
   height: 760px;
   margin-top: 28px;
@@ -528,7 +600,8 @@ li {
     var(--paper);
 }
 
-#first-lesson {
+#first-lesson,
+#ready-to-get-started {
   scroll-margin-top: 92px;
 }
 
@@ -588,6 +661,10 @@ li {
 
   .placeholder-grid .wide {
     grid-column: 1 / -1;
+  }
+
+  .credibility-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .lesson-grid,
