@@ -24,7 +24,7 @@
           <span class="brand-mark" aria-hidden="true">B</span>
           <span>Bower Maths</span>
         </a>
-        <a class="book-link" href="#book">Book</a>
+        <a class="book-link" href="#first-lesson">Book</a>
       </nav>
     </header>
 
@@ -37,7 +37,7 @@
             <p class="lead">Real parent feedback, genuine lesson examples and the system I use to help GCSE students make consistent progress.</p>
             <p>Choosing the right tutor can be difficult. Rather than making big promises, I'd rather show you exactly how I work, what parents have said, and the systems I use to help GCSE students make steady, measurable progress.</p>
             <div class="actions">
-              <a class="button" href="#book">Book here</a>
+              <a class="button" href="#first-lesson">Book here</a>
               <a class="text-link" href="https://cal.com/bower/maths">cal.com/bower/maths</a>
             </div>
           </div>
@@ -65,27 +65,27 @@
           <p class="section-subtitle">A simple system designed to build confidence and improve results</p>
           <ol class="steps">
             <li>
-              <h3>1. Initial Assessment</h3>
+              <h3>Initial Assessment</h3>
               <p>The first lesson is used to understand your child's current level, identify knowledge gaps and agree realistic goals. We'll usually look through recent school work, a test or topics they are finding difficult.</p>
             </li>
             <li>
-              <h3>2. Weekly 1:1 Lessons</h3>
+              <h3>Weekly 1:1 Lessons</h3>
               <p>Each lesson focuses on the areas that will make the biggest difference, whether that's understanding difficult topics, improving exam technique or preparing for upcoming tests.</p>
             </li>
             <li>
-              <h3>3. Support Between Lessons</h3>
+              <h3>Support Between Lessons</h3>
               <p>Students can message in our WhatsApp group if they get stuck on homework or revision, so they don't have to wait until the next lesson.</p>
             </li>
             <li>
-              <h3>4. Structured Revision</h3>
+              <h3>Structured Revision</h3>
               <p>Students receive access to a GCSE revision tracker with past papers, mark schemes and progress tracking, helping them revise in a clear and organised way.</p>
             </li>
             <li>
-              <h3>5. Parent Visibility</h3>
+              <h3>Parent Visibility</h3>
               <p>Parents can clearly see what has been covered, how their child is progressing and what we'll be focusing on next.</p>
             </li>
             <li>
-              <h3>6. Greater Confidence and Better GCSE Results</h3>
+              <h3>Greater Confidence and Better GCSE Results</h3>
               <p>Every part of the system is designed to make revision less overwhelming and help students make steady progress throughout the year.</p>
             </li>
           </ol>
@@ -140,13 +140,12 @@
 
       <section class="section final-section" id="book">
         <div class="wrap narrow">
-          <h2>The first lesson</h2>
+          <h2 id="first-lesson">The first lesson</h2>
           <p>The first lesson is about understanding where the student is now, not jumping straight into teaching.</p>
           <p>We'll normally look through recent school work or a test, identify the biggest gaps, and make a plan for the weeks ahead.</p>
           <div class="placeholder compact">image here</div>
           <h2><span aria-hidden="true">✨</span> Ready to get started?</h2>
           <p>If you'd like to see whether we're a good fit, the easiest next step is to book an initial lesson or a quick chat.</p>
-          <p class="book-here">Book here:<br><a href="https://cal.com/bower/maths">cal.com/bower/maths</a></p>
           <div class="cal-shell">
             <!-- Cal inline embed code begins -->
             <div style="width:100%;height:100%;overflow:scroll" id="my-cal-inline-maths"></div>
@@ -170,5 +169,16 @@
         </div>
       </section>
     </main>
+    <script>
+      document.querySelectorAll('a[href="#first-lesson"]').forEach((link) => {
+        link.addEventListener('click', (event) => {
+          const target = document.getElementById('first-lesson');
+          if (!target) return;
+          event.preventDefault();
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          history.replaceState(null, '', '#first-lesson');
+        });
+      });
+    </script>
   </body>
 </html>
