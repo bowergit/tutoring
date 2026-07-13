@@ -32,4 +32,4 @@ Use these settings:
 
 Booking uses `https://cal.com/bower/maths` and the homepage includes the inline Cal embed at the bottom.
 
-The current homepage intentionally contains no image files. The original DOCX has 12 image placements; each is represented by a labelled media placeholder until final assets are supplied.
+The homepage uses 15 ordered image assets from the source deck in `assets/media/`.

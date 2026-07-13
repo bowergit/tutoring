@@ -6,7 +6,7 @@ Build a polished, high-converting, mobile-first website for Daniel Bower GCSE Ma
 
 ## Content Source
 
-The supplied DOCX is the current source of truth for text/image placement. Text is rebuilt as HTML, and the 12 image placements are represented as labelled media placeholders until final image assets are supplied.
+The supplied DOCX is the current source of truth for text/image placement. Text is rebuilt as HTML, and the 15 supplied image assets are referenced in source order from `assets/media/`.
 
 ## Site Structure
 
@@ -29,4 +29,4 @@ The supplied DOCX is the current source of truth for text/image placement. Text 
 
 ## Remaining Input Needed
 
-- Final image files for the 12 labelled media placeholders.
+- None for the current image pass.
