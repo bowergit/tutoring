@@ -367,9 +367,16 @@ img {
   border-radius: 10px;
   overflow: hidden;
   box-shadow: var(--sh-lg);
+  aspect-ratio: 3 / 2;
 }
 
-.about-portrait img { border-radius: 0; }
+.about-portrait img {
+  border-radius: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 20%;
+}
 
 .about-content h2 {
   font-size: clamp(2.4rem, 3.5vw, 3.2rem);
@@ -752,8 +759,9 @@ img {
   }
 
   .about-inner {
-    grid-template-columns: 408px 1fr;
-    gap: 72px;
+    grid-template-columns: 1fr 1fr;
+    gap: 64px;
+    align-items: center;
   }
 
 }
