@@ -16,8 +16,8 @@
   --wrap:   min(1120px, calc(100% - 48px));
   --narrow: min(780px,  calc(100% - 48px));
 
-  --display: 'Fraunces', Georgia, 'Times New Roman', serif;
-  --sans:    'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --display: 'Poppins', ui-sans-serif, system-ui, sans-serif;
+  --sans:    'Poppins', ui-sans-serif, system-ui, sans-serif;
 
   --sh-sm: 0 2px 8px rgba(13,17,10,.07);
   --sh-md: 0 8px 32px rgba(13,17,10,.10);
@@ -126,9 +126,8 @@ img {
   place-items: center;
   color: var(--gold);
   font-family: var(--display);
-  font-size: 1.1rem;
+  font-size: 1rem;
   font-weight: 700;
-  font-style: italic;
 }
 
 .nav-book {
@@ -209,6 +208,25 @@ img {
   transform: translateY(-1px);
 }
 
+.btn-whatsapp {
+  background: #25D366;
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(37, 211, 102, 0.3);
+}
+
+.btn-whatsapp:hover {
+  background: #1eb759;
+  color: #fff;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(37, 211, 102, 0.4);
+}
+
+.btn-whatsapp-lg {
+  height: 54px;
+  padding: 0 32px;
+  font-size: 1rem;
+}
+
 /* ─── IMAGE FRAMES ───────────────────────────────────────────────────────── */
 .img-frame {
   border-radius: 10px;
@@ -269,12 +287,11 @@ img {
 
 .hero-inner h1 {
   color: #f7f4ef;
-  font-size: clamp(2.8rem, 5.5vw, 5rem);
+  font-size: clamp(2.6rem, 5vw, 4.4rem);
   font-weight: 700;
-  font-style: italic;
   margin-bottom: 28px;
-  max-width: 16ch;
-  line-height: 1.0;
+  max-width: 22ch;
+  line-height: 1.1;
 }
 
 .hero-sub {
@@ -346,37 +363,31 @@ img {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1px;
-  margin-top: 36px;
-  background: var(--rule);
-  border: 1px solid var(--rule);
-  border-radius: 8px;
-  overflow: hidden;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 28px;
 }
 
 .stats li {
   background: var(--cream);
-  padding: 18px 20px;
-}
-
-.stats strong {
-  display: block;
-  font-family: var(--display);
-  font-size: 1.7rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 12px 16px;
+  font-size: 0.875rem;
   font-weight: 600;
-  font-style: italic;
-  color: var(--forest);
-  line-height: 1;
-  margin-bottom: 4px;
+  color: var(--ink);
+  line-height: 1.4;
 }
 
-.stats span {
-  display: block;
-  font-size: 0.78rem;
+.stat-full {
+  grid-column: 1 / -1;
+  color: var(--forest-soft);
+}
+
+.stats-note {
+  margin-top: 10px;
+  font-size: 0.75rem;
   color: var(--muted);
-  font-weight: 500;
-  letter-spacing: 0.01em;
 }
 
 .about-feedback {
@@ -447,7 +458,6 @@ img {
   font-family: var(--display);
   font-size: 0.85rem;
   font-weight: 700;
-  font-style: italic;
   color: var(--gold);
   font-variant-numeric: tabular-nums;
 }
@@ -562,15 +572,20 @@ img {
   gap: 16px;
 }
 
-.lesson-note {
-  margin-top: 36px;
-  padding: 20px 24px;
-  border-left: 3px solid var(--gold);
-  border-radius: 0 6px 6px 0;
-  background: rgba(200, 146, 61, 0.07);
-  color: rgba(247, 244, 239, 0.7);
-  font-size: 0.9375rem;
-  font-style: italic;
+.lesson-callout {
+  margin-top: 40px;
+  padding: 24px 28px;
+  border-left: 4px solid var(--gold);
+  border-radius: 0 8px 8px 0;
+  background: rgba(200, 146, 61, 0.1);
+}
+
+.lesson-callout p {
+  color: #f7f4ef;
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0;
 }
 
 /* ─── FIRST LESSON ───────────────────────────────────────────────────────── */
@@ -590,8 +605,7 @@ img {
 
 /* ─── CTA ────────────────────────────────────────────────────────────────── */
 .cta h2 {
-  font-size: clamp(2.4rem, 4vw, 3.4rem);
-  font-style: italic;
+  font-size: clamp(2.4rem, 4vw, 3.2rem);
   margin-bottom: 16px;
 }
 
@@ -602,22 +616,22 @@ img {
   margin-bottom: 24px;
 }
 
-.book-direct {
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: rgba(247, 244, 239, 0.65);
-  margin-bottom: 0;
+.cta-footer {
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 24px;
 }
 
-.book-direct a {
-  color: var(--gold);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(200, 146, 61, 0.35);
-  transition: border-color 0.15s;
-}
-
-.book-direct a:hover {
-  border-color: var(--gold);
+.footer-note {
+  font-size: 0.8rem;
+  color: rgba(247, 244, 239, 0.4);
+  letter-spacing: 0.02em;
+  border-top: 1px solid rgba(247, 244, 239, 0.1);
+  padding-top: 20px;
+  width: 100%;
+  margin: 0;
 }
 
 .cal-shell {
@@ -640,12 +654,6 @@ img {
   scroll-margin-top: 68px;
 }
 
-.small-note {
-  margin-top: 24px;
-  font-size: 0.8rem;
-  color: rgba(247, 244, 239, 0.36);
-  letter-spacing: 0.03em;
-}
 
 /* ─── RESPONSIVE — mobile first enhancements ─────────────────────────────── */
 @media (min-width: 680px) {
@@ -677,9 +685,6 @@ img {
     gap: 72px;
   }
 
-  .stats {
-    grid-template-columns: repeat(4, 1fr);
-  }
 }
 
 @media (max-width: 520px) {
@@ -727,7 +732,7 @@ img {
 
   .img-frame { background: #22251f; }
   .stats li  { background: var(--cream); }
-  .stats strong { color: #6bd49a; }
+  .stat-full { color: #6bd49a; }
   .nav-book { background: #2c5c3a; }
   .nav-book:hover { background: var(--forest-soft); }
 }
@@ -750,7 +755,7 @@ img {
 
 :root[data-theme="dark"] .img-frame { background: #22251f; }
 :root[data-theme="dark"] .stats li  { background: var(--cream); }
-:root[data-theme="dark"] .stats strong { color: #6bd49a; }
+:root[data-theme="dark"] .stat-full { color: #6bd49a; }
 :root[data-theme="dark"] .nav-book { background: #2c5c3a; }
 :root[data-theme="dark"] .nav-book:hover { background: var(--forest-soft); }
 
