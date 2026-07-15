@@ -4,193 +4,198 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tutoring — Bower OS</title>
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <style>
   :root {
-    --ink: #1a1a1a; 
-    --paper: #faf9f7;
-    --card: #ffffff;
-    --line: #e4e2de;
-    --accent: #2f5233;
-    --accent-light: #e8f0e9;
-    --warn: #b3532a;
-    --warn-light: #fbeee6;
-    --muted: #6b6862;
+    --bg: #0d2618;
+    --card: #132b1e;
+    --card-2: #1a3828;
+    --line: #1f3d2a;
+    --gold: #d3b890;
+    --gold-dim: #6a5c3e;
+    --ink: #eeeae2;
+    --ink-dim: #a8c0ac;
+    --accent: #3d9e5f;
+    --accent-light: #0c2918;
+    --warn: #cc6b35;
+    --warn-light: #2a1208;
+    --muted: #608060;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    background: var(--paper);
+    font-family: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
     color: var(--ink);
+    -webkit-font-smoothing: antialiased;
   }
-  #root { max-width: 720px; margin: 0 auto; padding: 16px; padding-bottom: 80px; }
-  h1 { font-size: 1.4rem; margin: 8px 0 4px; }
-  .subtitle { color: var(--muted); font-size: 0.9rem; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+  #root { max-width: 720px; margin: 0 auto; padding-bottom: 100px; }
+
+  /* ── Header ── */
+  .app-header {
+    background: linear-gradient(160deg, #091a10 0%, #0d2618 100%);
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 40;
+  }
+  .header-row { display: flex; justify-content: space-between; align-items: center; }
+  .header-title { font-size: 1.45rem; font-weight: 700; color: var(--gold); letter-spacing: -0.02em; line-height: 1; }
+  .header-sub { font-size: 0.76rem; color: var(--muted); margin-top: 4px; }
+  .header-right { display: flex; align-items: center; gap: 8px; }
+  .sync-time { font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+  .refresh-btn {
+    background: var(--card-2); border: 1px solid var(--line); color: var(--ink-dim);
+    border-radius: 8px; padding: 7px 11px; font-size: 0.8rem; cursor: pointer;
+    font-family: inherit; display: flex; align-items: center; gap: 5px;
+  }
+  .refresh-btn:active { opacity: 0.6; }
   .add-btn {
-    background: var(--accent);
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
+    background: var(--gold); color: #0d2618; border: none;
+    border-radius: 8px; padding: 8px 14px; font-size: 0.82rem;
+    font-weight: 700; cursor: pointer; font-family: inherit;
   }
+  .add-btn:active { opacity: 0.8; }
+
+  /* ── Content ── */
+  .content { padding: 14px 16px; }
+
+  /* ── Cards ── */
   .card {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: 14px;
     margin-bottom: 10px;
     overflow: hidden;
   }
   .card-header {
     padding: 14px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; cursor: pointer;
   }
-  .card-header:active { background: #f5f4f1; }
-  .student-name { font-weight: 600; font-size: 1.02rem; }
-  .status-row { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .card-header:active { background: var(--card-2); }
+  .student-name { font-weight: 600; font-size: 1.02rem; color: var(--ink); }
+  .status-row { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
   .pill {
-    font-size: 0.72rem;
-    padding: 2px 8px;
-    border-radius: 20px;
-    font-weight: 500;
+    font-size: 0.68rem; padding: 3px 8px; border-radius: 20px; font-weight: 600; letter-spacing: 0.02em;
   }
-  .pill.ok { background: var(--accent-light); color: var(--accent); }
-  .pill.warn { background: var(--warn-light); color: var(--warn); }
-  .pill.neutral { background: #f0efec; color: var(--muted); }
-  .chevron { font-size: 1.2rem; color: var(--muted); transition: transform 0.25s cubic-bezier(0.4,0,0.2,1); }
+  .pill.ok { background: var(--accent-light); color: var(--accent); border: 1px solid #1a4a2a; }
+  .pill.warn { background: var(--warn-light); color: var(--warn); border: 1px solid #3a1808; }
+  .pill.neutral { background: var(--card-2); color: var(--ink-dim); border: 1px solid var(--line); }
+  .chevron { font-size: 1.1rem; color: var(--muted); transition: transform 0.25s cubic-bezier(0.4,0,0.2,1); }
   .chevron.open { transform: rotate(90deg); }
-  .card-body {
-    overflow: hidden;
-    max-height: 0;
-    transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1);
-  }
-  .card-body.open { max-height: 2400px; }
+  .card-body { overflow: hidden; max-height: 0; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); }
+  .card-body.open { max-height: 3000px; }
   .card-body-inner { padding: 0 16px 16px; border-top: 1px solid var(--line); }
   .section-label {
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--muted);
-    margin: 14px 0 6px;
+    font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin: 14px 0 6px; font-weight: 600;
   }
   .lesson-row {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 0;
-    font-size: 0.88rem;
-    border-bottom: 1px solid #f0efec;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0; font-size: 0.86rem; border-bottom: 1px solid var(--line);
   }
   .lesson-row:last-child { border-bottom: none; }
-  .lesson-date { color: var(--muted); }
-  .lesson-status { font-size: 0.78rem; }
+  .lesson-date { color: var(--ink-dim); }
+  .lesson-status { font-size: 0.75rem; font-weight: 500; }
   .lesson-status.completed { color: var(--accent); }
-  .lesson-status.scheduled { color: var(--muted); }
+  .lesson-status.scheduled { color: var(--gold); }
   .lesson-status.missed { color: var(--warn); }
   .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
   .btn {
-    flex: 1;
-    min-width: 100px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: none;
-    font-size: 0.85rem;
-    font-weight: 500;
-    cursor: pointer;
-    text-align: center;
-    text-decoration: none;
-    color: white;
+    flex: 1; min-width: 100px; padding: 10px 12px; border-radius: 10px; border: none;
+    font-size: 0.84rem; font-weight: 600; cursor: pointer; text-align: center;
+    text-decoration: none; color: white; font-family: inherit;
   }
-  .btn.whatsapp { background: #25D366; }
-  .btn.notes { background: var(--muted); }
-  .btn.more { background: #3a3a3a; }
-  .btn.edit { background: #8a8578; }
+  .btn.whatsapp { background: #25D366; color: #000; }
+  .btn.notes { background: var(--card-2); color: var(--ink-dim); border: 1px solid var(--line); }
+  .btn.more { background: var(--card-2); color: var(--ink); border: 1px solid var(--line); }
+  .btn.edit { background: var(--card-2); color: var(--ink); border: 1px solid var(--line); }
   .notes-box {
-    font-size: 0.85rem;
-    color: #444;
-    background: #f7f6f4;
-    padding: 10px 12px;
-    border-radius: 8px;
-    margin-top: 8px;
-    line-height: 1.4;
-    display: none;
+    font-size: 0.85rem; color: var(--ink-dim); background: var(--card-2);
+    padding: 10px 12px; border-radius: 8px; margin-top: 8px; line-height: 1.5;
+    border: 1px solid var(--line); display: none;
   }
   .notes-box.visible { display: block; }
   .empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 0.9rem; }
-  .loading { text-align: center; color: var(--muted); padding: 40px 20px; }
+  .loading { text-align: center; color: var(--muted); padding: 48px 20px; font-size: 0.9rem; letter-spacing: 0.05em; }
 
-  /* Modal / sheet */
-  @keyframes overlayIn { from { background: rgba(0,0,0,0); } to { background: rgba(0,0,0,0.4); } }
+  /* ── Modals ── */
+  @keyframes overlayIn { from { background: rgba(0,0,0,0); } to { background: rgba(0,0,0,0.75); } }
   @keyframes sheetUp { from { transform: translateY(48px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   .overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75);
     display: flex; align-items: flex-end; justify-content: center;
-    z-index: 100;
-    animation: overlayIn 0.2s ease forwards;
+    z-index: 100; animation: overlayIn 0.2s ease forwards;
   }
   .sheet {
-    background: var(--card);
-    width: 100%; max-width: 720px;
-    border-radius: 16px 16px 0 0;
-    padding: 20px;
-    max-height: 88vh;
-    overflow-y: auto;
+    background: var(--card); border: 1px solid var(--line);
+    width: 100%; max-width: 720px; border-radius: 20px 20px 0 0;
+    padding: 20px; max-height: 90vh; overflow-y: auto;
     animation: sheetUp 0.28s cubic-bezier(0.4,0,0.2,1) forwards;
   }
-  .sheet h2 { font-size: 1.15rem; margin: 0 0 16px; }
+  .sheet h2 { font-size: 1.1rem; margin: 0 0 16px; color: var(--gold); font-weight: 600; }
   .field { margin-bottom: 14px; }
   .field label {
-    display: block; font-size: 0.78rem; color: var(--muted);
-    margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em;
+    display: block; font-size: 0.7rem; color: var(--muted);
+    margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
   }
   .field input[type="text"], .field input[type="date"], .field input[type="number"], .field select, .field textarea {
     width: 100%; padding: 10px 12px; border: 1px solid var(--line);
-    border-radius: 8px; font-size: 0.95rem; font-family: inherit; background: #fff;
+    border-radius: 10px; font-size: 0.95rem; font-family: inherit;
+    background: var(--card-2); color: var(--ink);
   }
+  .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
   .field textarea { min-height: 70px; resize: vertical; }
   .checkbox-row { display: flex; align-items: center; gap: 8px; }
-  .checkbox-row input { width: 18px; height: 18px; }
+  .checkbox-row input { width: 18px; height: 18px; accent-color: var(--accent); }
   .btn-row { display: flex; gap: 10px; margin-top: 18px; }
-  .btn-row .btn { color: white; }
-  .btn.cancel { background: #ddd; color: #333; }
-  .btn.save { background: var(--accent); }
+  .btn.cancel { background: var(--card-2); color: var(--ink); border: 1px solid var(--line); flex: 0 0 auto; padding: 10px 18px; }
+  .btn.save { background: var(--accent); color: white; }
   .session-list { margin: 10px 0; }
   .session-pick-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 0; border-bottom: 1px solid #f0efec; font-size: 0.9rem;
+    padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; color: var(--ink-dim);
   }
-  .session-pick-row input { width: 18px; height: 18px; }
-  .tools-menu {
-    display: flex; flex-direction: column; gap: 8px; margin-top: 4px;
-  }
+  .session-pick-row input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .tools-menu { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
   .tools-menu button {
-    text-align: left; padding: 12px 14px; border-radius: 8px;
-    border: 1px solid var(--line); background: #fff; font-size: 0.9rem; cursor: pointer;
+    text-align: left; padding: 13px 16px; border-radius: 10px;
+    border: 1px solid var(--line); background: var(--card-2); font-size: 0.9rem;
+    cursor: pointer; color: var(--ink); font-family: inherit;
   }
-  .version-tag { text-align: center; color: var(--muted); font-size: 0.7rem; padding: 60px 0 8px; }
+  .tools-menu button:active { opacity: 0.7; }
+
+  /* ── Global tools button ── */
   .global-tools-btn {
     position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
-    background: var(--ink); color: white; border: none; border-radius: 24px;
-    padding: 12px 28px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.22); z-index: 50; white-space: nowrap;
+    background: var(--gold); color: #091a10; border: none; border-radius: 24px;
+    padding: 13px 28px; font-size: 0.88rem; font-weight: 700; cursor: pointer;
+    box-shadow: 0 4px 24px rgba(211,184,144,0.35); z-index: 50; white-space: nowrap;
+    font-family: inherit; letter-spacing: 0.01em;
   }
+  .global-tools-btn:active { opacity: 0.85; }
+
+  /* ── Growth calculator ── */
   .calc-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; font-size: 0.82rem; }
-  .calc-grid-cell { padding: 6px 4px; border-top: 1px solid #f0efec; }
-  .calc-grid-head { padding: 0 4px 6px; font-size: 0.72rem; color: var(--muted); }
+  .calc-grid-cell { padding: 7px 4px; border-top: 1px solid var(--line); color: var(--ink-dim); }
+  .calc-grid-head { padding: 0 4px 7px; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* ── Free lesson button ── */
   .free-btn {
-    font-size: 0.68rem; padding: 2px 7px; border-radius: 10px;
-    border: 1px solid var(--line); cursor: pointer; white-space: nowrap;
+    font-size: 0.65rem; padding: 2px 8px; border-radius: 10px;
+    border: 1px solid var(--line); cursor: pointer; white-space: nowrap; font-family: inherit;
   }
-  .free-btn.active { background: var(--accent-light); color: var(--accent); border-color: var(--accent-light); }
-  .free-btn.inactive { background: #f0efec; color: var(--muted); }
+  .free-btn.active { background: var(--accent-light); color: var(--accent); border-color: var(--accent); }
+  .free-btn.inactive { background: var(--card-2); color: var(--muted); }
+
+  /* ── Version tag ── */
+  .version-tag { text-align: center; color: var(--muted); font-size: 0.66rem; padding: 60px 0 8px; opacity: 0.4; }
+
+  /* ── Section divider ── */
+  .section-divider { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); padding: 16px 0 8px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -259,41 +264,40 @@ function SummaryWidget({ students, rateHistory }) {
   ];
 
   return (
-    <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:12,padding:'14px 16px',marginBottom:16}}>
-      <div style={{fontSize:'0.72rem',textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--muted)',marginBottom:10}}>Weekly snapshot</div>
+    <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'16px',marginBottom:14}}>
+      {/* Stats row */}
       {active.length > 0 && (
-        <div style={{display:'flex',gap:0,flexWrap:'wrap',marginBottom:12}}>
+        <div style={{display:'flex',gap:0,flexWrap:'wrap',marginBottom:16,paddingBottom:14,borderBottom:'1px solid var(--line)'}}>
           {stats.map(({label, value, accent}) => (
-            <div key={label} style={{flex:'1 1 80px',minWidth:70,marginBottom:4}}>
-              <div style={{fontSize:'1.3rem',fontWeight:700,color:accent?'var(--accent)':'var(--ink)'}}>{value}</div>
-              <div style={{fontSize:'0.72rem',color:'var(--muted)'}}>{label}</div>
+            <div key={label} style={{flex:'1 1 70px',minWidth:60}}>
+              <div style={{fontSize:'1.35rem',fontWeight:700,color:accent?'var(--gold)':'var(--ink)',letterSpacing:'-0.02em'}}>{value}</div>
+              <div style={{fontSize:'0.66rem',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginTop:1}}>{label}</div>
             </div>
           ))}
         </div>
       )}
-      <div style={{borderTop: active.length > 0 ? '1px solid var(--line)' : 'none', paddingTop: active.length > 0 ? 10 : 0}}>
-        <div style={{fontSize:'0.72rem',textTransform:'uppercase',letterSpacing:'0.05em',color:'var(--muted)',marginBottom:8}}>Goal</div>
-        <div style={{marginBottom:8}}>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.8rem',marginBottom:4}}>
-            <span>10 students by September</span>
-            <span style={{color:awayFromSep===0?'var(--accent)':'var(--muted)',fontWeight:awayFromSep===0?600:400}}>
-              {awayFromSep===0?'✓ reached':`${awayFromSep} to go`}
-            </span>
-          </div>
-          <div style={{background:'var(--line)',borderRadius:4,height:6}}>
-            <div style={{background:'var(--accent)',width:`${Math.min(active.length/SEP_TARGET,1)*100}%`,height:'100%',borderRadius:4,transition:'width 0.5s'}}></div>
-          </div>
+      {/* Goal tracker */}
+      <div style={{fontSize:'0.66rem',textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--muted)',marginBottom:10,fontWeight:600}}>Goal</div>
+      <div style={{marginBottom:10}}>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+          <span style={{fontSize:'0.82rem',color:'var(--ink-dim)'}}>10 by September</span>
+          <span style={{fontSize:'0.78rem',fontWeight:600,color:awayFromSep===0?'var(--accent)':'var(--muted)'}}>
+            {awayFromSep===0?'✓ reached':`${active.length} / ${SEP_TARGET}`}
+          </span>
         </div>
-        <div>
-          <div style={{display:'flex',justifyContent:'space-between',fontSize:'0.8rem',marginBottom:4}}>
-            <span>15 fully booked</span>
-            <span style={{color:awayFromFull===0?'var(--accent)':'var(--muted)',fontWeight:awayFromFull===0?600:400}}>
-              {awayFromFull===0?'🎉 fully booked!':`${awayFromFull} to go`}
-            </span>
-          </div>
-          <div style={{background:'var(--line)',borderRadius:4,height:6}}>
-            <div style={{background:awayFromFull===0?'var(--accent)':'#8aab8e',width:`${Math.min(active.length/FULL_TARGET,1)*100}%`,height:'100%',borderRadius:4,transition:'width 0.5s'}}></div>
-          </div>
+        <div style={{background:'var(--card-2)',borderRadius:4,height:5,border:'1px solid var(--line)'}}>
+          <div style={{background:'var(--accent)',width:`${Math.min(active.length/SEP_TARGET,1)*100}%`,height:'100%',borderRadius:4,transition:'width 0.6s cubic-bezier(0.4,0,0.2,1)'}}></div>
+        </div>
+      </div>
+      <div>
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
+          <span style={{fontSize:'0.82rem',color:'var(--ink-dim)'}}>15 fully booked</span>
+          <span style={{fontSize:'0.78rem',fontWeight:600,color:awayFromFull===0?'var(--gold)':'var(--muted)'}}>
+            {awayFromFull===0?'🎉 fully booked!':`${active.length} / ${FULL_TARGET}`}
+          </span>
+        </div>
+        <div style={{background:'var(--card-2)',borderRadius:4,height:5,border:'1px solid var(--line)'}}>
+          <div style={{background:awayFromSep===0?'var(--gold)':'var(--gold-dim)',width:`${Math.min(active.length/FULL_TARGET,1)*100}%`,height:'100%',borderRadius:4,transition:'width 0.6s cubic-bezier(0.4,0,0.2,1)'}}></div>
         </div>
       </div>
     </div>
@@ -394,6 +398,7 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
             <div className="tools-menu">
               <button onClick={() => setTool('growth')}>📈 Growth calculator — what if I had more students?</button>
               <button onClick={() => setTool('archived')}>🗂 Archived students{archived.length > 0 ? ` (${archived.length})` : ''}</button>
+              <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
             </div>
           </>
         )}
@@ -424,6 +429,27 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
                 </div>
               ))
             )}
+          </>
+        )}
+        {tool === 'info' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+              {backBtn}
+              <h2 style={{margin:0}}>About &amp; data sources</h2>
+            </div>
+            {[
+              { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase (Bower OS project). Name, school, exam board, rate, WhatsApp number, spreadsheet link — all edited via the Edit button on each card.' },
+              { icon: '📅', title: 'Lessons', body: 'Each lesson row in the database has a date, status (scheduled / completed / missed), and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load.' },
+              { icon: '💷', title: 'Payments & bundles', body: 'Logged manually via More Tools → Track cash payment. Each payment is tied to a bundle of sessions. Balance = total completed lessons − total paid.' },
+              { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script (tutoring_calendar_sync_v2.gs) runs nightly. It reads your Google Calendar Tutoring calendar, matches events to students by their "calendar name" field, and upserts lesson rows into Supabase — including marking sessions complete when the date passes.' },
+              { icon: '📈', title: 'Spreadsheet links', body: 'Each student can have a Google Sheets link (set via Edit). Tap the 📈 button on a card to open it. Links are stored in Supabase and can also be set directly in the database.' },
+              { icon: '💰', title: 'Rate history', body: 'Every rate change is recorded with a date. The app always uses the rate that was in effect on a given day — so historical balances stay accurate when you put prices up.' },
+            ].map(({ icon, title, body }) => (
+              <div key={title} style={{marginBottom:14, paddingBottom:14, borderBottom:'1px solid var(--line)'}}>
+                <div style={{fontSize:'0.88rem', fontWeight:600, color:'var(--gold)', marginBottom:4}}>{icon} {title}</div>
+                <div style={{fontSize:'0.83rem', color:'var(--ink-dim)', lineHeight:1.55}}>{body}</div>
+              </div>
+            ))}
           </>
         )}
         <div className="btn-row" style={{marginTop:20}}>
@@ -956,11 +982,18 @@ function App() {
   const [bundles, setBundles] = useState([]);
   const [rateHistory, setRateHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastSynced, setLastSynced] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [showGlobalTools, setShowGlobalTools] = useState(false);
 
-  async function loadAll() {
+  async function loadAll(isManualRefresh = false) {
+    if (isManualRefresh) setRefreshing(true);
+    // Auto-fix past scheduled lessons
+    const today = new Date().toISOString().slice(0, 10);
+    supabase.from('tutoring_lessons').update({ status: 'completed' })
+      .eq('status', 'scheduled').lt('lesson_date', today).then(() => {});
     const [s, l, p, b, r] = await Promise.all([
       supabase.from('tutoring_students').select('*').order('active', { ascending: false }).order('name'),
       supabase.from('tutoring_lessons').select('*'),
@@ -973,38 +1006,57 @@ function App() {
     setPayments(p.data || []);
     setBundles(b.data || []);
     setRateHistory(r.data || []);
+    setLastSynced(new Date());
     setLoading(false);
+    setRefreshing(false);
   }
 
   useEffect(() => { loadAll(); }, []);
 
   const activeStudents = students.filter(s => s.active);
-  const inactiveStudents = students.filter(s => !s.active);
+  const archivedCount = students.filter(s => !s.active).length;
+
+  const syncLabel = lastSynced
+    ? `synced ${lastSynced.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+    : '';
 
   return (
     <div>
-      <div className="subtitle">
-        <div>
-          <h1>Maths Tutoring</h1>
-          {activeStudents.length} active student{activeStudents.length !== 1 ? 's' : ''}
+      <div className="app-header">
+        <div className="header-row">
+          <div>
+            <div className="header-title">Maths Tutoring</div>
+            <div className="header-sub">
+              {activeStudents.length} active{archivedCount > 0 ? ` · ${archivedCount} archived` : ''}{syncLabel ? ` · ${syncLabel}` : ''}
+            </div>
+          </div>
+          <div className="header-right">
+            <button className="refresh-btn" onClick={() => loadAll(true)} disabled={refreshing}>
+              <span style={{display:'inline-block', animation: refreshing ? 'spin 0.8s linear infinite' : 'none'}}>↻</span>
+            </button>
+            <button className="add-btn" onClick={() => setShowAddModal(true)}>+ Add</button>
+          </div>
         </div>
-        <button className="add-btn" onClick={() => setShowAddModal(true)}>+ Add student</button>
       </div>
 
-      {!loading && <SummaryWidget students={students} rateHistory={rateHistory} />}
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
-      {loading && <div className="loading">Loading…</div>}
+      <div className="content">
+        {!loading && <SummaryWidget students={students} rateHistory={rateHistory} />}
 
-      {!loading && activeStudents.length === 0 && inactiveStudents.length === 0 && (
-        <div className="empty">No students yet. Tap "+ Add student" to get started.</div>
-      )}
+        {loading && <div className="loading">Loading…</div>}
 
-      {!loading && activeStudents.map(s => (
-        <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
-          allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
-      ))}
+        {!loading && activeStudents.length === 0 && (
+          <div className="empty">No active students. Tap "+ Add" to get started.</div>
+        )}
 
-      {!loading && <div className="version-tag">v1.2</div>}
+        {!loading && activeStudents.map(s => (
+          <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
+            allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
+        ))}
+
+        {!loading && <div className="version-tag">v1.3</div>}
+      </div>
 
       {showAddModal && (
         <StudentFormModal
