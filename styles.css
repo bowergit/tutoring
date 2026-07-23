@@ -721,8 +721,9 @@ img {
   align-items: start;
 }
 
-.progress-tall {
-  grid-row: span 2;
+.progress-stack {
+  display: grid;
+  gap: 20px;
 }
 
 /* ─── LESSONS ────────────────────────────────────────────────────────────── */
