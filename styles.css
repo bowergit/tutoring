@@ -766,6 +766,14 @@ img {
   gap: 24px;
 }
 
+.cta-nudge {
+  font-size: 0.9rem;
+  color: rgba(247, 244, 239, 0.55);
+  text-align: center;
+  max-width: 44ch;
+  margin: 0;
+}
+
 .footer-note {
   font-size: 0.8rem;
   color: rgba(247, 244, 239, 0.4);
