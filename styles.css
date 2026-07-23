@@ -721,6 +721,10 @@ img {
   align-items: start;
 }
 
+.progress-full {
+  grid-column: 1 / -1;
+}
+
 /* ─── LESSONS ────────────────────────────────────────────────────────────── */
 .lesson-grid {
   display: grid;
