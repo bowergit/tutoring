@@ -721,8 +721,8 @@ img {
   align-items: start;
 }
 
-.progress-full {
-  grid-column: 1 / -1;
+.progress-tall {
+  grid-row: span 2;
 }
 
 /* ─── LESSONS ────────────────────────────────────────────────────────────── */
