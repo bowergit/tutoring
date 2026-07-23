@@ -221,6 +221,18 @@ img {
   box-shadow: 0 8px 24px rgba(37, 211, 102, 0.4);
 }
 
+.btn-email {
+  background: transparent;
+  color: rgba(247, 244, 239, 0.65);
+  border: 1px solid rgba(247, 244, 239, 0.2);
+}
+
+.btn-email:hover {
+  background: rgba(247, 244, 239, 0.08);
+  color: rgba(247, 244, 239, 0.9);
+  transform: translateY(-1px);
+}
+
 .btn-whatsapp-lg {
   height: 54px;
   padding: 0 32px;
