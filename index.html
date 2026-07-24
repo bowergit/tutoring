@@ -226,6 +226,16 @@
   /* ── Version tag ── */
   .version-tag { text-align: center; color: var(--muted); font-size: 0.65rem; padding: 60px 0 8px; opacity: 0.45; }
 
+  /* ── Month group ── */
+  .month-hdr {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:9px 0; cursor:pointer; border-bottom:1px solid var(--line);
+  }
+  .month-hdr:active { opacity:0.7; }
+  .month-chevron { font-size:0.9rem; color:var(--muted); display:inline-block; transition:transform 0.2s; }
+  .lesson-row { cursor:pointer; }
+  .lesson-row:active { background:var(--card-2); margin:0 -4px; padding:7px 4px; border-radius:6px; }
+
   /* ── Animations ── */
   @keyframes fadeInUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
   @keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
@@ -336,14 +346,14 @@ function SummaryWidget({ students, rateHistory }) {
   ];
 
   return (
-    <div className="summary-widget" style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'16px',marginBottom:14}}>
+    <div className="summary-widget" style={{background:'var(--card)',border:'1px solid var(--line)',borderTop:'3px solid var(--gold)',borderRadius:14,padding:'16px',marginBottom:14}}>
       {/* Stats row */}
       {active.length > 0 && (
         <div style={{display:'flex',gap:0,flexWrap:'wrap',marginBottom:16,paddingBottom:14,borderBottom:'1px solid var(--line)'}}>
           {stats.map(({label, value, accent}) => (
             <div key={label} style={{flex:'1 1 70px',minWidth:60}}>
-              <div style={{fontSize:'1.35rem',fontWeight:700,color:accent?'var(--gold)':'var(--ink)',letterSpacing:'-0.02em'}}>{value}</div>
-              <div style={{fontSize:'0.66rem',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginTop:1}}>{label}</div>
+              <div style={{fontSize:'1.85rem',fontWeight:700,color:accent?'var(--gold)':'var(--ink)',letterSpacing:'-0.03em',lineHeight:1}}>{value}</div>
+              <div style={{fontSize:'0.66rem',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginTop:4}}>{label}</div>
             </div>
           ))}
         </div>
@@ -886,11 +896,68 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onArchive }) {
   );
 }
 
+function groupByMonth(lessons) {
+  const groups = {};
+  lessons.forEach(l => {
+    const key = l.lesson_date.slice(0, 7);
+    if (!groups[key]) {
+      const d = new Date(l.lesson_date + 'T12:00:00');
+      groups[key] = { key, label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }), lessons: [] };
+    }
+    groups[key].lessons.push(l);
+  });
+  return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
+}
+
+function LessonDetailSheet({ lesson, onClose, onToggleFree, toggling }) {
+  const d = new Date(lesson.lesson_date + 'T12:00:00');
+  const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  const statusClass = lesson.is_complimentary ? 'ok' : lesson.status === 'completed' ? 'ok' : lesson.status === 'missed' ? 'warn' : 'neutral';
+  const statusLabel = lesson.is_complimentary ? 'Free lesson' : lesson.status;
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="sheet">
+        <h2 style={{fontSize:'1rem',marginBottom:4}}>{dateStr}</h2>
+        {lesson.start_time && (
+          <div style={{fontSize:'0.88rem',color:'var(--muted)',marginBottom:12}}>🕐 {lesson.start_time}</div>
+        )}
+        <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
+          <span className={`pill ${statusClass}`}>{statusLabel}</span>
+          {lesson.rate_charged && !lesson.is_complimentary && (
+            <span className="pill neutral">£{lesson.rate_charged}</span>
+          )}
+        </div>
+        {lesson.lesson_notes && (
+          <div style={{fontSize:'0.83rem',color:'var(--ink-dim)',marginBottom:16,lineHeight:1.55,background:'var(--card-2)',padding:'10px 12px',borderRadius:8,border:'1px solid var(--line)'}}>
+            {lesson.lesson_notes}
+          </div>
+        )}
+        <div className="btn-row">
+          <button className="btn cancel" onClick={onClose}>Close</button>
+          {lesson.status === 'completed' && (
+            <button
+              className="btn save"
+              style={lesson.is_complimentary ? {background:'var(--warn)'} : {}}
+              onClick={onToggleFree}
+              disabled={toggling}
+            >
+              {toggling ? '…' : lesson.is_complimentary ? 'Remove free mark' : 'Mark as free'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function StudentCard({ student, lessons, payments, bundles, allStudents, rateHistory, onEdit, onDataChanged }) {
   const [open, setOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [showMoreTools, setShowMoreTools] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
+  const [openMonths, setOpenMonths] = useState({});
+  const [detailLesson, setDetailLesson] = useState(null);
+  const [toggling, setToggling] = useState(false);
 
   const studentLessons = lessons.filter(l => l.student_id === student.id)
     .sort((a, b) => new Date(b.lesson_date) - new Date(a.lesson_date));
@@ -928,7 +995,10 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
   }
 
   async function toggleComplimentary(lesson) {
+    setToggling(true);
     await supabase.from('tutoring_lessons').update({ is_complimentary: !lesson.is_complimentary }).eq('id', lesson.id);
+    setToggling(false);
+    setDetailLesson(null);
     onDataChanged();
   }
 
@@ -952,6 +1022,9 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
   const pastLessons = studentLessons
     .filter(l => l.status !== 'scheduled')
     .slice(0, Math.max(10, unpaidCount));
+
+  const groupedLessons = groupByMonth(pastLessons);
+  const isMonthOpen = key => key in openMonths ? openMonths[key] : (groupedLessons.length > 0 && groupedLessons[0].key === key);
 
   const studentFirstName = student.name.split(' ')[0];
   const parentFirstName = (student.parent_name || '').split(' ')[0];
@@ -1036,22 +1109,28 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
           )}
 
           <div className="section-label">History</div>
-          {pastLessons.map(l => (
-            <div className="lesson-row" key={l.id}>
-              <span className="lesson-date">{new Date(l.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-              <div style={{display:'flex', alignItems:'center', gap:6}}>
-                <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={l.is_complimentary ? {color:'var(--accent)'} : {}}>
-                  {l.is_complimentary ? 'free lesson' : (l.status + (l.rate_charged ? ` · £${l.rate_charged}` : ''))}
-                </span>
-                {l.status === 'completed' && (
-                  <button className={`free-btn ${l.is_complimentary ? 'active' : 'inactive'}`} onClick={() => toggleComplimentary(l)}>
-                    {l.is_complimentary ? '✓ free' : 'mark free'}
-                  </button>
-                )}
+          {groupedLessons.length === 0 && (
+            <div style={{fontSize:'0.85rem',color:'var(--muted)',padding:'6px 0'}}>No lessons logged yet.</div>
+          )}
+          {groupedLessons.map(group => (
+            <React.Fragment key={group.key}>
+              <div className="month-hdr" onClick={() => setOpenMonths(prev => ({...prev, [group.key]: !isMonthOpen(group.key)}))}>
+                <span style={{fontSize:'0.83rem',fontWeight:600,color:'var(--ink)'}}>{group.label}</span>
+                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                  <span style={{fontSize:'0.72rem',color:'var(--muted)'}}>{group.lessons.length} lesson{group.lessons.length !== 1 ? 's' : ''}</span>
+                  <span className="month-chevron" style={{transform:isMonthOpen(group.key)?'rotate(90deg)':'none'}}>›</span>
+                </div>
               </div>
-            </div>
+              {isMonthOpen(group.key) && group.lessons.map(l => (
+                <div className="lesson-row" key={l.id} onClick={() => setDetailLesson(l)}>
+                  <span className="lesson-date">{new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</span>
+                  <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={l.is_complimentary ? {color:'var(--accent)'} : {}}>
+                    {l.is_complimentary ? 'free' : (l.status + (l.rate_charged ? ` · £${l.rate_charged}` : ''))}
+                  </span>
+                </div>
+              ))}
+            </React.Fragment>
           ))}
-          {pastLessons.length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--muted)', padding: '6px 0' }}>No lessons logged yet.</div>}
 
           <div className="actions">
             {paymentWaLink && <a className="btn whatsapp" href={paymentWaLink} target="_blank" rel="noopener">💷 Request payment</a>}
@@ -1093,6 +1172,15 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
           upcomingLessons={upcomingLessons}
           onClose={() => setShowCashModal(false)}
           onSaved={() => { setShowCashModal(false); onDataChanged(); }}
+        />
+      )}
+
+      {detailLesson && (
+        <LessonDetailSheet
+          lesson={detailLesson}
+          onClose={() => setDetailLesson(null)}
+          onToggleFree={() => toggleComplimentary(detailLesson)}
+          toggling={toggling}
         />
       )}
     </div>
@@ -1179,7 +1267,7 @@ function App() {
             allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v1.4</div>}
+        {!loading && <div className="version-tag">v1.5</div>}
       </div>
 
       {showAddModal && (
