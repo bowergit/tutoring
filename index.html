@@ -550,6 +550,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
     has_extra_time: student?.has_extra_time || false,
     pays_in_cash: !!student?.pays_in_cash,
     is_zoom: !!student?.is_zoom,
+    zoom_link: student?.zoom_link || '',
     general_notes: student?.general_notes || '',
     calendar_title_pattern: student?.calendar_title_pattern || '',
     spreadsheet_url: student?.spreadsheet_url || '',
@@ -603,6 +604,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
       has_extra_time: form.has_extra_time,
       pays_in_cash: form.pays_in_cash,
       is_zoom: form.is_zoom,
+      zoom_link: form.is_zoom ? (form.zoom_link || null) : null,
       general_notes: form.general_notes,
       calendar_title_pattern: form.calendar_title_pattern,
       spreadsheet_url: form.spreadsheet_url || null,
@@ -701,6 +703,14 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
         <div className="field">
           <Toggle checked={form.is_zoom} onChange={v => setForm({...form, is_zoom: v})} label="Zoom lesson" />
         </div>
+        {form.is_zoom && (
+          <div className="field">
+            <label>Zoom link</label>
+            <input type="text" value={form.zoom_link}
+              onChange={e => setForm({...form, zoom_link: e.target.value})}
+              placeholder="https://zoom.us/j/..." />
+          </div>
+        )}
         <div className="field">
           <label>Google Sheet link (optional)</label>
           <input type="text" value={form.spreadsheet_url} onChange={e => setForm({...form, spreadsheet_url: e.target.value})} placeholder="Paste the sheet URL here" />
@@ -1049,6 +1059,9 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
             {waLink && <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener">WhatsApp</a>}
             {student.spreadsheet_url && (
               <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener" style={{background:'#1a7f4b', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}>📈</a>
+            )}
+            {student.is_zoom && student.zoom_link && (
+              <a className="btn" href={student.zoom_link} target="_blank" rel="noopener" style={{background:'#2D8CFF', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}>🎥</a>
             )}
             <button className="btn edit" onClick={() => onEdit(student)}>Edit</button>
             <button className="btn more" onClick={() => setShowMoreTools(true)}>More tools</button>
