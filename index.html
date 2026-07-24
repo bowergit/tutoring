@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tutoring — Bower OS</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232a5c38'/><text x='16' y='23' text-anchor='middle' font-family='sans-serif' font-weight='700' font-size='19' fill='%23d3b890'>M</text></svg>">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -221,6 +225,41 @@
 
   /* ── Version tag ── */
   .version-tag { text-align: center; color: var(--muted); font-size: 0.65rem; padding: 60px 0 8px; opacity: 0.45; }
+
+  /* ── Animations ── */
+  @keyframes fadeInUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
+  .summary-widget { animation: fadeInUp 0.35s cubic-bezier(0.4,0,0.2,1) both; }
+  .card { animation: fadeInUp 0.32s cubic-bezier(0.4,0,0.2,1) both; }
+  .card:nth-child(1) { animation-delay:0.05s; }
+  .card:nth-child(2) { animation-delay:0.09s; }
+  .card:nth-child(3) { animation-delay:0.13s; }
+  .card:nth-child(4) { animation-delay:0.17s; }
+  .card:nth-child(5) { animation-delay:0.21s; }
+  .card:nth-child(6) { animation-delay:0.25s; }
+  .card:nth-child(7) { animation-delay:0.28s; }
+  .card:nth-child(8) { animation-delay:0.31s; }
+  .card:nth-child(9) { animation-delay:0.34s; }
+  .card-body-inner { animation: fadeIn 0.22s ease both; }
+
+  /* ── Toggle switch ── */
+  .toggle-wrap { display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none; }
+  .toggle-track {
+    width:44px; height:26px; border-radius:13px; position:relative; flex-shrink:0;
+    transition: background 0.22s cubic-bezier(0.4,0,0.2,1);
+  }
+  .toggle-track.on  { background: var(--accent); }
+  .toggle-track.off { background: var(--card-2); border: 1.5px solid var(--line); }
+  .toggle-thumb {
+    position:absolute; top:3px; width:18px; height:18px; border-radius:9px;
+    background:white; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    transition: left 0.22s cubic-bezier(0.4,0,0.2,1);
+  }
+  .toggle-track.on  .toggle-thumb { left:22px; }
+  .toggle-track.off .toggle-thumb { left:3px; }
+  .toggle-label { font-size:0.88rem; color:var(--ink); }
+  .rate-cash-row { display:flex; align-items:center; gap:12px; }
+  .rate-cash-row input { width:90px !important; flex-shrink:0; }
 </style>
 </head>
 <body>
@@ -262,12 +301,22 @@ function getCurrentRate(studentId, rateHistory, fallback = 90) {
   return rows.length > 0 ? parseFloat(rows[0].rate) : fallback;
 }
 
+// ---------- Toggle ----------
+function Toggle({ checked, onChange, label }) {
+  return (
+    <div className="toggle-wrap" onClick={() => onChange(!checked)}>
+      <div className={`toggle-track ${checked ? 'on' : 'off'}`}>
+        <div className="toggle-thumb" />
+      </div>
+      {label && <span className="toggle-label">{label}</span>}
+    </div>
+  );
+}
+
 // ---------- Summary Widget ----------
 function SummaryWidget({ students, rateHistory }) {
   const active = students.filter(s => s.active);
 
-  const weeklyGross = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
-  const annualGross = weeklyGross * 40;
   const weeklyNet = active.reduce((sum, s) => {
     const rate = getCurrentRate(s.id, rateHistory);
     return sum + (s.pays_in_cash ? rate : rate * 0.6);
@@ -281,15 +330,13 @@ function SummaryWidget({ students, rateHistory }) {
   const awayFromFull = Math.max(0, FULL_TARGET - active.length);
 
   const stats = [
-    { label: 'students',   value: active.length,   accent: false },
-    { label: 'gross/week', value: fmt(weeklyGross), accent: false },
-    { label: 'net/week',   value: fmt(weeklyNet),   accent: true  },
-    { label: 'gross/year', value: fmt(annualGross), accent: false },
-    { label: 'net/year',   value: fmt(annualNet),   accent: true  },
+    { label: 'students', value: active.length,  accent: false },
+    { label: 'net/week', value: fmt(weeklyNet),  accent: true  },
+    { label: 'net/year', value: fmt(annualNet),  accent: true  },
   ];
 
   return (
-    <div style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'16px',marginBottom:14}}>
+    <div className="summary-widget" style={{background:'var(--card)',border:'1px solid var(--line)',borderRadius:14,padding:'16px',marginBottom:14}}>
       {/* Stats row */}
       {active.length > 0 && (
         <div style={{display:'flex',gap:0,flexWrap:'wrap',marginBottom:16,paddingBottom:14,borderBottom:'1px solid var(--line)'}}>
@@ -378,9 +425,8 @@ function GrowthCalculator({ students, rateHistory }) {
           <input type="number" min="0" step="5" value={extraRate} onChange={e => setExtraRate(parseInt(e.target.value)||0)} />
         </div>
       </div>
-      <div className="checkbox-row" style={{marginBottom:14}}>
-        <input type="checkbox" checked={extraCash} onChange={e => setExtraCash(e.target.checked)} />
-        <label style={{marginBottom:0, fontSize:'0.88rem'}}>Pay in cash</label>
+      <div style={{marginBottom:14}}>
+        <Toggle checked={extraCash} onChange={setExtraCash} label="Pay in cash" />
       </div>
       <div className="calc-grid">
         <div className="calc-grid-head"></div>
@@ -502,7 +548,8 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
     exam_board_custom: initPreset === 'other' ? existingBoard : '',
     exam_tier: student?.exam_tier || '',
     has_extra_time: student?.has_extra_time || false,
-    pays_in_cash: student?.pays_in_cash || false,
+    pays_in_cash: !!student?.pays_in_cash,
+    is_zoom: !!student?.is_zoom,
     general_notes: student?.general_notes || '',
     calendar_title_pattern: student?.calendar_title_pattern || '',
     spreadsheet_url: student?.spreadsheet_url || '',
@@ -546,11 +593,16 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
       address: form.address,
       school: form.school,
       school_year: form.school_year ? parseInt(form.school_year) : null,
-      school_year_as_of_date: form.school_year ? new Date().toISOString().slice(0, 10) : null,
+      school_year_as_of_date: form.school_year
+        ? (parseInt(form.school_year) !== student?.school_year
+            ? new Date().toISOString().slice(0, 10)
+            : (student?.school_year_as_of_date || new Date().toISOString().slice(0, 10)))
+        : null,
       exam_board: exam_board || null,
       exam_tier: form.exam_tier || null,
       has_extra_time: form.has_extra_time,
       pays_in_cash: form.pays_in_cash,
+      is_zoom: form.is_zoom,
       general_notes: form.general_notes,
       calendar_title_pattern: form.calendar_title_pattern,
       spreadsheet_url: form.spreadsheet_url || null,
@@ -602,11 +654,17 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
         </div>
         <div className="field">
           <label>School</label>
-          <input type="text" value={form.school} onChange={e => setForm({...form, school: e.target.value})} />
+          <input type="text" list="school-options" value={form.school} onChange={e => setForm({...form, school: e.target.value})} />
+          <datalist id="school-options">
+            {[...new Set(allStudents.map(s => s.school).filter(Boolean))].map(sc => <option key={sc} value={sc} />)}
+          </datalist>
         </div>
         <div className="field">
-          <label>Rate per session (£)</label>
-          <input type="number" min="0" step="5" value={ratePerSession} onChange={e => setRatePerSession(e.target.value)} placeholder="e.g. 90" />
+          <label>Rate per session</label>
+          <div className="rate-cash-row">
+            <input type="number" min="0" step="5" value={ratePerSession} onChange={e => setRatePerSession(e.target.value)} placeholder="e.g. 90" />
+            <Toggle checked={form.pays_in_cash} onChange={v => setForm({...form, pays_in_cash: v})} label="Cash" />
+          </div>
         </div>
         <div className="field">
           <label>School year (7–13, as of today)</label>
@@ -637,13 +695,11 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
             <option value="not_sure">Not sure yet</option>
           </select>
         </div>
-        <div className="field checkbox-row">
-          <input type="checkbox" checked={form.has_extra_time} onChange={e => setForm({...form, has_extra_time: e.target.checked})} />
-          <label style={{marginBottom: 0}}>Has extra time (25%)</label>
+        <div className="field">
+          <Toggle checked={form.has_extra_time} onChange={v => setForm({...form, has_extra_time: v})} label="Has extra time (25%)" />
         </div>
-        <div className="field checkbox-row">
-          <input type="checkbox" checked={form.pays_in_cash} onChange={e => setForm({...form, pays_in_cash: e.target.checked})} />
-          <label style={{marginBottom: 0}}>Pays in cash (take-home = full rate, no tax deducted)</label>
+        <div className="field">
+          <Toggle checked={form.is_zoom} onChange={v => setForm({...form, is_zoom: v})} label="Zoom lesson" />
         </div>
         <div className="field">
           <label>Google Sheet link (optional)</label>
@@ -671,9 +727,8 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
           <label>Notes</label>
           <textarea value={form.general_notes} onChange={e => setForm({...form, general_notes: e.target.value})} />
         </div>
-        <div className="field checkbox-row">
-          <input type="checkbox" checked={form.active} onChange={e => setForm({...form, active: e.target.checked})} />
-          <label style={{marginBottom: 0}}>Active student</label>
+        <div className="field">
+          <Toggle checked={form.active} onChange={v => setForm({...form, active: v})} label="Active student" />
         </div>
 
         <div className="btn-row">
@@ -880,6 +935,14 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
   const currentRate = getCurrentRate(student.id, rateHistory);
   const unpaidCount = balance > 0 && currentRate > 0 ? Math.ceil(balance / currentRate) : 0;
 
+  const sixMonthsOut = new Date();
+  sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
+  const sixMonthsOutStr = sixMonthsOut.toISOString().slice(0, 10);
+  const upcomingNext6 = upcomingLessons.filter(l => l.lesson_date <= sixMonthsOutStr);
+  const pastLessons = studentLessons
+    .filter(l => l.status !== 'scheduled')
+    .slice(0, Math.max(10, unpaidCount));
+
   const studentFirstName = student.name.split(' ')[0];
   const parentFirstName = (student.parent_name || '').split(' ')[0];
   const greeting = parentFirstName ? `Hi ${parentFirstName}!` : 'Hi!';
@@ -912,7 +975,8 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
               <span className="pill neutral">Next: {new Date(nextLesson.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
             )}
             {displayYear && <span className="pill neutral">Y{displayYear}</span>}
-            {student.has_extra_time && <span className="pill neutral">+25% time</span>}
+            <span className="pill neutral">£{currentRate}</span>
+            {student.is_zoom && <span className="pill neutral">Zoom</span>}
           </div>
         </div>
         <span className={`chevron ${open ? 'open' : ''}`}>›</span>
@@ -924,10 +988,20 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
             <React.Fragment>
               <div className="section-label">Details</div>
               {(student.school || displayYear) && (
-                <div style={{ fontSize: '0.85rem', color: '#444', marginBottom: 4 }}>
+                <div style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: 4 }}>
                   {student.school}{displayYear ? `, Year ${displayYear}` : ''}{student.exam_board ? ` · ${student.exam_board}` : ''}{student.exam_tier && student.exam_tier !== 'not_sure' ? ` (${student.exam_tier})` : ''}
                 </div>
               )}
+              {displayYear && student.school_year && (() => {
+                const now = new Date();
+                const thisAug = new Date(now.getFullYear(), 7, 1);
+                const nextAug = now < thisAug ? thisAug : new Date(now.getFullYear() + 1, 7, 1);
+                const nextDisplayYear = Math.min(displayYear + 1, 13);
+                const daysToUpdate = Math.ceil((nextAug - now) / 86400000);
+                const startedLabel = student.school_year !== displayYear ? ` · started Y${student.school_year}` : '';
+                const updateLabel = nextDisplayYear <= 13 ? ` · Y${nextDisplayYear} in ${daysToUpdate}d` : '';
+                return <div style={{fontSize:'0.76rem', color:'var(--muted)', marginBottom:4}}>{`Y${displayYear}${startedLabel}${updateLabel}`}</div>;
+              })()}
               {referredBy && (
                 <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>Referred by {referredBy.name.split(' ')[0]}</div>
               )}
@@ -939,8 +1013,20 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
             </React.Fragment>
           )}
 
-          <div className="section-label">Recent lessons</div>
-          {studentLessons.slice(0, Math.max(10, unpaidCount)).map(l => (
+          {upcomingNext6.length > 0 && (
+            <>
+              <div className="section-label">Upcoming</div>
+              {upcomingNext6.map(l => (
+                <div className="lesson-row" key={l.id}>
+                  <span className="lesson-date">{new Date(l.lesson_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                  <span className="lesson-status scheduled">{l.bundle_id ? 'prepaid' : 'scheduled'}</span>
+                </div>
+              ))}
+            </>
+          )}
+
+          <div className="section-label">History</div>
+          {pastLessons.map(l => (
             <div className="lesson-row" key={l.id}>
               <span className="lesson-date">{new Date(l.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
               <div style={{display:'flex', alignItems:'center', gap:6}}>
@@ -955,7 +1041,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
               </div>
             </div>
           ))}
-          {studentLessons.length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>No lessons logged yet.</div>}
+          {pastLessons.length === 0 && <div style={{ fontSize: '0.85rem', color: 'var(--muted)', padding: '6px 0' }}>No lessons logged yet.</div>}
 
           <div className="actions">
             {paymentWaLink && <a className="btn whatsapp" href={paymentWaLink} target="_blank" rel="noopener">💷 Request payment</a>}
@@ -1080,7 +1166,7 @@ function App() {
             allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v1.3</div>}
+        {!loading && <div className="version-tag">v1.4</div>}
       </div>
 
       {showAddModal && (
