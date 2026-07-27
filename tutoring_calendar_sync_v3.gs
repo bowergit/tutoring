@@ -1,5 +1,5 @@
 /**
- * Tutoring Calendar → Supabase sync (v3)
+ * Tutoring Calendar → Supabase sync (v3.1)
  *
  * Reads events from the "Tutoring" Google Calendar and inserts/updates
  * matching rows in tutoring_lessons. Student matching patterns are pulled
@@ -15,6 +15,17 @@
  *    back a day or two, and a short window means lessons you deliberately
  *    deleted from the database don't get resurrected from old calendar events.
  *
+ * NEW IN v3.1:
+ *  - Recurring events are now stored as one row per occurrence. Apps Script's
+ *    getId() returns the iCalUID, which Google shares across every occurrence
+ *    of a series, so a weekly lesson would otherwise collapse into a single
+ *    row. Occurrences of a recurring event get the start time appended to make
+ *    the key unique. Non-recurring events keep their plain id, so existing
+ *    rows are untouched.
+ *  - Fixed the deletion request: UUIDs were wrapped in double quotes, which
+ *    are not legal in a URL, so UrlFetchApp rejected it as an invalid
+ *    argument. Deletions are also chunked to keep URLs a sane length.
+ *
  * SETUP (unchanged):
  * 1. Script Properties: SUPABASE_URL, SUPABASE_SERVICE_KEY (use the
  *    service_role legacy JWT key, NOT the new sb_secret_ key — Apps Script's
@@ -29,6 +40,9 @@ const SYNC_WINDOW_DAYS_FUTURE = 90;
 // Everything before this date is declared already paid for. The tutoring app
 // excludes pre_settled lessons from outstanding balances.
 const RESET_DATE = '2026-07-27';
+
+// How many ids to put in a single delete request.
+const DELETE_CHUNK_SIZE = 50;
 
 // Titles to explicitly ignore (not lessons) — kept in code since these are
 // structural, not student-specific. Add more if you spot other non-lesson
@@ -85,6 +99,24 @@ function matchStudentId_(title, matchers) {
   return { studentId: null, ignored: false };
 }
 
+/**
+ * Builds the key stored in tutoring_lessons.google_event_id.
+ *
+ * getId() returns the iCalUID, and Google gives every occurrence of a
+ * recurring series the SAME iCalUID — so using it alone would make all
+ * occurrences of a weekly lesson upsert over each other, leaving one row.
+ * Appending the start time gives each occurrence its own row. Two separate
+ * events on the same day are unaffected either way, since they already have
+ * different ids.
+ */
+function lessonKey_(event) {
+  const id = event.getId();
+  if (!event.isRecurringEvent()) return id;
+  const stamp = Utilities.formatDate(
+    event.getStartTime(), Session.getScriptTimeZone(), "yyyy-MM-dd'T'HH:mm");
+  return id + '::' + stamp;
+}
+
 function syncTutoringCalendar() {
   const config = getSupabaseConfig_();
   if (!config.url || !config.key) {
@@ -106,17 +138,18 @@ function syncTutoringCalendar() {
 
   const events = calendar.getEvents(startDate, endDate);
   const unmatched = [];
-  const seenEventIds = {};
+  const seenKeys = {};
   let inserted = 0;
   let skipped = 0;
 
   events.forEach(event => {
     const title = event.getTitle();
+    const key = lessonKey_(event);
 
     // Record EVERY event in the window, including ignored and unmatched ones.
     // Deletion below only removes rows whose event is genuinely gone from the
     // calendar — never rows that merely stopped matching a student pattern.
-    seenEventIds[event.getId()] = true;
+    seenKeys[key] = true;
 
     const match = matchStudentId_(title, matchers);
 
@@ -129,13 +162,12 @@ function syncTutoringCalendar() {
     const lessonDate = Utilities.formatDate(event.getStartTime(), Session.getScriptTimeZone(), 'yyyy-MM-dd');
     const startTime = Utilities.formatDate(event.getStartTime(), Session.getScriptTimeZone(), 'HH:mm');
     const status = event.getStartTime() < now ? 'completed' : 'scheduled';
-    const googleEventId = event.getId();
 
-    const success = upsertLesson_(config, match.studentId, lessonDate, status, googleEventId, title, startTime);
+    const success = upsertLesson_(config, match.studentId, lessonDate, status, key, title, startTime);
     if (success) inserted++; else skipped++;
   });
 
-  const removed = reconcileDeletions_(config, seenEventIds, startDate, endDate);
+  const removed = reconcileDeletions_(config, seenKeys, startDate, endDate);
 
   Logger.log('Synced: ' + inserted + ' | Failed: ' + skipped +
              ' | Deleted (event gone): ' + removed +
@@ -145,13 +177,13 @@ function syncTutoringCalendar() {
   }
 }
 
-function upsertLesson_(config, studentId, lessonDate, status, googleEventId, title, startTime) {
+function upsertLesson_(config, studentId, lessonDate, status, eventKey, title, startTime) {
   const url = config.url + '/rest/v1/tutoring_lessons?on_conflict=google_event_id';
   const payload = {
     student_id: studentId,
     lesson_date: lessonDate,
     status: status,
-    google_event_id: googleEventId,
+    google_event_id: eventKey,
     lesson_notes: title,
     start_time: startTime,
     // Anything taught before the reset date is already paid for, so it must
@@ -182,7 +214,7 @@ function upsertLesson_(config, studentId, lessonDate, status, googleEventId, tit
  * exists. Only touches rows that came from the calendar (google_event_id set),
  * so lessons added by hand in the app are never affected.
  */
-function reconcileDeletions_(config, seenEventIds, startDate, endDate) {
+function reconcileDeletions_(config, seenKeys, startDate, endDate) {
   const tz = Session.getScriptTimeZone();
   const fromStr = Utilities.formatDate(startDate, tz, 'yyyy-MM-dd');
   const toStr = Utilities.formatDate(endDate, tz, 'yyyy-MM-dd');
@@ -205,7 +237,7 @@ function reconcileDeletions_(config, seenEventIds, startDate, endDate) {
   }
 
   const rows = JSON.parse(response.getContentText());
-  const orphans = rows.filter(r => !seenEventIds[r.google_event_id]);
+  const orphans = rows.filter(r => !seenKeys[r.google_event_id]);
   if (orphans.length === 0) return 0;
 
   // A lesson attached to a payment is never silently binned — deleting it
@@ -218,23 +250,32 @@ function reconcileDeletions_(config, seenEventIds, startDate, endDate) {
 
   if (deletable.length === 0) return 0;
 
-  const idList = deletable.map(r => '"' + r.id + '"').join(',');
-  const delRes = UrlFetchApp.fetch(
-    config.url + '/rest/v1/tutoring_lessons?id=in.(' + idList + ')',
-    {
-      method: 'delete',
-      headers: supabaseHeaders_(config),
-      muteHttpExceptions: true
-    }
-  );
+  let deleted = 0;
+  for (let i = 0; i < deletable.length; i += DELETE_CHUNK_SIZE) {
+    const chunk = deletable.slice(i, i + DELETE_CHUNK_SIZE);
+    // No quotes around the UUIDs: quotes are not valid URL characters and
+    // UrlFetchApp rejects the whole request as an invalid argument.
+    const idList = chunk.map(r => r.id).join(',');
 
-  if (delRes.getResponseCode() >= 300) {
-    Logger.log('Deletion failed: ' + delRes.getContentText());
-    return 0;
+    const delRes = UrlFetchApp.fetch(
+      config.url + '/rest/v1/tutoring_lessons?id=in.(' + idList + ')',
+      {
+        method: 'delete',
+        headers: supabaseHeaders_(config),
+        muteHttpExceptions: true
+      }
+    );
+
+    if (delRes.getResponseCode() >= 300) {
+      Logger.log('Deletion failed: ' + delRes.getContentText());
+      continue;
+    }
+
+    chunk.forEach(r => {
+      Logger.log('DELETED (removed from calendar): ' + r.lesson_date + ' — ' + r.lesson_notes);
+    });
+    deleted += chunk.length;
   }
 
-  deletable.forEach(r => {
-    Logger.log('DELETED (removed from calendar): ' + r.lesson_date + ' — ' + r.lesson_notes);
-  });
-  return deletable.length;
+  return deleted;
 }
