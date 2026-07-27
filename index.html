@@ -344,12 +344,33 @@ function currentSchoolYear(baseYear, asOfDate) {
 
 const PRESET_BOARDS = ['Edexcel', 'AQA', 'Edexcel IGCSE', 'OCR'];
 
-function getCurrentRate(studentId, rateHistory, fallback = 90) {
-  const today = new Date().toISOString().slice(0, 10);
+// The rate in effect on a given date. Rates dated in the future are ignored
+// until that date arrives, so a September rise doesn't affect today's figures.
+// Ties on effective_from_date are broken by created_at, so the most recent
+// edit always wins rather than whichever row happened to sort first.
+function getRateOnDate(studentId, rateHistory, dateStr, fallback = 90) {
   const rows = (rateHistory || [])
-    .filter(r => r.student_id === studentId && r.effective_from_date <= today)
-    .sort((a, b) => b.effective_from_date.localeCompare(a.effective_from_date));
+    .filter(r => r.student_id === studentId && r.effective_from_date <= dateStr)
+    .sort((a, b) => {
+      const byDate = b.effective_from_date.localeCompare(a.effective_from_date);
+      if (byDate !== 0) return byDate;
+      return String(b.created_at || '').localeCompare(String(a.created_at || ''));
+    });
   return rows.length > 0 ? parseFloat(rows[0].rate) : fallback;
+}
+
+function getCurrentRate(studentId, rateHistory, fallback = 90) {
+  return getRateOnDate(studentId, rateHistory, new Date().toISOString().slice(0, 10), fallback);
+}
+
+// What a lesson is worth. An explicit rate_charged is a manual override and
+// always wins; otherwise it's the rate that applied on the day it was taught,
+// so past lessons keep their old price when you put rates up.
+function rateForLesson(lesson, rateHistory, fallback = 90) {
+  if (lesson.rate_charged !== null && lesson.rate_charged !== undefined && lesson.rate_charged !== '') {
+    return parseFloat(lesson.rate_charged);
+  }
+  return getRateOnDate(lesson.student_id, rateHistory, lesson.lesson_date, fallback);
 }
 
 // ---------- Toggle ----------
@@ -803,7 +824,7 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
 }
 
 // ---------- Add/Edit Student Modal ----------
-function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
+function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHistory = [] }) {
   const isEdit = !!student;
   const existingBoard = student?.exam_board || '';
   const initPreset = PRESET_BOARDS.includes(existingBoard) ? existingBoard : (existingBoard ? 'other' : '');
@@ -829,8 +850,10 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
     referred_by_student_id: student?.referred_by_student_id || '',
     active: student?.active !== undefined ? student.active : true,
   });
+  const todayStr = new Date().toISOString().slice(0, 10);
   const [ratePerSession, setRatePerSession] = useState('');
   const [originalRate, setOriginalRate] = useState(null);
+  const [rateFrom, setRateFrom] = useState(todayStr);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -894,12 +917,16 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
     }
 
     const rateNum = parseFloat(ratePerSession);
-    if (studentId && ratePerSession && !isNaN(rateNum) && rateNum !== originalRate) {
-      await supabase.from('tutoring_rate_history').insert({
+    const rateChanged = rateNum !== originalRate;
+    const schedulingFutureRise = rateFrom !== todayStr;
+    if (studentId && ratePerSession && !isNaN(rateNum) && (rateChanged || schedulingFutureRise)) {
+      // Upsert, not insert: editing a rate twice in one day must replace that
+      // day's figure rather than leave two rows competing for the same date.
+      await supabase.from('tutoring_rate_history').upsert({
         student_id: studentId,
         rate: rateNum,
-        effective_from_date: new Date().toISOString().slice(0, 10),
-      });
+        effective_from_date: rateFrom,
+      }, { onConflict: 'student_id,effective_from_date' });
     }
 
     setSaving(false);
@@ -940,6 +967,27 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
             <input type="number" min="0" step="5" value={ratePerSession} onChange={e => setRatePerSession(e.target.value)} placeholder="e.g. 90" />
             <Toggle checked={form.pays_in_cash} onChange={v => setForm({...form, pays_in_cash: v})} label="Cash" />
           </div>
+          <label style={{marginTop:10}}>Effective from</label>
+          <input type="date" value={rateFrom} onChange={e => setRateFrom(e.target.value)} />
+          <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
+            Leave as today to change the rate now, or set a future date to
+            schedule a rise. Lessons keep whichever rate applied on the day they
+            were taught.
+          </div>
+          {isEdit && student?.id && (() => {
+            const future = (rateHistory || [])
+              .filter(r => r.student_id === student.id && r.effective_from_date > todayStr)
+              .sort((a, b) => a.effective_from_date.localeCompare(b.effective_from_date));
+            if (future.length === 0) return null;
+            return (
+              <div style={{fontSize:'0.78rem', color:'var(--gold)', marginTop:6}}>
+                Scheduled: {future.map(r =>
+                  `£${parseFloat(r.rate)} from ${new Date(r.effective_from_date + 'T12:00:00')
+                    .toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}`
+                ).join(' · ')}
+              </div>
+            );
+          })()}
         </div>
         <div className="field">
           <label>School year (7–13, as of today)</label>
@@ -1039,7 +1087,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
 // ---------- Payment Modal (add / edit) ----------
 // A payment owns a bundle; the bundle is what ties it to specific lessons.
 // Lessons carrying that bundle_id are "the lessons this payment covers".
-function PaymentModal({ student, payment, lessons, currentRate, onClose, onSaved }) {
+function PaymentModal({ student, payment, lessons, currentRate, rateHistory = [], onClose, onSaved }) {
   const editing = !!payment;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -1065,10 +1113,17 @@ function PaymentModal({ student, payment, lessons, currentRate, onClose, onSaved
     }
   }, []);
 
-  // Amount tracks the session count until the user overrides it.
+  // Each selected lesson is priced at the rate that applied on its own date,
+  // so a payment spanning a rate rise adds up correctly.
+  const expectedTotal = selectedIds.reduce((sum, id) => {
+    const l = lessons.find(x => x.id === id);
+    return sum + (l ? rateForLesson(l, rateHistory, rate) : rate);
+  }, 0);
+
+  // Amount follows the selected lessons until the user overrides it.
   useEffect(() => {
-    if (!touchedAmount) setAmount(String((selectedIds.length * rate).toFixed(2)).replace(/\.00$/, ''));
-  }, [selectedIds, rate, touchedAmount]);
+    if (!touchedAmount) setAmount(String(expectedTotal.toFixed(2)).replace(/\.00$/, ''));
+  }, [expectedTotal, touchedAmount]);
 
   function toggleLesson(id) {
     setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
@@ -1148,8 +1203,8 @@ function PaymentModal({ student, payment, lessons, currentRate, onClose, onSaved
           <input type="number" min="0" step="0.01" value={amount} placeholder="0.00"
                  onChange={e => { setTouched(true); setAmount(e.target.value); }} />
           <div style={{fontSize:'0.78rem', color:'var(--muted)', marginTop:4}}>
-            {selectedIds.length} session{selectedIds.length !== 1 ? 's' : ''} × £{rate} = £{(selectedIds.length * rate).toFixed(2)}
-            {touchedAmount && Math.abs((parseFloat(amount)||0) - selectedIds.length * rate) > 0.005 && (
+            {selectedIds.length} session{selectedIds.length !== 1 ? 's' : ''} at their own dates' rates = £{expectedTotal.toFixed(2)}
+            {touchedAmount && Math.abs((parseFloat(amount) || 0) - expectedTotal) > 0.005 && (
               <span style={{color:'var(--gold)'}}> · manual override</span>
             )}
           </div>
@@ -1169,6 +1224,9 @@ function PaymentModal({ student, payment, lessons, currentRate, onClose, onSaved
                   <span style={{flex:1}}>
                     {new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'2-digit' })}
                     {l.start_time ? ` · ${l.start_time}` : ''}
+                  </span>
+                  <span style={{fontSize:'0.72rem', color:'var(--muted)', marginRight:6}}>
+                    £{rateForLesson(l, rateHistory, rate)}
                   </span>
                   <span style={{fontSize:'0.72rem', color: l.status === 'scheduled' ? 'var(--gold)' : 'var(--muted)'}}>
                     {l.status === 'scheduled' ? 'upcoming' : l.status}
@@ -1297,7 +1355,7 @@ function groupByMonth(lessons) {
   return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
 }
 
-function LessonDetailSheet({ lesson, payment, onClose, onToggleFree, toggling }) {
+function LessonDetailSheet({ lesson, payment, lessonRate, onClose, onToggleFree, toggling }) {
   const d = new Date(lesson.lesson_date + 'T12:00:00');
   const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   const statusClass = lesson.is_complimentary ? 'ok' : lesson.status === 'completed' ? 'ok' : lesson.status === 'missed' ? 'warn' : 'neutral';
@@ -1312,8 +1370,8 @@ function LessonDetailSheet({ lesson, payment, onClose, onToggleFree, toggling })
         </div>
         <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
           <span className={`pill ${statusClass}`}>{statusLabel}</span>
-          {lesson.rate_charged && !lesson.is_complimentary && (
-            <span className="pill neutral">£{lesson.rate_charged}</span>
+          {!lesson.is_complimentary && lessonRate != null && (
+            <span className="pill neutral">£{lessonRate}</span>
           )}
           {payment
             ? <span className="pill ok">paid · {methodLabel}</span>
@@ -1374,7 +1432,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
   // declared already paid, so they never count towards the balance.
   const totalOwed = completedLessons
     .filter(l => !l.is_complimentary && !l.pre_settled)
-    .reduce((sum, l) => sum + (parseFloat(l.rate_charged) || 0), 0);
+    .reduce((sum, l) => sum + rateForLesson(l, rateHistory), 0);
   const totalPaid = studentPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
   const balance = totalOwed - totalPaid;
 
@@ -1552,7 +1610,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
                       </span>
                     )}
                     <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={l.is_complimentary ? {color:'var(--accent)'} : {}}>
-                      {l.is_complimentary ? 'free' : (l.status + (l.rate_charged ? ` · £${l.rate_charged}` : ''))}
+                      {l.is_complimentary ? 'free' : `${l.status} · £${rateForLesson(l, rateHistory)}`}
                     </span>
                     <span className="chev">›</span>
                   </span>
@@ -1642,6 +1700,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
           payment={editPayment}
           lessons={studentLessons}
           currentRate={currentRate}
+          rateHistory={rateHistory}
           onClose={() => { setShowCashModal(false); setEditPayment(null); }}
           onSaved={() => { setShowCashModal(false); setEditPayment(null); onDataChanged(); }}
         />
@@ -1661,6 +1720,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
         <LessonDetailSheet
           lesson={detailLesson}
           payment={paymentByLessonId[detailLesson.id]}
+          lessonRate={rateForLesson(detailLesson, rateHistory)}
           onClose={() => setDetailLesson(null)}
           onToggleFree={() => toggleComplimentary(detailLesson)}
           toggling={toggling}
@@ -1771,12 +1831,13 @@ function App() {
             allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v2.1</div>}
+        {!loading && <div className="version-tag">v2.2</div>}
       </div>
 
       {showAddModal && (
         <StudentFormModal
           allStudents={students}
+          rateHistory={rateHistory}
           onClose={() => setShowAddModal(false)}
           onSaved={() => { setShowAddModal(false); loadAll(); }}
         />
@@ -1792,6 +1853,7 @@ function App() {
         <StudentFormModal
           student={editingStudent}
           allStudents={students}
+          rateHistory={rateHistory}
           onClose={() => setEditingStudent(null)}
           onSaved={() => { setEditingStudent(null); loadAll(); }}
         />
