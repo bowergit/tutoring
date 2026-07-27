@@ -234,8 +234,37 @@
   }
   .month-hdr:active { opacity:0.7; }
   .month-chevron { font-size:0.9rem; color:var(--muted); display:inline-block; transition:transform 0.2s; }
-  .lesson-row { cursor:pointer; }
-  .lesson-row:active { background:var(--card-2); margin:0 -4px; padding:7px 4px; border-radius:6px; }
+  /* Rows are tappable on mobile and clickable on desktop.
+     Inset via box-shadow so the highlight never shifts layout. */
+  .lesson-row, .pay-row { cursor:pointer; border-radius:6px; transition: box-shadow 0.15s, background 0.15s; }
+  .lesson-row:active, .pay-row:active { background:var(--card-2); box-shadow:0 0 0 4px var(--card-2); }
+  @media (hover:hover) {
+    .lesson-row:hover, .pay-row:hover { background:var(--card-2); box-shadow:0 0 0 4px var(--card-2); }
+    .month-hdr:hover { opacity:0.75; }
+  }
+  .lesson-row .chev, .pay-row .chev { color:var(--muted); font-size:0.85rem; margin-left:8px; opacity:0; transition:opacity 0.15s; }
+  @media (hover:hover) { .lesson-row:hover .chev, .pay-row:hover .chev { opacity:1; } }
+
+  /* Payments */
+  .pay-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:8px 0; font-size:0.86rem; border-bottom:1px solid var(--line);
+  }
+  .pay-row:last-child { border-bottom:none; }
+  .pay-method {
+    font-size:0.66rem; font-weight:600; text-transform:uppercase; letter-spacing:0.04em;
+    padding:2px 7px; border-radius:5px; background:var(--card-2); border:1px solid var(--line); color:var(--muted);
+  }
+  .pay-method.cash { color:var(--gold); border-color:var(--gold); }
+  .pay-method.bank_transfer { color:#2D8CFF; border-color:#2D8CFF; }
+  .pay-method.monzo_auto { color:#FF4F64; border-color:#FF4F64; }
+  .seg { display:flex; gap:6px; }
+  .seg button {
+    flex:1; padding:9px 8px; border-radius:9px; font-size:0.84rem; font-weight:500;
+    border:1px solid var(--line); background:var(--card-2); color:var(--muted);
+    cursor:pointer; font-family:inherit; transition: all 0.15s;
+  }
+  .seg button.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
 
   /* ── Animations ── */
   @keyframes fadeInUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
@@ -522,7 +551,7 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
             {[
               { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase (Bower OS project). Name, school, exam board, rate, WhatsApp number, spreadsheet link — all edited via the Edit button on each card.' },
               { icon: '📅', title: 'Lessons', body: 'Each lesson row in the database has a date, status (scheduled / completed / missed), and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load.' },
-              { icon: '💷', title: 'Payments & bundles', body: 'Logged manually via More Tools → Track cash payment. Each payment is tied to a bundle of sessions. Balance = total completed lessons − total paid.' },
+              { icon: '💷', title: 'Payments', body: 'Open a student and expand Payments to see every payment, or log a new one (cash or bank transfer). Tap a payment to see which lessons it covers, edit it, or delete it. Balance = total completed lessons − total paid. Monzo will feed into this same list once connected.' },
               { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script (tutoring_calendar_sync_v2.gs) runs nightly. It reads your Google Calendar Tutoring calendar, matches events to students by their "calendar name" field, and upserts lesson rows into Supabase — including marking sessions complete when the date passes.' },
               { icon: '📈', title: 'Spreadsheet links', body: 'Each student can have a Google Sheets link (set via Edit). Tap the 📈 button on a card to open it. Links are stored in Supabase and can also be set directly in the database.' },
               { icon: '💰', title: 'Rate history', body: 'Every rate change is recorded with a date. The app always uses the rate that was in effect on a given day — so historical balances stay accurate when you put prices up.' },
@@ -763,59 +792,87 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
   );
 }
 
-// ---------- Cash Payment Modal ----------
-function CashPaymentModal({ student, upcomingLessons, onClose, onSaved }) {
-  const [datePaid, setDatePaid] = useState(new Date().toISOString().slice(0, 10));
-  const [numSessions, setNumSessions] = useState(1);
-  const [selectedLessonIds, setSelectedLessonIds] = useState([]);
-  const [rate, setRate] = useState(90);
-  const [saving, setSaving] = useState(false);
+// ---------- Payment Modal (add / edit) ----------
+// A payment owns a bundle; the bundle is what ties it to specific lessons.
+// Lessons carrying that bundle_id are "the lessons this payment covers".
+function PaymentModal({ student, payment, lessons, currentRate, onClose, onSaved }) {
+  const editing = !!payment;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [datePaid, setDatePaid]   = useState(payment?.date_paid || today);
+  const [method, setMethod]       = useState(payment?.method || (student.pays_in_cash ? 'cash' : 'bank_transfer'));
+  const [amount, setAmount]       = useState(payment ? String(payment.amount) : '');
+  const [selectedIds, setSelected] = useState([]);
+  const [saving, setSaving]       = useState(false);
+  const [touchedAmount, setTouched] = useState(editing);
+
+  const rate = currentRate || 90;
+
+  // Lessons this payment may cover: anything unassigned (past or future),
+  // plus whatever is already attached to this payment's bundle.
+  const candidates = lessons
+    .filter(l => l.status !== 'cancelled' && !l.is_complimentary)
+    .filter(l => !l.bundle_id || (payment?.bundle_id && l.bundle_id === payment.bundle_id))
+    .sort((a, b) => b.lesson_date.localeCompare(a.lesson_date));
 
   useEffect(() => {
-    setSelectedLessonIds(upcomingLessons.slice(0, numSessions).map(l => l.id));
-  }, [numSessions]);
-
-  useEffect(() => {
-    async function fetchRate() {
-      const today = new Date().toISOString().slice(0, 10);
-      const { data } = await supabase
-        .from('tutoring_rate_history')
-        .select('rate')
-        .eq('student_id', student.id)
-        .lte('effective_from_date', today)
-        .order('effective_from_date', { ascending: false })
-        .limit(1)
-        .single();
-      if (data) setRate(parseFloat(data.rate));
+    if (editing && payment.bundle_id) {
+      setSelected(lessons.filter(l => l.bundle_id === payment.bundle_id).map(l => l.id));
     }
-    fetchRate();
-  }, [student.id]);
+  }, []);
+
+  // Amount tracks the session count until the user overrides it.
+  useEffect(() => {
+    if (!touchedAmount) setAmount(String((selectedIds.length * rate).toFixed(2)).replace(/\.00$/, ''));
+  }, [selectedIds, rate, touchedAmount]);
+
+  function toggleLesson(id) {
+    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
 
   async function handleSave() {
     setSaving(true);
-    const amount = rate * numSessions;
+    const amt = parseFloat(amount) || 0;
+    const n = selectedIds.length || 1;
 
-    const { data: bundle } = await supabase.from('tutoring_bundles').insert({
+    let bundleId = payment?.bundle_id || null;
+    const bundleFields = {
       student_id: student.id,
-      number_of_sessions: numSessions,
+      number_of_sessions: n,
       payment_timing: 'prepaid',
       rate_per_session: rate,
-      total_cost: amount,
+      total_cost: amt,
       date_created: datePaid,
-      notes: 'Cash payment logged via app'
-    }).select().single();
+      notes: `${method === 'cash' ? 'Cash' : method === 'bank_transfer' ? 'Bank transfer' : 'Payment'} logged via app`
+    };
 
-    await supabase.from('tutoring_payments').insert({
-      student_id: student.id,
-      bundle_id: bundle?.id,
-      amount: amount,
-      date_paid: datePaid,
-      method: 'cash'
-    });
+    if (bundleId) {
+      await supabase.from('tutoring_bundles').update(bundleFields).eq('id', bundleId);
+    } else {
+      const { data: b } = await supabase.from('tutoring_bundles').insert(bundleFields).select().single();
+      bundleId = b?.id || null;
+    }
 
-    if (bundle && selectedLessonIds.length > 0) {
-      for (const lessonId of selectedLessonIds) {
-        await supabase.from('tutoring_lessons').update({ bundle_id: bundle.id }).eq('id', lessonId);
+    if (editing) {
+      await supabase.from('tutoring_payments')
+        .update({ amount: amt, date_paid: datePaid, method, bundle_id: bundleId })
+        .eq('id', payment.id);
+    } else {
+      await supabase.from('tutoring_payments').insert({
+        student_id: student.id, bundle_id: bundleId,
+        amount: amt, date_paid: datePaid, method
+      });
+    }
+
+    if (bundleId) {
+      // Detach lessons that were unticked, attach the ticked ones.
+      const previously = lessons.filter(l => l.bundle_id === bundleId).map(l => l.id);
+      const toDetach = previously.filter(id => !selectedIds.includes(id));
+      if (toDetach.length) {
+        await supabase.from('tutoring_lessons').update({ bundle_id: null }).in('id', toDetach);
+      }
+      if (selectedIds.length) {
+        await supabase.from('tutoring_lessons').update({ bundle_id: bundleId }).in('id', selectedIds);
       }
     }
 
@@ -826,54 +883,140 @@ function CashPaymentModal({ student, upcomingLessons, onClose, onSaved }) {
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
-        <h2>Track cash payment — {student.name}</h2>
+        <h2>{editing ? 'Edit payment' : 'Log payment'} — {student.name}</h2>
+
+        <div className="field">
+          <label>Method</label>
+          <div className="seg">
+            {[['cash','💵 Cash'],['bank_transfer','🏦 Transfer'],['other','Other']].map(([v,lab]) => (
+              <button key={v} className={method === v ? 'sel' : ''} onClick={() => setMethod(v)}>{lab}</button>
+            ))}
+          </div>
+        </div>
 
         <div className="field">
           <label>Date paid</label>
           <input type="date" value={datePaid} onChange={e => setDatePaid(e.target.value)} />
         </div>
+
         <div className="field">
-          <label>Number of sessions this covers</label>
-          <input type="number" min="1" value={numSessions} onChange={e => setNumSessions(parseInt(e.target.value) || 1)} />
-          <div style={{fontSize: '0.78rem', color: 'var(--muted)', marginTop: 4}}>
-            Rate: £{rate}/session · Total: £{(rate * numSessions).toFixed(2)}
+          <label>Amount</label>
+          <input type="number" min="0" step="0.01" value={amount} placeholder="0.00"
+                 onChange={e => { setTouched(true); setAmount(e.target.value); }} />
+          <div style={{fontSize:'0.78rem', color:'var(--muted)', marginTop:4}}>
+            {selectedIds.length} session{selectedIds.length !== 1 ? 's' : ''} × £{rate} = £{(selectedIds.length * rate).toFixed(2)}
+            {touchedAmount && Math.abs((parseFloat(amount)||0) - selectedIds.length * rate) > 0.005 && (
+              <span style={{color:'var(--gold)'}}> · manual override</span>
+            )}
           </div>
         </div>
 
-        {upcomingLessons.length > 0 ? (
-          <div className="field">
-            <label>Sessions this payment covers (pre-filled from calendar — untick any that don't apply)</label>
+        <div className="field">
+          <label>Lessons this payment covers</label>
+          {candidates.length === 0 ? (
+            <div style={{fontSize:'0.85rem', color:'var(--muted)', padding:'6px 0'}}>
+              No unassigned lessons — every lesson is already covered by another payment.
+            </div>
+          ) : (
             <div className="session-list">
-              {upcomingLessons.slice(0, Math.max(numSessions, 5)).map(l => (
+              {candidates.slice(0, 24).map(l => (
                 <div className="session-pick-row" key={l.id}>
-                  <input
-                    type="checkbox"
-                    checked={selectedLessonIds.includes(l.id)}
-                    onChange={e => {
-                      if (e.target.checked) setSelectedLessonIds([...selectedLessonIds, l.id]);
-                      else setSelectedLessonIds(selectedLessonIds.filter(id => id !== l.id));
-                    }}
-                  />
-                  <span>{new Date(l.lesson_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                  <input type="checkbox" checked={selectedIds.includes(l.id)} onChange={() => toggleLesson(l.id)} />
+                  <span style={{flex:1}}>
+                    {new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'2-digit' })}
+                    {l.start_time ? ` · ${l.start_time}` : ''}
+                  </span>
+                  <span style={{fontSize:'0.72rem', color: l.status === 'scheduled' ? 'var(--gold)' : 'var(--muted)'}}>
+                    {l.status === 'scheduled' ? 'upcoming' : l.status}
+                  </span>
                 </div>
               ))}
             </div>
-            <div style={{fontSize: '0.78rem', color: 'var(--muted)'}}>
-              As each date passes, the calendar sync will mark it completed automatically.
-            </div>
-          </div>
-        ) : (
-          <div style={{fontSize: '0.85rem', color: 'var(--muted)', margin: '10px 0'}}>
-            No upcoming scheduled lessons found for this student — sessions can be matched up later once they're on the calendar.
-          </div>
-        )}
+          )}
+        </div>
 
         <div className="btn-row">
           <button className="btn cancel" onClick={onClose}>Cancel</button>
           <button className="btn save" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save payment'}
+            {saving ? 'Saving…' : editing ? 'Save changes' : 'Log payment'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Payment Detail Sheet ----------
+function PaymentDetailSheet({ payment, lessons, onClose, onEdit, onDeleted }) {
+  const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+
+  const covered = payment.bundle_id
+    ? lessons.filter(l => l.bundle_id === payment.bundle_id).sort((a,b) => a.lesson_date.localeCompare(b.lesson_date))
+    : [];
+
+  const methodLabel = { cash:'Cash', bank_transfer:'Bank transfer', monzo_auto:'Monzo (auto)', other:'Other' }[payment.method] || payment.method;
+
+  async function handleDelete() {
+    setBusy(true);
+    // Release the lessons first so they aren't orphaned against a dead bundle.
+    if (payment.bundle_id) {
+      await supabase.from('tutoring_lessons').update({ bundle_id: null }).eq('bundle_id', payment.bundle_id);
+    }
+    await supabase.from('tutoring_payments').delete().eq('id', payment.id);
+    if (payment.bundle_id) {
+      await supabase.from('tutoring_bundles').delete().eq('id', payment.bundle_id);
+    }
+    setBusy(false);
+    onDeleted();
+  }
+
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="sheet">
+        <h2 style={{fontSize:'1.5rem', marginBottom:2, letterSpacing:'-0.02em'}}>£{parseFloat(payment.amount).toFixed(2)}</h2>
+        <div style={{fontSize:'0.86rem', color:'var(--muted)', marginBottom:14}}>
+          {new Date(payment.date_paid + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
+        </div>
+
+        <div style={{display:'flex', gap:6, marginBottom:16, flexWrap:'wrap'}}>
+          <span className={`pay-method ${payment.method}`}>{methodLabel}</span>
+          {payment.monzo_transaction_id && <span className="pill neutral">auto-matched</span>}
+        </div>
+
+        <div className="section-label">Covers {covered.length} lesson{covered.length !== 1 ? 's' : ''}</div>
+        {covered.length === 0 ? (
+          <div style={{fontSize:'0.85rem', color:'var(--muted)', padding:'6px 0 10px'}}>
+            Not yet linked to any lessons — tap Edit to pick which sessions this covers.
+          </div>
+        ) : (
+          <div style={{marginBottom:10}}>
+            {covered.map(l => (
+              <div className="lesson-row" key={l.id} style={{cursor:'default'}}>
+                <span className="lesson-date">
+                  {new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' })}
+                  {l.start_time ? ` · ${l.start_time}` : ''}
+                </span>
+                <span className={`lesson-status ${l.status}`}>{l.status}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {confirming ? (
+          <div className="btn-row">
+            <button className="btn cancel" onClick={() => setConfirming(false)}>Keep</button>
+            <button className="btn save" style={{background:'var(--warn)'}} onClick={handleDelete} disabled={busy}>
+              {busy ? '…' : 'Delete for good'}
+            </button>
+          </div>
+        ) : (
+          <div className="btn-row">
+            <button className="btn cancel" onClick={onClose}>Close</button>
+            <button className="btn" style={{background:'var(--warn)', color:'#fff'}} onClick={() => setConfirming(true)}>Delete</button>
+            <button className="btn save" onClick={onEdit}>Edit</button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -886,7 +1029,7 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onArchive }) {
       <div className="sheet">
         <h2>More tools — {student.name}</h2>
         <div className="tools-menu">
-          <button onClick={onTrackCash}>💵 Track cash payment</button>
+          <button onClick={onTrackCash}>💷 Log a payment</button>
           <button onClick={onArchive} style={{color:'var(--warn)'}}>🗂 Archive student</button>
         </div>
         <div className="btn-row">
@@ -910,24 +1053,33 @@ function groupByMonth(lessons) {
   return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
 }
 
-function LessonDetailSheet({ lesson, onClose, onToggleFree, toggling }) {
+function LessonDetailSheet({ lesson, payment, onClose, onToggleFree, toggling }) {
   const d = new Date(lesson.lesson_date + 'T12:00:00');
   const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   const statusClass = lesson.is_complimentary ? 'ok' : lesson.status === 'completed' ? 'ok' : lesson.status === 'missed' ? 'warn' : 'neutral';
   const statusLabel = lesson.is_complimentary ? 'Free lesson' : lesson.status;
+  const methodLabel = payment && ({ cash:'cash', bank_transfer:'bank transfer', monzo_auto:'Monzo', other:'payment' }[payment.method] || payment.method);
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
         <h2 style={{fontSize:'1rem',marginBottom:4}}>{dateStr}</h2>
-        {lesson.start_time && (
-          <div style={{fontSize:'0.88rem',color:'var(--muted)',marginBottom:12}}>🕐 {lesson.start_time}</div>
-        )}
+        <div style={{fontSize:'0.88rem',color:'var(--muted)',marginBottom:12}}>
+          {lesson.start_time ? `🕐 ${lesson.start_time}` : <span style={{opacity:0.7}}>🕐 time not synced yet</span>}
+        </div>
         <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
           <span className={`pill ${statusClass}`}>{statusLabel}</span>
           {lesson.rate_charged && !lesson.is_complimentary && (
             <span className="pill neutral">£{lesson.rate_charged}</span>
           )}
+          {payment
+            ? <span className="pill ok">paid · {methodLabel}</span>
+            : (!lesson.is_complimentary && <span className="pill warn">unpaid</span>)}
         </div>
+        {payment && (
+          <div style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:16}}>
+            Covered by the £{parseFloat(payment.amount).toFixed(2)} payment on {new Date(payment.date_paid + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}.
+          </div>
+        )}
         {lesson.lesson_notes && (
           <div style={{fontSize:'0.83rem',color:'var(--ink-dim)',marginBottom:16,lineHeight:1.55,background:'var(--card-2)',padding:'10px 12px',borderRadius:8,border:'1px solid var(--line)'}}>
             {lesson.lesson_notes}
@@ -958,6 +1110,9 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
   const [showCashModal, setShowCashModal] = useState(false);
   const [openMonths, setOpenMonths] = useState({});
   const [detailLesson, setDetailLesson] = useState(null);
+  const [detailPayment, setDetailPayment] = useState(null);
+  const [editPayment, setEditPayment] = useState(null);
+  const [paymentsOpen, setPaymentsOpen] = useState(false);
   const [toggling, setToggling] = useState(false);
 
   const studentLessons = lessons.filter(l => l.student_id === student.id)
@@ -975,9 +1130,15 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
   const totalPaid = studentPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
   const balance = totalOwed - totalPaid;
 
-  const lastPaymentDate = studentPayments.length > 0
-    ? studentPayments.sort((a, b) => new Date(b.date_paid) - new Date(a.date_paid))[0].date_paid
-    : null;
+  const paymentsNewestFirst = [...studentPayments].sort((a, b) => b.date_paid.localeCompare(a.date_paid));
+  const lastPaymentDate = paymentsNewestFirst[0]?.date_paid || null;
+
+  // Lesson id -> the payment whose bundle covers it.
+  const paymentByLessonId = {};
+  studentPayments.forEach(p => {
+    if (!p.bundle_id) return;
+    studentLessons.filter(l => l.bundle_id === p.bundle_id).forEach(l => { paymentByLessonId[l.id] = p; });
+  });
 
   const daysSinceLastPayment = lastPaymentDate ? daysBetween(lastPaymentDate) : null;
   const isOverdue = balance > 0 && (daysSinceLastPayment === null || daysSinceLastPayment > 2);
@@ -1101,9 +1262,17 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
             <>
               <div className="section-label">Upcoming</div>
               {upcomingNext6.map(l => (
-                <div className="lesson-row" key={l.id}>
-                  <span className="lesson-date">{new Date(l.lesson_date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                  <span className="lesson-status scheduled">{l.bundle_id ? 'prepaid' : 'scheduled'}</span>
+                <div className="lesson-row" key={l.id} onClick={() => setDetailLesson(l)}>
+                  <span className="lesson-date">
+                    {new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                    {l.start_time && <span style={{color:'var(--muted)'}}> · {l.start_time}</span>}
+                  </span>
+                  <span style={{display:'flex',alignItems:'center'}}>
+                    <span className="lesson-status scheduled" style={l.bundle_id ? {color:'var(--accent)'} : {}}>
+                      {l.bundle_id ? 'prepaid' : 'scheduled'}
+                    </span>
+                    <span className="chev">›</span>
+                  </span>
                 </div>
               ))}
             </>
@@ -1124,14 +1293,64 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
               </div>
               {isMonthOpen(group.key) && group.lessons.map(l => (
                 <div className="lesson-row" key={l.id} onClick={() => setDetailLesson(l)}>
-                  <span className="lesson-date">{new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</span>
-                  <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={l.is_complimentary ? {color:'var(--accent)'} : {}}>
-                    {l.is_complimentary ? 'free' : (l.status + (l.rate_charged ? ` · £${l.rate_charged}` : ''))}
+                  <span className="lesson-date">
+                    {new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' })}
+                    {l.start_time && <span style={{color:'var(--muted)'}}> · {l.start_time}</span>}
+                  </span>
+                  <span style={{display:'flex',alignItems:'center'}}>
+                    {paymentByLessonId[l.id] && !l.is_complimentary && (
+                      <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>✓ paid</span>
+                    )}
+                    <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={l.is_complimentary ? {color:'var(--accent)'} : {}}>
+                      {l.is_complimentary ? 'free' : (l.status + (l.rate_charged ? ` · £${l.rate_charged}` : ''))}
+                    </span>
+                    <span className="chev">›</span>
                   </span>
                 </div>
               ))}
             </React.Fragment>
           ))}
+
+          <div className="month-hdr" onClick={() => setPaymentsOpen(!paymentsOpen)} style={{marginTop:14}}>
+            <span className="section-label" style={{margin:0}}>Payments</span>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <span style={{fontSize:'0.72rem',color:'var(--muted)'}}>
+                {studentPayments.length === 0 ? 'none' : `${studentPayments.length} · £${totalPaid.toFixed(2)} total`}
+              </span>
+              <span className="month-chevron" style={{transform:paymentsOpen?'rotate(90deg)':'none'}}>›</span>
+            </div>
+          </div>
+          {paymentsOpen && (
+            <>
+              {paymentsNewestFirst.map(p => {
+                const n = p.bundle_id ? studentLessons.filter(l => l.bundle_id === p.bundle_id).length : 0;
+                return (
+                  <div className="pay-row" key={p.id} onClick={() => setDetailPayment(p)}>
+                    <span style={{display:'flex',alignItems:'center',gap:8}}>
+                      <span className="lesson-date">
+                        {new Date(p.date_paid + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' })}
+                      </span>
+                      <span className={`pay-method ${p.method}`}>
+                        {{cash:'cash', bank_transfer:'transfer', monzo_auto:'monzo', other:'other'}[p.method] || p.method}
+                      </span>
+                    </span>
+                    <span style={{display:'flex',alignItems:'center'}}>
+                      <span style={{fontSize:'0.72rem',color:'var(--muted)',marginRight:8}}>
+                        {n > 0 ? `${n} lesson${n !== 1 ? 's' : ''}` : 'unlinked'}
+                      </span>
+                      <span style={{fontWeight:600,color:'var(--ink)'}}>£{parseFloat(p.amount).toFixed(2)}</span>
+                      <span className="chev">›</span>
+                    </span>
+                  </div>
+                );
+              })}
+              <button
+                className="btn"
+                style={{width:'100%',marginTop:10,background:'var(--card-2)',color:'var(--ink)',border:'1px solid var(--line)'}}
+                onClick={() => { setEditPayment(null); setShowCashModal(true); }}
+              >+ Log a payment</button>
+            </>
+          )}
 
           <div className="actions">
             {paymentWaLink && <a className="btn whatsapp" href={paymentWaLink} target="_blank" rel="noopener">💷 Request payment</a>}
@@ -1162,23 +1381,36 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
         <MoreToolsSheet
           student={student}
           onClose={() => setShowMoreTools(false)}
-          onTrackCash={() => { setShowMoreTools(false); setShowCashModal(true); }}
+          onTrackCash={() => { setShowMoreTools(false); setEditPayment(null); setShowCashModal(true); }}
           onArchive={archiveStudent}
         />
       )}
 
       {showCashModal && (
-        <CashPaymentModal
+        <PaymentModal
           student={student}
-          upcomingLessons={upcomingLessons}
-          onClose={() => setShowCashModal(false)}
-          onSaved={() => { setShowCashModal(false); onDataChanged(); }}
+          payment={editPayment}
+          lessons={studentLessons}
+          currentRate={currentRate}
+          onClose={() => { setShowCashModal(false); setEditPayment(null); }}
+          onSaved={() => { setShowCashModal(false); setEditPayment(null); onDataChanged(); }}
+        />
+      )}
+
+      {detailPayment && (
+        <PaymentDetailSheet
+          payment={detailPayment}
+          lessons={studentLessons}
+          onClose={() => setDetailPayment(null)}
+          onEdit={() => { setEditPayment(detailPayment); setDetailPayment(null); setShowCashModal(true); }}
+          onDeleted={() => { setDetailPayment(null); onDataChanged(); }}
         />
       )}
 
       {detailLesson && (
         <LessonDetailSheet
           lesson={detailLesson}
+          payment={paymentByLessonId[detailLesson.id]}
           onClose={() => setDetailLesson(null)}
           onToggleFree={() => toggleComplimentary(detailLesson)}
           toggling={toggling}
@@ -1268,7 +1500,7 @@ function App() {
             allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v1.5</div>}
+        {!loading && <div className="version-tag">v1.6</div>}
       </div>
 
       {showAddModal && (
