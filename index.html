@@ -545,6 +545,141 @@ function PerspectiveCalculator({ addNetW }) {
   );
 }
 
+// ---------- Monzo ----------
+const FN_BASE = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
+
+function MonzoPanel({ students, onDataChanged }) {
+  const [status, setStatus] = useState(null);
+  const [pending, setPending] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [working, setWorking] = useState({});
+
+  const activeStudents = students.filter(s => s.active);
+
+  useEffect(() => { refresh(); }, []);
+
+  async function refresh() {
+    setPending(null);
+    try {
+      const s = await fetch(`${FN_BASE}/monzo-status`).then(r => r.json());
+      setStatus(s);
+      const p = await fetch(`${FN_BASE}/monzo-review`).then(r => r.json());
+      setPending(p.pending || []);
+    } catch (e) {
+      setStatus({ connected: false, problem: String(e) });
+      setPending([]);
+    }
+  }
+
+  async function syncNow() {
+    setBusy(true); setMsg(null);
+    try {
+      const r = await fetch(`${FN_BASE}/monzo-sync`).then(r => r.json());
+      setMsg(r.ok
+        ? `Logged ${r.newly_logged} new payment${r.newly_logged === 1 ? '' : 's'}.`
+        : `Problem: ${r.problem}`);
+      if (r.ok) onDataChanged();
+    } catch { setMsg('Sync failed — check your connection.'); }
+    setBusy(false);
+    refresh();
+  }
+
+  async function act(txId, body) {
+    setWorking(w => ({ ...w, [txId]: true }));
+    try {
+      await fetch(`${FN_BASE}/monzo-review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transaction_id: txId, ...body }),
+      });
+      setPending(p => p.filter(x => x.transaction_id !== txId));
+      if (body.student_id) onDataChanged();
+    } finally {
+      setWorking(w => ({ ...w, [txId]: false }));
+    }
+  }
+
+  const connected = status?.connected && status?.data_access_approved;
+
+  return (
+    <div>
+      <div style={{
+        display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10,
+        background:'var(--card-2)', border:'1px solid var(--line)', marginBottom:12, fontSize:'0.85rem'
+      }}>
+        <span style={{
+          width:9, height:9, borderRadius:5, flexShrink:0,
+          background: status === null ? 'var(--muted)' : connected ? 'var(--accent)' : 'var(--warn)'
+        }} />
+        <span style={{flex:1}}>
+          {status === null ? 'Checking…'
+            : connected ? 'Connected to Monzo'
+            : status?.connected ? 'Connected, but data access not approved in the Monzo app'
+            : 'Not connected'}
+        </span>
+        {!connected && status !== null && (
+          <a href={`${FN_BASE}/monzo-connect`} style={{
+            fontSize:'0.78rem', fontWeight:600, color:'var(--accent)', textDecoration:'none'
+          }}>Reconnect →</a>
+        )}
+      </div>
+
+      <button className="btn save" style={{width:'100%', marginBottom:6}} onClick={syncNow} disabled={busy}>
+        {busy ? 'Checking Monzo…' : '↻ Sync payments now'}
+      </button>
+      {msg && <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:10}}>{msg}</div>}
+
+      <div className="section-label" style={{marginTop:16}}>
+        Unrecognised transfers{pending ? ` (${pending.length})` : ''}
+      </div>
+      <div style={{fontSize:'0.78rem', color:'var(--muted)', marginBottom:10, lineHeight:1.45}}>
+        Money that came in but doesn't match a student. Assign one to a student and
+        every future transfer from that account is logged automatically. These are
+        read live from Monzo — nothing here is stored unless you assign it.
+      </div>
+
+      {pending === null && <div style={{fontSize:'0.85rem', color:'var(--muted)'}}>Loading…</div>}
+      {pending?.length === 0 && (
+        <div style={{fontSize:'0.85rem', color:'var(--muted)'}}>Nothing waiting — all caught up.</div>
+      )}
+
+      {pending?.map(t => (
+        <div key={t.transaction_id} style={{
+          padding:'10px 0', borderBottom:'1px solid var(--line)',
+          opacity: working[t.transaction_id] ? 0.45 : 1
+        }}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10}}>
+            <span style={{fontWeight:600, fontSize:'0.9rem'}}>{t.from || 'Unknown sender'}</span>
+            <span style={{fontWeight:700, fontSize:'0.95rem'}}>£{t.amount.toFixed(2)}</span>
+          </div>
+          <div style={{fontSize:'0.75rem', color:'var(--muted)', marginTop:2}}>
+            {new Date(t.date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}
+            {t.reference && t.reference !== t.from ? ` · ${t.reference}` : ''}
+          </div>
+          <div style={{display:'flex', gap:6, marginTop:8}}>
+            <select
+              value=""
+              disabled={working[t.transaction_id]}
+              onChange={e => e.target.value && act(t.transaction_id, { student_id: e.target.value })}
+              style={{flex:1, fontSize:'0.82rem', padding:'7px 8px'}}
+            >
+              <option value="">Assign to student…</option>
+              {activeStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <button
+              className="btn cancel"
+              style={{flex:'0 0 auto', minWidth:'auto', padding:'7px 12px', fontSize:'0.8rem'}}
+              disabled={working[t.transaction_id]}
+              onClick={() => act(t.transaction_id, { dismiss: true })}
+            >Not tutoring</button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ---------- Global Tools Sheet ----------
 function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
   const [tool, setTool] = useState(null);
@@ -580,9 +715,7 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
               <button onClick={() => setTool('growth')}>📈 Growth calculator — what if I had more students?</button>
               <button onClick={() => setTool('perspective')}>🎯 What does this get me?</button>
               <button onClick={() => setTool('archived')}>🗂 Archived students{archived.length > 0 ? ` (${archived.length})` : ''}</button>
-              <a href="https://uilytgubukiinyrqrltj.supabase.co/functions/v1/monzo-connect" style={{textDecoration:'none'}}>
-                <button style={{width:'100%'}}>🏦 Connect Monzo</button>
-              </a>
+              <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>
               <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
             </div>
           </>
@@ -631,6 +764,15 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
             <PerspectiveCalculator addNetW={addNetW} />
           </>
         )}
+        {tool === 'monzo' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Monzo payments</h2>
+            </div>
+            <MonzoPanel students={students} onDataChanged={onDataChanged} />
+          </>
+        )}
         {tool === 'archived' && (
           <>
             <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
@@ -660,7 +802,8 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
             {[
               { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase (Bower OS project). Name, school, exam board, rate, WhatsApp number, spreadsheet link — all edited via the Edit button on each card.' },
               { icon: '📅', title: 'Lessons', body: 'Each lesson row in the database has a date, status (scheduled / completed / missed), and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load.' },
-              { icon: '💷', title: 'Payments', body: 'Open a student and expand Payments to see every payment, or log a new one (cash or bank transfer). Tap a payment to see which lessons it covers, edit it, or delete it. Balance = total completed lessons − total paid. Monzo will feed into this same list once connected.' },
+              { icon: '💷', title: 'Payments', body: 'Open a student and expand Payments to see every payment, or log a new one (cash or bank transfer). Tap a payment to see which lessons it covers, edit it, or delete it. Balance = total completed lessons − total paid.' },
+              { icon: '🏦', title: 'Monzo', body: 'Tools → Monzo payments pulls incoming bank transfers and logs them against the right student automatically. Set "Expect bank transfers from" on a student to teach it a parent\'s name; after the first match it remembers their account, so it keeps working even when the bank formats the name differently. Only money coming IN from real people is ever looked at — card spending, pot transfers and declines are filtered out, and unrecognised transfers are read live and never stored.' },
               { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script (tutoring_calendar_sync_v2.gs) runs nightly. It reads your Google Calendar Tutoring calendar, matches events to students by their "calendar name" field, and upserts lesson rows into Supabase — including marking sessions complete when the date passes.' },
               { icon: '📈', title: 'Spreadsheet links', body: 'Each student can have a Google Sheets link (set via Edit). Tap the 📈 button on a card to open it. Links are stored in Supabase and can also be set directly in the database.' },
               { icon: '💰', title: 'Rate history', body: 'Every rate change is recorded with a date. The app always uses the rate that was in effect on a given day — so historical balances stay accurate when you put prices up.' },
@@ -700,6 +843,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
     pays_in_cash: !!student?.pays_in_cash,
     is_zoom: !!student?.is_zoom,
     zoom_link: student?.zoom_link || '',
+    monzo_payer_name: student?.monzo_payer_name || '',
     general_notes: student?.general_notes || '',
     calendar_title_pattern: student?.calendar_title_pattern || '',
     spreadsheet_url: student?.spreadsheet_url || '',
@@ -754,6 +898,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
       pays_in_cash: form.pays_in_cash,
       is_zoom: form.is_zoom,
       zoom_link: form.is_zoom ? (form.zoom_link || null) : null,
+      monzo_payer_name: form.monzo_payer_name || null,
       general_notes: form.general_notes,
       calendar_title_pattern: form.calendar_title_pattern,
       spreadsheet_url: form.spreadsheet_url || null,
@@ -860,6 +1005,17 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [] }) {
               placeholder="https://zoom.us/j/..." />
           </div>
         )}
+        <div className="field">
+          <label>Expect bank transfers from</label>
+          <input type="text" value={form.monzo_payer_name}
+            onChange={e => setForm({...form, monzo_payer_name: e.target.value})}
+            placeholder="e.g. Sarah Simons" />
+          <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
+            The parent's name as it appears on their bank account. Used to match
+            incoming Monzo transfers. After the first match the account is
+            remembered, so the name no longer has to be exact.
+          </div>
+        </div>
         <div className="field">
           <label>Google Sheet link (optional)</label>
           <input type="text" value={form.spreadsheet_url} onChange={e => setForm({...form, spreadsheet_url: e.target.value})} placeholder="Paste the sheet URL here" />
@@ -1630,7 +1786,7 @@ function App() {
             allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v1.8</div>}
+        {!loading && <div className="version-tag">v1.9</div>}
       </div>
 
       {showAddModal && (
