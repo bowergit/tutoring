@@ -436,28 +436,33 @@ function normaliseUKPhone(raw) {
 }
 
 // ---------- Growth Calculator ----------
-function GrowthCalculator({ students, rateHistory }) {
+function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, setExtraRate, extraCash, setExtraCash }) {
   const active = students.filter(s => s.active);
   const avgRate = active.length > 0
     ? Math.round(active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0) / active.length)
     : 90;
 
-  const [extra, setExtra] = useState(4);
-  const [extraRate, setExtraRate] = useState(avgRate);
-  const [extraCash, setExtraCash] = useState(false);
+  // Use passed props, or init with defaults if not provided
+  const e = extra !== undefined ? extra : 4;
+  const er = extraRate !== undefined ? extraRate : avgRate;
+  const ec = extraCash !== undefined ? extraCash : false;
+
+  const setE = setExtra || (() => {});
+  const setER = setExtraRate || (() => {});
+  const setEC = setExtraCash || (() => {});
 
   const currGrossW = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
   const currNetW   = active.reduce((sum, s) => {
     const r = getCurrentRate(s.id, rateHistory);
     return sum + (s.pays_in_cash ? r : r * 0.6);
   }, 0);
-  const addGrossW = extra * extraRate;
-  const addNetW   = extra * extraRate * (extraCash ? 1 : 0.6);
+  const addGrossW = e * er;
+  const addNetW   = e * er * (ec ? 1 : 0.6);
 
   const fmt = n => n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
 
   const rows = [
-    { label: 'Students',  curr: active.length,    add: extra,      isCount: true },
+    { label: 'Students',  curr: active.length,    add: e,      isCount: true },
     { label: 'Gross/wk', curr: currGrossW,        add: addGrossW  },
     { label: 'Net/wk',   curr: currNetW,          add: addNetW    },
     { label: 'Gross/yr', curr: currGrossW * 40,   add: addGrossW * 40 },
@@ -469,20 +474,20 @@ function GrowthCalculator({ students, rateHistory }) {
       <div style={{display:'flex', gap:10, marginBottom:12}}>
         <div className="field" style={{flex:1, marginBottom:0}}>
           <label>Extra students</label>
-          <input type="number" min="1" value={extra} onChange={e => setExtra(parseInt(e.target.value)||1)} />
+          <input type="number" min="1" value={e} onChange={ev => setE(parseInt(ev.target.value)||1)} />
         </div>
         <div className="field" style={{flex:1, marginBottom:0}}>
           <label>Rate £/session</label>
-          <input type="number" min="0" step="5" value={extraRate} onChange={e => setExtraRate(parseInt(e.target.value)||0)} />
+          <input type="number" min="0" step="5" value={er} onChange={ev => setER(parseInt(ev.target.value)||0)} />
         </div>
       </div>
       <div style={{marginBottom:14}}>
-        <Toggle checked={extraCash} onChange={setExtraCash} label="Pay in cash" />
+        <Toggle checked={ec} onChange={setEC} label="Pay in cash" />
       </div>
       <div className="calc-grid">
         <div className="calc-grid-head"></div>
         <div className="calc-grid-head">Now</div>
-        <div className="calc-grid-head">+{extra} more</div>
+        <div className="calc-grid-head">+{e} more</div>
         <div className="calc-grid-head">New total</div>
         {rows.map(({ label, curr, add, isCount }) => (
           <React.Fragment key={label}>
@@ -498,37 +503,34 @@ function GrowthCalculator({ students, rateHistory }) {
 }
 
 // ---------- Perspective Calculator ----------
-function PerspectiveCalculator({ students, rateHistory }) {
-  const active = students.filter(s => s.active);
-  const currNetW = active.reduce((sum, s) => {
-    const r = getCurrentRate(s.id, rateHistory);
-    return sum + (s.pays_in_cash ? r : r * 0.6);
-  }, 0);
-  const currNetY = currNetW * 52;
+function PerspectiveCalculator({ addNetW }) {
+  const addNetY = addNetW * 52;
 
   const items = [
-    { emoji: '🍫', name: 'Kitkats per year', price: 0.25 },
+    { emoji: '🍫', name: 'Kitkats', price: 0.25 },
     { emoji: '☕', name: 'Posh coffees (£5)', price: 5 },
     { emoji: '🥩', name: 'Kosher steaks (£95)', price: 95 },
-    { emoji: '🍾', name: 'Bottles of fancy champagne (£60)', price: 60 },
+    { emoji: '🍾', name: 'Fancy champagne bottles (£60)', price: 60 },
     { emoji: '🎟️', name: 'Michelin dinners for 2 (£250)', price: 250 },
     { emoji: '🏨', name: 'Nights at Four Seasons (£500)', price: 500 },
     { emoji: '✈️', name: 'Economy flights to Tokyo (£800)', price: 800 },
     { emoji: '🏝️', name: 'Weeks in Maldives (£4k)', price: 4000 },
     { emoji: '🚗', name: 'Used Range Rovers (£30k)', price: 30000 },
-    { emoji: '🏠', name: 'Decent flats in Zone 2 London (£500k)', price: 500000 },
+    { emoji: '✈️🛫', name: 'Private jet flights to Sydney (£120k)', price: 120000 },
     { emoji: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', name: 'Tiny Scottish islands (£50k)', price: 50000 },
-    { emoji: '🛸', name: 'Virgin Galactic trips to space (£450k)', price: 450000 },
+    { emoji: '🛸', name: 'Virgin Galactic space trips (£450k)', price: 450000 },
   ];
+
+  const fmt = n => n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
 
   return (
     <div>
       <div style={{fontSize:'0.9rem', color:'var(--ink-dim)', marginBottom:14, lineHeight:1.5}}>
-        Here's what your <span style={{fontWeight:600, color:'var(--ink)'}}>net £{currNetY.toLocaleString('en-GB', {maximumFractionDigits:0})}/year</span> currently gets you:
+        With this growth, you'd pocket an extra <span style={{fontWeight:600, color:'var(--ink)'}}>{fmt(addNetY)}/year</span>. That's:
       </div>
       <div className="perspective-grid">
         {items.map(item => {
-          const count = Math.floor(currNetY / item.price);
+          const count = Math.floor(addNetY / item.price);
           return (
             <div className="perspective-item" key={item.name}>
               <div className="emoji">{item.emoji}</div>
@@ -547,6 +549,17 @@ function PerspectiveCalculator({ students, rateHistory }) {
 function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
   const [tool, setTool] = useState(null);
   const archived = students.filter(s => !s.active);
+
+  // Growth calculator state (shared with perspective calc)
+  const active = students.filter(s => s.active);
+  const avgRate = active.length > 0
+    ? Math.round(active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0) / active.length)
+    : 90;
+  const [extra, setExtra] = useState(4);
+  const [extraRate, setExtraRate] = useState(avgRate);
+  const [extraCash, setExtraCash] = useState(false);
+
+  const addNetW = extra * extraRate * (extraCash ? 1 : 0.6);
 
   async function unarchive(id) {
     await supabase.from('tutoring_students').update({ active: true }).eq('id', id);
@@ -576,10 +589,19 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
               {backBtn}
               <h2 style={{margin:0}}>Growth calculator</h2>
             </div>
-            <GrowthCalculator students={students} rateHistory={rateHistory} />
+            <GrowthCalculator
+              students={students}
+              rateHistory={rateHistory}
+              extra={extra}
+              setExtra={setExtra}
+              extraRate={extraRate}
+              setExtraRate={setExtraRate}
+              extraCash={extraCash}
+              setExtraCash={setExtraCash}
+            />
             <div style={{borderTop:'1px solid var(--line)', paddingTop:16, marginTop:20}}>
               <h3 style={{fontSize:'1rem', marginBottom:10}}>Here's what it gets you</h3>
-              <PerspectiveCalculator students={students} rateHistory={rateHistory} />
+              <PerspectiveCalculator addNetW={addNetW} />
             </div>
           </>
         )}
