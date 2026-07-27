@@ -216,6 +216,17 @@
   .calc-grid-cell { padding: 7px 4px; border-top: 1px solid var(--line); color: var(--ink-dim); }
   .calc-grid-head { padding: 0 4px 7px; font-size: 0.67rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 
+  /* ── Perspective items ── */
+  .perspective-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+  .perspective-item {
+    padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--card-2); font-size: 0.82rem;
+  }
+  .perspective-item .emoji { font-size: 1.4rem; display: block; margin-bottom: 4px; }
+  .perspective-item .name { font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+  .perspective-item .count { font-size: 1.8rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; }
+  .perspective-item .per-year { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+
   /* ── Free lesson button ── */
   .free-btn {
     font-size: 0.65rem; padding: 2px 8px; border-radius: 10px;
@@ -486,6 +497,52 @@ function GrowthCalculator({ students, rateHistory }) {
   );
 }
 
+// ---------- Perspective Calculator ----------
+function PerspectiveCalculator({ students, rateHistory }) {
+  const active = students.filter(s => s.active);
+  const currNetW = active.reduce((sum, s) => {
+    const r = getCurrentRate(s.id, rateHistory);
+    return sum + (s.pays_in_cash ? r : r * 0.6);
+  }, 0);
+  const currNetY = currNetW * 52;
+
+  const items = [
+    { emoji: '🍫', name: 'Kitkats per year', price: 0.25 },
+    { emoji: '☕', name: 'Posh coffees (£5)', price: 5 },
+    { emoji: '🥩', name: 'Kosher steaks (£95)', price: 95 },
+    { emoji: '🍾', name: 'Bottles of fancy champagne (£60)', price: 60 },
+    { emoji: '🎟️', name: 'Michelin dinners for 2 (£250)', price: 250 },
+    { emoji: '🏨', name: 'Nights at Four Seasons (£500)', price: 500 },
+    { emoji: '✈️', name: 'Economy flights to Tokyo (£800)', price: 800 },
+    { emoji: '🏝️', name: 'Weeks in Maldives (£4k)', price: 4000 },
+    { emoji: '🚗', name: 'Used Range Rovers (£30k)', price: 30000 },
+    { emoji: '🏠', name: 'Decent flats in Zone 2 London (£500k)', price: 500000 },
+    { emoji: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', name: 'Tiny Scottish islands (£50k)', price: 50000 },
+    { emoji: '🛸', name: 'Virgin Galactic trips to space (£450k)', price: 450000 },
+  ];
+
+  return (
+    <div>
+      <div style={{fontSize:'0.9rem', color:'var(--ink-dim)', marginBottom:14, lineHeight:1.5}}>
+        Here's what your <span style={{fontWeight:600, color:'var(--ink)'}}>net £{currNetY.toLocaleString('en-GB', {maximumFractionDigits:0})}/year</span> currently gets you:
+      </div>
+      <div className="perspective-grid">
+        {items.map(item => {
+          const count = Math.floor(currNetY / item.price);
+          return (
+            <div className="perspective-item" key={item.name}>
+              <div className="emoji">{item.emoji}</div>
+              <div className="name">{item.name}</div>
+              <div className="count">{count.toLocaleString('en-GB')}</div>
+              {item.price < 1000 && <div className="per-year">per year</div>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ---------- Global Tools Sheet ----------
 function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
   const [tool, setTool] = useState(null);
@@ -520,6 +577,10 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
               <h2 style={{margin:0}}>Growth calculator</h2>
             </div>
             <GrowthCalculator students={students} rateHistory={rateHistory} />
+            <div style={{borderTop:'1px solid var(--line)', paddingTop:16, marginTop:20}}>
+              <h3 style={{fontSize:'1rem', marginBottom:10}}>Here's what it gets you</h3>
+              <PerspectiveCalculator students={students} rateHistory={rateHistory} />
+            </div>
           </>
         )}
         {tool === 'archived' && (
