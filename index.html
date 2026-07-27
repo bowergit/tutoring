@@ -777,13 +777,15 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
               <h2 style={{margin:0}}>About &amp; data sources</h2>
             </div>
             {[
-              { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase (Bower OS project). Name, school, exam board, rate, WhatsApp number, spreadsheet link — all edited via the Edit button on each card.' },
-              { icon: '📅', title: 'Lessons', body: 'Each lesson row in the database has a date, status (scheduled / completed / missed), and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load.' },
-              { icon: '💷', title: 'Payments', body: 'Open a student and expand Payments to see every payment, or log a new one (cash or bank transfer). Tap a payment to see which lessons it covers, edit it, or delete it. Balance = total completed lessons − total paid.' },
-              { icon: '🏦', title: 'Monzo', body: 'Tools → Monzo payments pulls incoming bank transfers and logs them against the right student automatically. Set "Expect bank transfers from" on a student to teach it a parent\'s name; after the first match it remembers their account, so it keeps working even when the bank formats the name differently. Only money coming IN from real people is ever looked at — card spending, pot transfers and declines are filtered out, and unrecognised transfers are read live and never stored.' },
-              { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script (tutoring_calendar_sync_v2.gs) runs nightly. It reads your Google Calendar Tutoring calendar, matches events to students by their "calendar name" field, and upserts lesson rows into Supabase — including marking sessions complete when the date passes.' },
+              { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase (Bower OS project). Name, school, exam board, rate, WhatsApp number, Zoom link, spreadsheet link, and the bank name to expect payments from — all edited via the Edit button on each card.' },
+              { icon: '📅', title: 'Lessons', body: 'Each lesson row has a date, start time, status (scheduled / completed / missed) and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load. History is grouped by month — tap a month to expand it, then tap a lesson for its detail, where you can also mark it free.' },
+              { icon: '🔄', title: 'Fresh start — 27 July 2026', body: 'Everything taught before 27 July 2026 is marked as already paid for. Those lessons still show in history (tagged "settled") but never count towards a balance, and all payments predating that date were cleared out. The old records were archived inside the database rather than destroyed, so they can be recovered if ever needed.' },
+              { icon: '💷', title: 'Payments', body: 'Open a student and expand Payments to see every payment, or log a new one (cash or bank transfer). Tap a payment to see which lessons it covers, edit it, or delete it. Balance = completed lessons since the reset − total paid.' },
+              { icon: '🏦', title: 'Monzo', body: 'Tools → Monzo payments pulls incoming bank transfers and logs them against the right student automatically. Set "Expect bank transfers from" on a student to teach it a parent\'s name; after the first match it remembers their account, so it keeps working even when the bank formats the name differently. Only money coming IN from real people is ever looked at — card spending, pot transfers and declines are filtered out, and unrecognised transfers are read live and never stored. Nothing before 27 July 2026 is considered.' },
+              { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script (tutoring_calendar_sync_v3.gs) runs nightly. It reads your Tutoring calendar, matches events to students by their "calendar name" field, and writes lesson rows into Supabase with their start times — marking sessions complete once the date passes. Delete an event from the calendar and the lesson is removed too, unless a payment is attached to it, in which case it is kept and flagged in the log. Lessons you add by hand in the app are never touched by the sync.' },
               { icon: '📈', title: 'Spreadsheet links', body: 'Each student can have a Google Sheets link (set via Edit). Tap the 📈 button on a card to open it. Links are stored in Supabase and can also be set directly in the database.' },
               { icon: '💰', title: 'Rate history', body: 'Every rate change is recorded with a date. The app always uses the rate that was in effect on a given day — so historical balances stay accurate when you put prices up.' },
+              { icon: '🔐', title: 'Security', body: 'Monzo credentials live only in Supabase\'s secret store, and the Monzo tables are locked so the key embedded in this page cannot read any bank data. Student details are not yet behind a login, so treat the site URL as private until that is added.' },
             ].map(({ icon, title, body }) => (
               <div key={title} style={{marginBottom:14, paddingBottom:14, borderBottom:'1px solid var(--line)'}}>
                 <div style={{fontSize:'0.88rem', fontWeight:600, color:'var(--gold)', marginBottom:4}}>{icon} {title}</div>
@@ -1769,7 +1771,7 @@ function App() {
             allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v2.0</div>}
+        {!loading && <div className="version-tag">v2.1</div>}
       </div>
 
       {showAddModal && (
