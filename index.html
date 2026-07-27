@@ -713,7 +713,6 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
             <h2>Tools</h2>
             <div className="tools-menu">
               <button onClick={() => setTool('growth')}>📈 Growth calculator — what if I had more students?</button>
-              <button onClick={() => setTool('perspective')}>🎯 What does this get me?</button>
               <button onClick={() => setTool('archived')}>🗂 Archived students{archived.length > 0 ? ` (${archived.length})` : ''}</button>
               <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>
               <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
@@ -740,28 +739,6 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
               <h3 style={{fontSize:'1rem', marginBottom:10}}>Here's what it gets you</h3>
               <PerspectiveCalculator addNetW={addNetW} />
             </div>
-          </>
-        )}
-        {tool === 'perspective' && (
-          <>
-            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
-              {backBtn}
-              <h2 style={{margin:0}}>What does this get me?</h2>
-            </div>
-            <div style={{display:'flex', gap:10, marginBottom:12}}>
-              <div className="field" style={{flex:1, marginBottom:0}}>
-                <label>Extra students</label>
-                <input type="number" min="1" value={extra} onChange={e => setExtra(parseInt(e.target.value)||1)} />
-              </div>
-              <div className="field" style={{flex:1, marginBottom:0}}>
-                <label>Rate £/session</label>
-                <input type="number" min="0" step="5" value={extraRate} onChange={e => setExtraRate(parseInt(e.target.value)||0)} />
-              </div>
-            </div>
-            <div style={{marginBottom:14}}>
-              <Toggle checked={extraCash} onChange={setExtraCash} label="Pay in cash" />
-            </div>
-            <PerspectiveCalculator addNetW={addNetW} />
           </>
         )}
         {tool === 'monzo' && (
@@ -1338,7 +1315,9 @@ function LessonDetailSheet({ lesson, payment, onClose, onToggleFree, toggling })
           )}
           {payment
             ? <span className="pill ok">paid · {methodLabel}</span>
-            : (!lesson.is_complimentary && <span className="pill warn">unpaid</span>)}
+            : lesson.pre_settled
+              ? <span className="pill ok">settled before 27 Jul</span>
+              : (!lesson.is_complimentary && <span className="pill warn">unpaid</span>)}
         </div>
         {payment && (
           <div style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:16}}>
@@ -1389,8 +1368,10 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
     .sort((a, b) => new Date(a.lesson_date) - new Date(b.lesson_date));
 
   const completedLessons = studentLessons.filter(l => l.status === 'completed');
+  // pre_settled lessons were taught before the 27 Jul 2026 reset and are
+  // declared already paid, so they never count towards the balance.
   const totalOwed = completedLessons
-    .filter(l => !l.is_complimentary)
+    .filter(l => !l.is_complimentary && !l.pre_settled)
     .reduce((sum, l) => sum + (parseFloat(l.rate_charged) || 0), 0);
   const totalPaid = studentPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
   const balance = totalOwed - totalPaid;
@@ -1563,8 +1544,10 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
                     {l.start_time && <span style={{color:'var(--muted)'}}> · {l.start_time}</span>}
                   </span>
                   <span style={{display:'flex',alignItems:'center'}}>
-                    {paymentByLessonId[l.id] && !l.is_complimentary && (
-                      <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>✓ paid</span>
+                    {!l.is_complimentary && (paymentByLessonId[l.id] || l.pre_settled) && (
+                      <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>
+                        {paymentByLessonId[l.id] ? '✓ paid' : '✓ settled'}
+                      </span>
                     )}
                     <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={l.is_complimentary ? {color:'var(--accent)'} : {}}>
                       {l.is_complimentary ? 'free' : (l.status + (l.rate_charged ? ` · £${l.rate_charged}` : ''))}
@@ -1786,7 +1769,7 @@ function App() {
             allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v1.9</div>}
+        {!loading && <div className="version-tag">v2.0</div>}
       </div>
 
       {showAddModal && (
