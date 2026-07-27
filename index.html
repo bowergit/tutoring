@@ -580,6 +580,9 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
               <button onClick={() => setTool('growth')}>📈 Growth calculator — what if I had more students?</button>
               <button onClick={() => setTool('perspective')}>🎯 What does this get me?</button>
               <button onClick={() => setTool('archived')}>🗂 Archived students{archived.length > 0 ? ` (${archived.length})` : ''}</button>
+              <a href="https://uilytgubukiinyrqrltj.supabase.co/functions/v1/monzo-connect" style={{textDecoration:'none'}}>
+                <button style={{width:'100%'}}>🏦 Connect Monzo</button>
+              </a>
               <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
             </div>
           </>
@@ -1538,6 +1541,17 @@ function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [showGlobalTools, setShowGlobalTools] = useState(false);
+  const [monzoStatus, setMonzoStatus] = useState(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const monzo = params.get('monzo');
+    if (monzo) {
+      setMonzoStatus(monzo);
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => setMonzoStatus(null), 6000);
+    }
+  }, []);
 
   async function loadAll(isManualRefresh = false) {
     if (isManualRefresh) setRefreshing(true);
@@ -1573,6 +1587,16 @@ function App() {
 
   return (
     <div>
+      {monzoStatus && (
+        <div style={{
+          position:'fixed', top:12, left:'50%', transform:'translateX(-50%)', zIndex:200,
+          padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600,
+          background: monzoStatus === 'connected' ? 'var(--accent)' : 'var(--warn)',
+          color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
+        }}>
+          {monzoStatus === 'connected' ? '🏦 Monzo connected successfully' : 'Monzo connection was cancelled or denied'}
+        </div>
+      )}
       <div className="app-header">
         <div className="header-row">
           <div>
@@ -1606,7 +1630,7 @@ function App() {
             allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v1.7</div>}
+        {!loading && <div className="version-tag">v1.8</div>}
       </div>
 
       {showAddModal && (
