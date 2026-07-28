@@ -1085,94 +1085,69 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
 }
 
 // ---------- Payment Modal (add / edit) ----------
-// A payment owns a bundle; the bundle is what ties it to specific lessons.
-// Lessons carrying that bundle_id are "the lessons this payment covers".
-function PaymentModal({ student, payment, lessons, currentRate, rateHistory = [], onClose, onSaved }) {
+// Records the money only. Which lessons it pays for is worked out by the
+// database, oldest unpaid first — so paying per lesson, paying for several at
+// once, and paying in advance are all the same action. The preview below
+// shows what it will settle before you commit.
+function PaymentModal({ student, payment, lessons, currentRate, rateHistory = [],
+                        allocations = [], onClose, onSaved }) {
   const editing = !!payment;
   const today = new Date().toISOString().slice(0, 10);
 
   const [datePaid, setDatePaid]   = useState(payment?.date_paid || today);
   const [method, setMethod]       = useState(payment?.method || (student.pays_in_cash ? 'cash' : 'bank_transfer'));
   const [amount, setAmount]       = useState(payment ? String(payment.amount) : '');
-  const [selectedIds, setSelected] = useState([]);
   const [saving, setSaving]       = useState(false);
-  const [touchedAmount, setTouched] = useState(editing);
 
   const rate = currentRate || 90;
 
-  // Lessons this payment may cover: anything unassigned (past or future),
-  // plus whatever is already attached to this payment's bundle.
-  const candidates = lessons
-    .filter(l => l.status !== 'cancelled' && !l.is_complimentary)
-    .filter(l => !l.bundle_id || (payment?.bundle_id && l.bundle_id === payment.bundle_id))
-    .sort((a, b) => b.lesson_date.localeCompare(a.lesson_date));
+  // Mirrors allocate_payment() in the database so the preview matches what
+  // will actually happen. Money already allocated by OTHER payments counts as
+  // paid; this payment's own existing allocations are ignored, since editing
+  // it redistributes from scratch.
+  const paidByOthers = {};
+  allocations.forEach(a => {
+    if (editing && a.payment_id === payment.id) return;
+    paidByOthers[a.lesson_id] = (paidByOthers[a.lesson_id] || 0) + parseFloat(a.amount);
+  });
 
-  useEffect(() => {
-    if (editing && payment.bundle_id) {
-      setSelected(lessons.filter(l => l.bundle_id === payment.bundle_id).map(l => l.id));
-    }
-  }, []);
+  const queue = lessons
+    .filter(l => l.status !== 'cancelled' && !l.is_complimentary && !l.pre_settled)
+    .sort((a, b) => (a.lesson_date + (a.start_time || '00:00'))
+                      .localeCompare(b.lesson_date + (b.start_time || '00:00')));
 
-  // Each selected lesson is priced at the rate that applied on its own date,
-  // so a payment spanning a rate rise adds up correctly.
-  const expectedTotal = selectedIds.reduce((sum, id) => {
-    const l = lessons.find(x => x.id === id);
-    return sum + (l ? rateForLesson(l, rateHistory, rate) : rate);
-  }, 0);
-
-  // Amount follows the selected lessons until the user overrides it.
-  useEffect(() => {
-    if (!touchedAmount) setAmount(String(expectedTotal.toFixed(2)).replace(/\.00$/, ''));
-  }, [expectedTotal, touchedAmount]);
-
-  function toggleLesson(id) {
-    setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  let remaining = parseFloat(amount) || 0;
+  const willCover = [];
+  for (const l of queue) {
+    if (remaining <= 0.005) break;
+    const due = rateForLesson(l, rateHistory, rate) - (paidByOthers[l.id] || 0);
+    if (due <= 0.005) continue;
+    const take = Math.min(due, remaining);
+    willCover.push({ lesson: l, take, partial: take < due - 0.005 });
+    remaining -= take;
   }
+  const leftOver = remaining;
+
+  // Prefill a new payment with one session at the current rate, since that is
+  // by far the most common case.
+  useEffect(() => {
+    if (!editing) setAmount(String(rate));
+  }, []);
 
   async function handleSave() {
     setSaving(true);
     const amt = parseFloat(amount) || 0;
-    const n = selectedIds.length || 1;
 
-    let bundleId = payment?.bundle_id || null;
-    const bundleFields = {
-      student_id: student.id,
-      number_of_sessions: n,
-      payment_timing: 'prepaid',
-      rate_per_session: rate,
-      total_cost: amt,
-      date_created: datePaid,
-      notes: `${method === 'cash' ? 'Cash' : method === 'bank_transfer' ? 'Bank transfer' : 'Payment'} logged via app`
-    };
-
-    if (bundleId) {
-      await supabase.from('tutoring_bundles').update(bundleFields).eq('id', bundleId);
-    } else {
-      const { data: b } = await supabase.from('tutoring_bundles').insert(bundleFields).select().single();
-      bundleId = b?.id || null;
-    }
-
+    // Allocation is handled by a database trigger, so it happens identically
+    // however the payment arrives — here, from Monzo, or by hand.
     if (editing) {
       await supabase.from('tutoring_payments')
-        .update({ amount: amt, date_paid: datePaid, method, bundle_id: bundleId })
+        .update({ amount: amt, date_paid: datePaid, method })
         .eq('id', payment.id);
     } else {
       await supabase.from('tutoring_payments').insert({
-        student_id: student.id, bundle_id: bundleId,
-        amount: amt, date_paid: datePaid, method
+        student_id: student.id, amount: amt, date_paid: datePaid, method
       });
-    }
-
-    if (bundleId) {
-      // Detach lessons that were unticked, attach the ticked ones.
-      const previously = lessons.filter(l => l.bundle_id === bundleId).map(l => l.id);
-      const toDetach = previously.filter(id => !selectedIds.includes(id));
-      if (toDetach.length) {
-        await supabase.from('tutoring_lessons').update({ bundle_id: null }).in('id', toDetach);
-      }
-      if (selectedIds.length) {
-        await supabase.from('tutoring_lessons').update({ bundle_id: bundleId }).in('id', selectedIds);
-      }
     }
 
     setSaving(false);
@@ -1203,30 +1178,28 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
           <input type="number" min="0" step="0.01" value={amount} placeholder="0.00"
                  onChange={e => { setTouched(true); setAmount(e.target.value); }} />
           <div style={{fontSize:'0.78rem', color:'var(--muted)', marginTop:4}}>
-            {selectedIds.length} session{selectedIds.length !== 1 ? 's' : ''} at their own dates' rates = £{expectedTotal.toFixed(2)}
-            {touchedAmount && Math.abs((parseFloat(amount) || 0) - expectedTotal) > 0.005 && (
-              <span style={{color:'var(--gold)'}}> · manual override</span>
-            )}
+            Current rate £{rate} per session.
           </div>
         </div>
 
         <div className="field">
-          <label>Lessons this payment covers</label>
-          {candidates.length === 0 ? (
+          <label>What this settles</label>
+          {willCover.length === 0 ? (
             <div style={{fontSize:'0.85rem', color:'var(--muted)', padding:'6px 0'}}>
-              No unassigned lessons — every lesson is already covered by another payment.
+              {(parseFloat(amount) || 0) <= 0
+                ? 'Enter an amount to see which lessons it covers.'
+                : 'Nothing outstanding — the whole amount will sit as credit against future lessons.'}
             </div>
           ) : (
             <div className="session-list">
-              {candidates.slice(0, 24).map(l => (
-                <div className="session-pick-row" key={l.id}>
-                  <input type="checkbox" checked={selectedIds.includes(l.id)} onChange={() => toggleLesson(l.id)} />
+              {willCover.map(({ lesson: l, take, partial }) => (
+                <div className="session-pick-row" key={l.id} style={{gap:8}}>
                   <span style={{flex:1}}>
                     {new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'2-digit' })}
                     {l.start_time ? ` · ${l.start_time}` : ''}
                   </span>
-                  <span style={{fontSize:'0.72rem', color:'var(--muted)', marginRight:6}}>
-                    £{rateForLesson(l, rateHistory, rate)}
+                  <span style={{fontSize:'0.74rem', color: partial ? 'var(--gold)' : 'var(--accent)'}}>
+                    £{take.toFixed(2)}{partial ? ' (part)' : ''}
                   </span>
                   <span style={{fontSize:'0.72rem', color: l.status === 'scheduled' ? 'var(--gold)' : 'var(--muted)'}}>
                     {l.status === 'scheduled' ? 'upcoming' : l.status}
@@ -1235,6 +1208,14 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
               ))}
             </div>
           )}
+          {leftOver > 0.005 && (
+            <div style={{fontSize:'0.78rem', color:'var(--gold)', marginTop:6}}>
+              £{leftOver.toFixed(2)} left over — held as credit against future lessons.
+            </div>
+          )}
+          <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:6, lineHeight:1.45}}>
+            Payments always go to the oldest unpaid lesson first.
+          </div>
         </div>
 
         <div className="btn-row">
@@ -1249,26 +1230,26 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
 }
 
 // ---------- Payment Detail Sheet ----------
-function PaymentDetailSheet({ payment, lessons, onClose, onEdit, onDeleted }) {
+function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdit, onDeleted }) {
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
-  const covered = payment.bundle_id
-    ? lessons.filter(l => l.bundle_id === payment.bundle_id).sort((a,b) => a.lesson_date.localeCompare(b.lesson_date))
-    : [];
+  const covered = allocations
+    .filter(a => a.payment_id === payment.id)
+    .map(a => ({ lesson: lessons.find(l => l.id === a.lesson_id), amount: parseFloat(a.amount) }))
+    .filter(x => x.lesson)
+    .sort((a, b) => a.lesson.lesson_date.localeCompare(b.lesson.lesson_date));
+
+  const allocated = covered.reduce((sum, c) => sum + c.amount, 0);
+  const unallocated = parseFloat(payment.amount) - allocated;
 
   const methodLabel = { cash:'Cash', bank_transfer:'Bank transfer', monzo_auto:'Monzo (auto)', other:'Other' }[payment.method] || payment.method;
 
   async function handleDelete() {
     setBusy(true);
-    // Release the lessons first so they aren't orphaned against a dead bundle.
-    if (payment.bundle_id) {
-      await supabase.from('tutoring_lessons').update({ bundle_id: null }).eq('bundle_id', payment.bundle_id);
-    }
+    // Allocations are removed automatically by the foreign key cascade, which
+    // frees those lessons to be settled by a later payment.
     await supabase.from('tutoring_payments').delete().eq('id', payment.id);
-    if (payment.bundle_id) {
-      await supabase.from('tutoring_bundles').delete().eq('id', payment.bundle_id);
-    }
     setBusy(false);
     onDeleted();
   }
@@ -1289,19 +1270,28 @@ function PaymentDetailSheet({ payment, lessons, onClose, onEdit, onDeleted }) {
         <div className="section-label">Covers {covered.length} lesson{covered.length !== 1 ? 's' : ''}</div>
         {covered.length === 0 ? (
           <div style={{fontSize:'0.85rem', color:'var(--muted)', padding:'6px 0 10px'}}>
-            Not yet linked to any lessons — tap Edit to pick which sessions this covers.
+            Nothing was outstanding when this arrived — it is sitting as credit
+            and will settle the next lesson automatically.
           </div>
         ) : (
           <div style={{marginBottom:10}}>
-            {covered.map(l => (
+            {covered.map(({ lesson: l, amount }) => (
               <div className="lesson-row" key={l.id} style={{cursor:'default'}}>
                 <span className="lesson-date">
                   {new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'2-digit' })}
                   {l.start_time ? ` · ${l.start_time}` : ''}
                 </span>
-                <span className={`lesson-status ${l.status}`}>{l.status}</span>
+                <span style={{display:'flex', alignItems:'center', gap:8}}>
+                  <span style={{fontSize:'0.78rem', fontWeight:600, color:'var(--accent)'}}>£{amount.toFixed(2)}</span>
+                  <span className={`lesson-status ${l.status}`}>{l.status}</span>
+                </span>
               </div>
             ))}
+          </div>
+        )}
+        {unallocated > 0.005 && (
+          <div style={{fontSize:'0.8rem', color:'var(--gold)', marginBottom:10}}>
+            £{unallocated.toFixed(2)} of this payment is unused credit.
           </div>
         )}
 
@@ -1324,14 +1314,116 @@ function PaymentDetailSheet({ payment, lessons, onClose, onEdit, onDeleted }) {
   );
 }
 
+// ---------- Statement ----------
+// A plain, chronological record of every chargeable lesson and exactly which
+// money settled it — the thing to read out when a parent asks "when did I pay
+// for that?". Copyable as text so it can be pasted straight into WhatsApp.
+function StatementSheet({ student, lessons, rateHistory, payState, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  const rows = lessons
+    .filter(l => l.status !== 'cancelled' && !l.is_complimentary && !l.pre_settled)
+    .sort((a, b) => (a.lesson_date + (a.start_time || '')).localeCompare(b.lesson_date + (b.start_time || '')))
+    .map(l => ({ lesson: l, st: payState(l) }));
+
+  const totalCharged = rows.reduce((s, r) => s + r.st.rate, 0);
+  const totalPaidHere = rows.reduce((s, r) => s + Math.min(r.st.paid, r.st.rate), 0);
+  const outstanding = totalCharged - totalPaidHere;
+
+  const fmtDate = d => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+
+  function asText() {
+    const lines = [`${student.name} — lesson and payment record`, ''];
+    rows.forEach(({ lesson: l, st }) => {
+      const when = fmtDate(l.lesson_date) + (l.start_time ? ` ${l.start_time}` : '');
+      if (st.settled && st.payments.length > 0) {
+        const paidOn = st.payments.map(p => fmtDate(p.date_paid)).join(', ');
+        lines.push(`${when} — £${st.rate} — paid ${paidOn}`);
+      } else if (st.partial) {
+        lines.push(`${when} — £${st.rate} — part paid £${st.paid.toFixed(2)}`);
+      } else {
+        lines.push(`${when} — £${st.rate} — unpaid`);
+      }
+    });
+    lines.push('', `Total charged: £${totalCharged.toFixed(2)}`);
+    lines.push(`Total paid: £${totalPaidHere.toFixed(2)}`);
+    if (outstanding > 0.005) lines.push(`Outstanding: £${outstanding.toFixed(2)}`);
+    return lines.join('\n');
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(asText());
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard unavailable — the text is on screen anyway */ }
+  }
+
+  return (
+    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="sheet">
+        <h2 style={{marginBottom:4}}>Payment record — {student.name}</h2>
+        <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14}}>
+          Every lesson since 27 July 2026, and when it was paid for.
+        </div>
+
+        {rows.length === 0 && (
+          <div style={{fontSize:'0.85rem', color:'var(--muted)', padding:'8px 0'}}>
+            No chargeable lessons yet.
+          </div>
+        )}
+
+        {rows.map(({ lesson: l, st }) => (
+          <div key={l.id} style={{padding:'9px 0', borderBottom:'1px solid var(--line)'}}>
+            <div style={{display:'flex', justifyContent:'space-between', gap:10}}>
+              <span style={{fontSize:'0.87rem', fontWeight:500}}>
+                {fmtDate(l.lesson_date)}{l.start_time ? ` · ${l.start_time}` : ''}
+              </span>
+              <span style={{fontSize:'0.87rem', fontWeight:600}}>£{st.rate}</span>
+            </div>
+            <div style={{fontSize:'0.78rem', marginTop:3,
+                         color: st.settled ? 'var(--accent)' : st.partial ? 'var(--gold)' : 'var(--warn)'}}>
+              {st.settled && st.payments.length > 0
+                ? `Paid ${st.payments.map(p => fmtDate(p.date_paid)).join(', ')}`
+                : st.settled ? 'Paid'
+                : st.partial ? `Part paid — £${st.paid.toFixed(2)} of £${st.rate}`
+                : l.status === 'scheduled' ? 'Not yet due' : 'Unpaid'}
+            </div>
+          </div>
+        ))}
+
+        <div style={{marginTop:14, paddingTop:12, borderTop:'2px solid var(--line)', fontSize:'0.88rem'}}>
+          <div style={{display:'flex', justifyContent:'space-between'}}>
+            <span style={{color:'var(--muted)'}}>Total charged</span><span>£{totalCharged.toFixed(2)}</span>
+          </div>
+          <div style={{display:'flex', justifyContent:'space-between', marginTop:3}}>
+            <span style={{color:'var(--muted)'}}>Total paid</span><span>£{totalPaidHere.toFixed(2)}</span>
+          </div>
+          <div style={{display:'flex', justifyContent:'space-between', marginTop:5, fontWeight:700,
+                       color: outstanding > 0.005 ? 'var(--warn)' : 'var(--accent)'}}>
+            <span>{outstanding > 0.005 ? 'Outstanding' : 'Settled'}</span>
+            <span>£{Math.max(0, outstanding).toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div className="btn-row">
+          <button className="btn cancel" onClick={onClose}>Close</button>
+          <button className="btn save" onClick={copy}>{copied ? 'Copied ✓' : 'Copy as text'}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ---------- More Tools Sheet ----------
-function MoreToolsSheet({ student, onClose, onTrackCash, onArchive }) {
+function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive }) {
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
         <h2>More tools — {student.name}</h2>
         <div className="tools-menu">
           <button onClick={onTrackCash}>💷 Log a payment</button>
+          <button onClick={onStatement}>🧾 Payment record — what was paid when</button>
           <button onClick={onArchive} style={{color:'var(--warn)'}}>🗂 Archive student</button>
         </div>
         <div className="btn-row">
@@ -1355,12 +1447,13 @@ function groupByMonth(lessons) {
   return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
 }
 
-function LessonDetailSheet({ lesson, payment, lessonRate, onClose, onToggleFree, toggling }) {
+function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree, toggling }) {
   const d = new Date(lesson.lesson_date + 'T12:00:00');
   const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   const statusClass = lesson.is_complimentary ? 'ok' : lesson.status === 'completed' ? 'ok' : lesson.status === 'missed' ? 'warn' : 'neutral';
   const statusLabel = lesson.is_complimentary ? 'Free lesson' : lesson.status;
-  const methodLabel = payment && ({ cash:'cash', bank_transfer:'bank transfer', monzo_auto:'Monzo', other:'payment' }[payment.method] || payment.method);
+  const METHODS = { cash:'cash', bank_transfer:'bank transfer', monzo_auto:'bank transfer', other:'payment' };
+  const st = payState || { rate: lessonRate, paid: 0, payments: [], settled: false, partial: false };
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
@@ -1373,15 +1466,37 @@ function LessonDetailSheet({ lesson, payment, lessonRate, onClose, onToggleFree,
           {!lesson.is_complimentary && lessonRate != null && (
             <span className="pill neutral">£{lessonRate}</span>
           )}
-          {payment
-            ? <span className="pill ok">paid · {methodLabel}</span>
-            : lesson.pre_settled
-              ? <span className="pill ok">settled before 27 Jul</span>
-              : (!lesson.is_complimentary && <span className="pill warn">unpaid</span>)}
+          {lesson.is_complimentary ? null
+            : lesson.pre_settled ? <span className="pill ok">settled before 27 Jul</span>
+            : st.settled ? <span className="pill ok">paid</span>
+            : st.partial ? <span className="pill warn">part paid · £{st.paid.toFixed(2)} of £{st.rate}</span>
+            : <span className="pill warn">unpaid</span>}
         </div>
-        {payment && (
-          <div style={{fontSize:'0.8rem',color:'var(--muted)',marginBottom:16}}>
-            Covered by the £{parseFloat(payment.amount).toFixed(2)} payment on {new Date(payment.date_paid + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}.
+
+        {/* The receipt: exactly what was paid, when, and how. */}
+        {st.payments.length > 0 && (
+          <div style={{
+            marginBottom:16, padding:'10px 12px', borderRadius:8,
+            background:'var(--card-2)', border:'1px solid var(--line)'
+          }}>
+            <div style={{fontSize:'0.72rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6}}>
+              Payment record
+            </div>
+            {st.payments
+              .slice()
+              .sort((a, b) => a.date_paid.localeCompare(b.date_paid))
+              .map(p => (
+                <div key={p.id} style={{fontSize:'0.83rem', color:'var(--ink-dim)', lineHeight:1.5}}>
+                  £{p.allocated.toFixed(2)} received {new Date(p.date_paid + 'T12:00:00')
+                    .toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
+                  {' '}by {METHODS[p.method] || p.method}
+                </div>
+              ))}
+            {st.partial && (
+              <div style={{fontSize:'0.8rem', color:'var(--gold)', marginTop:4}}>
+                £{(st.rate - st.paid).toFixed(2)} still outstanding on this lesson.
+              </div>
+            )}
           </div>
         )}
         {lesson.lesson_notes && (
@@ -1407,7 +1522,7 @@ function LessonDetailSheet({ lesson, payment, lessonRate, onClose, onToggleFree,
   );
 }
 
-function StudentCard({ student, lessons, payments, bundles, allStudents, rateHistory, onEdit, onDataChanged }) {
+function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, onEdit, onDataChanged }) {
   const [open, setOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [showMoreTools, setShowMoreTools] = useState(false);
@@ -1416,6 +1531,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
   const [detailLesson, setDetailLesson] = useState(null);
   const [detailPayment, setDetailPayment] = useState(null);
   const [editPayment, setEditPayment] = useState(null);
+  const [showStatement, setShowStatement] = useState(false);
   const [paymentsOpen, setPaymentsOpen] = useState(false);
   const [toggling, setToggling] = useState(false);
 
@@ -1439,28 +1555,46 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
   const paymentsNewestFirst = [...studentPayments].sort((a, b) => b.date_paid.localeCompare(a.date_paid));
   const lastPaymentDate = paymentsNewestFirst[0]?.date_paid || null;
 
-  // Lesson id -> the payment whose bundle covers it.
-  const paymentByLessonId = {};
-  studentPayments.forEach(p => {
-    if (!p.bundle_id) return;
-    studentLessons.filter(l => l.bundle_id === p.bundle_id).forEach(l => { paymentByLessonId[l.id] = p; });
+  // Which money paid for which lesson. A lesson can be part-paid, or covered
+  // by more than one payment, so each entry carries the full picture.
+  const lessonIds = new Set(studentLessons.map(l => l.id));
+  const studentAllocations = allocations.filter(a => lessonIds.has(a.lesson_id));
+  const paymentsById = Object.fromEntries(studentPayments.map(p => [p.id, p]));
+
+  const payInfoByLessonId = {};
+  studentAllocations.forEach(a => {
+    const info = payInfoByLessonId[a.lesson_id] || { paid: 0, payments: [] };
+    info.paid += parseFloat(a.amount);
+    const p = paymentsById[a.payment_id];
+    if (p) info.payments.push({ ...p, allocated: parseFloat(a.amount) });
+    payInfoByLessonId[a.lesson_id] = info;
   });
+
+  function lessonPayState(l) {
+    const rate = rateForLesson(l, rateHistory);
+    const info = payInfoByLessonId[l.id];
+    const paid = info ? info.paid : 0;
+    return {
+      rate, paid,
+      payments: info ? info.payments : [],
+      settled: l.pre_settled || l.is_complimentary || paid >= rate - 0.005,
+      partial: paid > 0.005 && paid < rate - 0.005,
+    };
+  }
+
+  // Money received that isn't yet attached to a lesson — i.e. credit in hand.
+  const allocatedTotal = studentAllocations.reduce((sum, a) => sum + parseFloat(a.amount), 0);
 
   const daysSinceLastPayment = lastPaymentDate ? daysBetween(lastPaymentDate) : null;
   const isOverdue = balance > 0 && (daysSinceLastPayment === null || daysSinceLastPayment > 2);
 
   const nextLesson = upcomingLessons[0];
 
-  const activeBundle = studentBundles.find(b => {
-    const used = studentLessons.filter(l => l.bundle_id === b.id && l.status === 'completed').length;
-    return used < b.number_of_sessions;
-  });
-
-  let bundleRemaining = null;
-  if (activeBundle) {
-    const used = studentLessons.filter(l => l.bundle_id === activeBundle.id && l.status === 'completed').length;
-    bundleRemaining = activeBundle.number_of_sessions - used;
-  }
+  // Credit in hand: money received beyond what's been allocated to lessons,
+  // expressed as roughly how many sessions it covers ahead.
+  const creditInHand = Math.max(0, totalPaid - allocatedTotal);
+  const bundleRemaining = null;
+  const activeBundle = null;
 
   async function toggleComplimentary(lesson) {
     setToggling(true);
@@ -1504,8 +1638,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
   const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}` : null;
   const paymentMsg = `${greeting} Just a note that we have ${unpaidCount} outstanding session${unpaidCount !== 1 ? 's' : ''} totalling £${balance.toFixed(2)}. Could you let me know when's convenient to settle up? Thanks!`;
   const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
-  const bundleMsg = bundleRemaining !== null ? `${greeting} Just to let you know, there's ${bundleRemaining} session${bundleRemaining !== 1 ? 's' : ''} left in ${studentFirstName}'s current bundle. When you get a chance, it'd be great to sort another bundle. Thanks!` : '';
-  const bundleWaLink = phone && bundleRemaining !== null && bundleRemaining <= 1 ? `https://wa.me/${phone}?text=${encodeURIComponent(bundleMsg)}` : null;
+  const bundleWaLink = null;
 
   return (
     <div className="card">
@@ -1519,8 +1652,8 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
               </span>
             )}
             {balance <= 0 && <span className="pill ok">Paid up</span>}
-            {bundleRemaining !== null && bundleRemaining <= 1 && (
-              <span className="pill warn">{bundleRemaining} session left</span>
+            {creditInHand > 0.005 && (
+              <span className="pill ok">£{creditInHand.toFixed(2)} credit</span>
             )}
             {nextLesson && (
               <span className="pill neutral">Next: {new Date(nextLesson.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
@@ -1574,8 +1707,8 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
                     {l.start_time && <span style={{color:'var(--muted)'}}> · {l.start_time}</span>}
                   </span>
                   <span style={{display:'flex',alignItems:'center'}}>
-                    <span className="lesson-status scheduled" style={l.bundle_id ? {color:'var(--accent)'} : {}}>
-                      {l.bundle_id ? 'prepaid' : 'scheduled'}
+                    <span className="lesson-status scheduled" style={lessonPayState(l).settled ? {color:'var(--accent)'} : {}}>
+                      {lessonPayState(l).settled ? 'prepaid' : 'scheduled'}
                     </span>
                     <span className="chev">›</span>
                   </span>
@@ -1604,11 +1737,13 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
                     {l.start_time && <span style={{color:'var(--muted)'}}> · {l.start_time}</span>}
                   </span>
                   <span style={{display:'flex',alignItems:'center'}}>
-                    {!l.is_complimentary && (paymentByLessonId[l.id] || l.pre_settled) && (
-                      <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>
-                        {paymentByLessonId[l.id] ? '✓ paid' : '✓ settled'}
-                      </span>
-                    )}
+                    {!l.is_complimentary && (() => {
+                      const st = lessonPayState(l);
+                      if (l.pre_settled) return <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>✓ settled</span>;
+                      if (st.settled)    return <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>✓ paid</span>;
+                      if (st.partial)    return <span style={{fontSize:'0.7rem',color:'var(--gold)',marginRight:7}}>part paid</span>;
+                      return null;
+                    })()}
                     <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={l.is_complimentary ? {color:'var(--accent)'} : {}}>
                       {l.is_complimentary ? 'free' : `${l.status} · £${rateForLesson(l, rateHistory)}`}
                     </span>
@@ -1631,7 +1766,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
           {paymentsOpen && (
             <>
               {paymentsNewestFirst.map(p => {
-                const n = p.bundle_id ? studentLessons.filter(l => l.bundle_id === p.bundle_id).length : 0;
+                const n = studentAllocations.filter(a => a.payment_id === p.id).length;
                 return (
                   <div className="pay-row" key={p.id} onClick={() => setDetailPayment(p)}>
                     <span style={{display:'flex',alignItems:'center',gap:8}}>
@@ -1690,6 +1825,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
           student={student}
           onClose={() => setShowMoreTools(false)}
           onTrackCash={() => { setShowMoreTools(false); setEditPayment(null); setShowCashModal(true); }}
+          onStatement={() => { setShowMoreTools(false); setShowStatement(true); }}
           onArchive={archiveStudent}
         />
       )}
@@ -1701,6 +1837,7 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
           lessons={studentLessons}
           currentRate={currentRate}
           rateHistory={rateHistory}
+          allocations={studentAllocations}
           onClose={() => { setShowCashModal(false); setEditPayment(null); }}
           onSaved={() => { setShowCashModal(false); setEditPayment(null); onDataChanged(); }}
         />
@@ -1710,16 +1847,27 @@ function StudentCard({ student, lessons, payments, bundles, allStudents, rateHis
         <PaymentDetailSheet
           payment={detailPayment}
           lessons={studentLessons}
+          allocations={studentAllocations}
           onClose={() => setDetailPayment(null)}
           onEdit={() => { setEditPayment(detailPayment); setDetailPayment(null); setShowCashModal(true); }}
           onDeleted={() => { setDetailPayment(null); onDataChanged(); }}
         />
       )}
 
+      {showStatement && (
+        <StatementSheet
+          student={student}
+          lessons={studentLessons}
+          rateHistory={rateHistory}
+          payState={lessonPayState}
+          onClose={() => setShowStatement(false)}
+        />
+      )}
+
       {detailLesson && (
         <LessonDetailSheet
           lesson={detailLesson}
-          payment={paymentByLessonId[detailLesson.id]}
+          payState={lessonPayState(detailLesson)}
           lessonRate={rateForLesson(detailLesson, rateHistory)}
           onClose={() => setDetailLesson(null)}
           onToggleFree={() => toggleComplimentary(detailLesson)}
@@ -1735,6 +1883,7 @@ function App() {
   const [lessons, setLessons] = useState([]);
   const [payments, setPayments] = useState([]);
   const [bundles, setBundles] = useState([]);
+  const [allocations, setAllocations] = useState([]);
   const [rateHistory, setRateHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -1756,22 +1905,29 @@ function App() {
 
   async function loadAll(isManualRefresh = false) {
     if (isManualRefresh) setRefreshing(true);
-    // Auto-fix past scheduled lessons
+    // Auto-complete lessons that have already happened. Two passes, because a
+    // lesson earlier TODAY has passed too — checking the date alone left this
+    // morning's lesson showing as upcoming until tomorrow.
     const today = new Date().toISOString().slice(0, 10);
-    supabase.from('tutoring_lessons').update({ status: 'completed' })
-      .eq('status', 'scheduled').lt('lesson_date', today).then(() => {});
-    const [s, l, p, b, r] = await Promise.all([
+    const nowHHMM = new Date().toTimeString().slice(0, 5);
+    await supabase.from('tutoring_lessons').update({ status: 'completed' })
+      .eq('status', 'scheduled').lt('lesson_date', today);
+    await supabase.from('tutoring_lessons').update({ status: 'completed' })
+      .eq('status', 'scheduled').eq('lesson_date', today).lt('start_time', nowHHMM);
+    const [s, l, p, b, r, a] = await Promise.all([
       supabase.from('tutoring_students').select('*').order('active', { ascending: false }).order('name'),
       supabase.from('tutoring_lessons').select('*'),
       supabase.from('tutoring_payments').select('*'),
       supabase.from('tutoring_bundles').select('*'),
-      supabase.from('tutoring_rate_history').select('*')
+      supabase.from('tutoring_rate_history').select('*'),
+      supabase.from('tutoring_payment_allocations').select('*')
     ]);
     setStudents(s.data || []);
     setLessons(l.data || []);
     setPayments(p.data || []);
     setBundles(b.data || []);
     setRateHistory(r.data || []);
+    setAllocations(a.data || []);
     setLastSynced(new Date());
     setLoading(false);
     setRefreshing(false);
@@ -1828,10 +1984,11 @@ function App() {
 
         {!loading && activeStudents.map(s => (
           <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
-            allStudents={students} rateHistory={rateHistory} onEdit={setEditingStudent} onDataChanged={loadAll} />
+            allocations={allocations} allStudents={students} rateHistory={rateHistory}
+            onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v2.2</div>}
+        {!loading && <div className="version-tag">v2.3</div>}
       </div>
 
       {showAddModal && (
