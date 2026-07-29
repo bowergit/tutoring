@@ -520,6 +520,24 @@ function dummyRateFor(studentId) {
   return 35 + (hashStr(String(studentId) + ':rate35') % 9) * 5;
 }
 
+// Stand-ins for the other identifying fields on the edit form. 07700 900xxx is
+// Ofcom's reserved drama/fiction range, so it can never be a real number.
+const DUMMY_STREETS = ['Elm','Oak','Ash','Cedar','Maple','Birch','Willow','Hazel'];
+const DUMMY_SCHOOLS = ['Northgate High','Kingsway Academy','Parkview School','Beechwood High','Riverside College'];
+
+function dummyPhoneFor(seed) {
+  return '07700 900' + String(100 + hashStr(String(seed) + ':ph') % 900);
+}
+function dummyAddressFor(seed) {
+  const n = 1 + hashStr(String(seed) + ':hn') % 98;
+  return `${n} ${DUMMY_STREETS[hashStr(String(seed) + ':st') % DUMMY_STREETS.length]} Road`;
+}
+function dummySchoolFor(seed) {
+  return DUMMY_SCHOOLS[hashStr(String(seed) + ':sch') % DUMMY_SCHOOLS.length];
+}
+
+const HIDDEN_TEXT_MASK = '•••••';
+
 const HIDDEN_MONEY_MASK = '£•••';
 
 // Money display. By the time a number reaches here it is ALREADY correct for
@@ -532,6 +550,22 @@ function useMoney() {
     const fmt = formatter || (n => `£${Number(n).toFixed(2).replace(/\.00$/, '')}`);
     if (moneyMode === 'hidden') return HIDDEN_MONEY_MASK;
     return fmt(value);
+  };
+}
+
+// For amounts that arrive already real and have no student to scale against —
+// chiefly unmatched Monzo transfers, which come straight off the bank API. Fake
+// mode substitutes a plausible transfer: one to four sessions at a fake rate.
+function useRawMoney() {
+  const { moneyMode } = usePrivacy();
+  return (real, seedKey) => {
+    if (moneyMode === 'hidden') return HIDDEN_MONEY_MASK;
+    if (moneyMode === 'dummy') {
+      const h = hashStr(String(seedKey ?? real));
+      const sessions = 1 + (h % 4);
+      return `£${((35 + (h % 9) * 5) * sessions).toFixed(2).replace(/\.00$/, '')}`;
+    }
+    return `£${Number(real).toFixed(2).replace(/\.00$/, '')}`;
   };
 }
 
@@ -810,7 +844,7 @@ function PerspectiveCalculator({ addNetW }) {
 const FN_BASE = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
 
 function MonzoPanel({ students, onDataChanged }) {
-  const M = useMoney();
+  const M = useRawMoney();
   const N = useNameDisplay();
   const nameModeIsNormal = usePrivacy().nameMode === 'normal';
   const [status, setStatus] = useState(null);
@@ -952,6 +986,7 @@ function GlobalToolsSheet({ students, rateHistory, moneyMode, setMoneyMode, name
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
   const [tool, setTool] = useState(null);
+  const [buysOpen, setBuysOpen] = useState(false);
   const privacyOn = moneyMode !== 'normal' || nameMode !== 'normal';
   const archived = students.filter(s => !s.active);
 
@@ -963,6 +998,12 @@ function GlobalToolsSheet({ students, rateHistory, moneyMode, setMoneyMode, name
   const [extra, setExtra] = useState(4);
   const [extraRate, setExtraRate] = useState(avgRate);
   const [extraCash, setExtraCash] = useState(false);
+
+  // avgRate is derived from rates that are themselves faked in privacy mode, but
+  // extraRate was seeded once at mount — so without this it would keep showing
+  // the real average after the switch was flipped, leaking the very figure the
+  // switch is meant to hide.
+  useEffect(() => { setExtraRate(avgRate); }, [moneyMode]);
 
   const addNetW = extra * extraRate * (extraCash ? 1 : 0.6);
 
@@ -1016,10 +1057,10 @@ function GlobalToolsSheet({ students, rateHistory, moneyMode, setMoneyMode, name
               onChange={setNameMode}
             />
             <div style={{fontSize:'0.76rem', color:'var(--gold)', marginTop:14, lineHeight:1.5}}>
-              Forms you open to add or edit still show the real figures — masking
-              a field you're about to save into would risk writing fake data into
-              your actual records. The same goes for the text the payment record
-              copies for a parent.
+              While either switch is off centre, the add/edit forms show masked
+              values and go read-only — a field displaying a fake number that you
+              could still save would put fake data in your real records. The text
+              the payment record copies for a parent stays real either way.
             </div>
           </>
         )}
@@ -1039,9 +1080,18 @@ function GlobalToolsSheet({ students, rateHistory, moneyMode, setMoneyMode, name
               extraCash={extraCash}
               setExtraCash={setExtraCash}
             />
-            <div style={{borderTop:'1px solid var(--line)', paddingTop:16, marginTop:20}}>
-              <h3 style={{fontSize:'1rem', marginBottom:10}}>Here's what it gets you</h3>
-              <PerspectiveCalculator addNetW={addNetW} />
+            <div style={{marginTop:20}}>
+              <div className="month-hdr" onClick={() => setBuysOpen(!buysOpen)}>
+                <span style={{fontSize:'0.9rem', fontWeight:600, color:'var(--ink)'}}>
+                  🎯 Here's what it buys you
+                </span>
+                <span className="month-chevron" style={{transform: buysOpen ? 'rotate(90deg)' : 'none'}}>›</span>
+              </div>
+              {buysOpen && (
+                <div style={{paddingTop:12}}>
+                  <PerspectiveCalculator addNetW={addNetW} />
+                </div>
+              )}
             </div>
           </>
         )}
@@ -1109,7 +1159,25 @@ function GlobalToolsSheet({ students, rateHistory, moneyMode, setMoneyMode, name
 // ---------- Add/Edit Student Modal ----------
 function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHistory = [] }) {
   const [cls, close] = useAnimatedClose(onClose);
+  const { moneyMode, nameMode } = usePrivacy();
+  const N = useNameDisplay();
   const isEdit = !!student;
+
+  // With privacy on, the form shows masked values so it can be demonstrated
+  // without exposing anything — and becomes read-only, because a field you can
+  // edit while it displays a fake value is one Save away from writing that
+  // fake value into the real record.
+  const demo = moneyMode !== 'normal' || nameMode !== 'normal';
+  const seed = student?.id || 'new-student';
+  const maskName  = (real, isPayer) => nameMode === 'normal' ? real
+    : nameMode === 'dummy' ? (isPayer ? dummyPayerNameFor(seed) : dummyNameFor(seed))
+    : HIDDEN_TEXT_MASK;
+  const maskText  = (real, faker) => nameMode === 'normal' ? real
+    : nameMode === 'dummy' ? faker(seed)
+    : HIDDEN_TEXT_MASK;
+  const maskRate  = real => moneyMode === 'normal' ? real
+    : moneyMode === 'dummy' ? String(dummyRateFor(seed))
+    : '•••';
   const existingBoard = student?.exam_board || '';
   const initPreset = PRESET_BOARDS.includes(existingBoard) ? existingBoard : (existingBoard ? 'other' : '');
 
@@ -1222,25 +1290,39 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
       <div className={`sheet${cls}`}>
         <h2>{isEdit ? 'Edit student' : 'Add student'}</h2>
 
+        {demo && (
+          <div style={{
+            fontSize:'0.76rem', fontWeight:600, color:'#fff', background:'var(--gold)',
+            padding:'8px 11px', borderRadius:8, marginBottom:14, lineHeight:1.4
+          }}>
+            Privacy mode is on, so this form shows masked values and is read-only.
+            Turn it off in Tools to make changes.
+          </div>
+        )}
+
+        {/* One wrapper rather than readOnly on fifteen inputs: this also stops
+            the toggles and selects being changed, so nothing here can be
+            altered while the values on display aren't the real ones. */}
+        <div style={demo ? { pointerEvents: 'none', opacity: 0.9 } : undefined}>
         <div className="field">
           <label>Name</label>
-          <input type="text" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+          <input type="text" value={maskName(form.name)} onChange={e => setForm({...form, name: e.target.value})} />
         </div>
         <div className="field">
           <label>Parent name</label>
-          <input type="text" value={form.parent_name} onChange={e => setForm({...form, parent_name: e.target.value})} />
+          <input type="text" value={maskName(form.parent_name, true)} onChange={e => setForm({...form, parent_name: e.target.value})} />
         </div>
         <div className="field">
           <label>Parent's mobile number</label>
-          <input type="text" value={form.parent_phone} onChange={e => setForm({...form, parent_phone: e.target.value})} placeholder="07700 900000" />
+          <input type="text" value={maskText(form.parent_phone, dummyPhoneFor)} onChange={e => setForm({...form, parent_phone: e.target.value})} placeholder="07700 900000" />
         </div>
         <div className="field">
           <label>Address</label>
-          <input type="text" value={form.address} onChange={e => setForm({...form, address: e.target.value})} />
+          <input type="text" value={maskText(form.address, dummyAddressFor)} onChange={e => setForm({...form, address: e.target.value})} />
         </div>
         <div className="field">
           <label>School</label>
-          <input type="text" list="school-options" value={form.school} onChange={e => setForm({...form, school: e.target.value})} />
+          <input type="text" list="school-options" value={maskText(form.school, dummySchoolFor)} onChange={e => setForm({...form, school: e.target.value})} />
           <datalist id="school-options">
             {[...new Set(allStudents.map(s => s.school).filter(Boolean))].map(sc => <option key={sc} value={sc} />)}
           </datalist>
@@ -1248,7 +1330,10 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         <div className="field">
           <label>Rate per session</label>
           <div className="rate-cash-row">
-            <input type="number" min="0" step="5" value={ratePerSession} onChange={e => setRatePerSession(e.target.value)} placeholder="e.g. 90" />
+            {/* type=text while masked, because a number input cannot render dots */}
+            <input type={demo ? 'text' : 'number'} min="0" step="5"
+              value={maskRate(ratePerSession)}
+              onChange={e => setRatePerSession(e.target.value)} placeholder="e.g. 90" />
             <Toggle checked={form.pays_in_cash} onChange={v => setForm({...form, pays_in_cash: v})} label="Cash" />
           </div>
           <label style={{marginTop:10}}>Effective from</label>
@@ -1266,7 +1351,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
             return (
               <div style={{fontSize:'0.78rem', color:'var(--gold)', marginTop:6}}>
                 Scheduled: {future.map(r =>
-                  `£${parseFloat(r.rate)} from ${new Date(r.effective_from_date + 'T12:00:00')
+                  `£${maskRate(String(parseFloat(r.rate)))} from ${new Date(r.effective_from_date + 'T12:00:00')
                     .toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}`
                 ).join(' · ')}
               </div>
@@ -1318,7 +1403,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         )}
         <div className="field">
           <label>Expect bank transfers from</label>
-          <input type="text" value={form.monzo_payer_name}
+          <input type="text" value={maskName(form.monzo_payer_name, true)}
             onChange={e => setForm({...form, monzo_payer_name: e.target.value})}
             placeholder="e.g. Sarah Simons" />
           <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
@@ -1336,13 +1421,13 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
           <select value={form.referred_by_student_id} onChange={e => setForm({...form, referred_by_student_id: e.target.value})}>
             <option value="">— not a referral —</option>
             {allStudents.filter(s => s.id !== student?.id).map(s => (
-              <option key={s.id} value={s.id}>{s.name}</option>
+              <option key={s.id} value={s.id}>{N(s.name, s.id)}</option>
             ))}
           </select>
         </div>
         <div className="field">
           <label>Student's name in your calendar</label>
-          <input type="text" value={form.calendar_title_pattern}
+          <input type="text" value={maskName(form.calendar_title_pattern)}
             onChange={e => setForm({...form, calendar_title_pattern: e.target.value})}
             placeholder="e.g. Saskia" />
           <div style={{fontSize: '0.78rem', color: 'var(--muted)', marginTop: 4}}>
@@ -1351,17 +1436,21 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         </div>
         <div className="field">
           <label>Notes</label>
-          <textarea value={form.general_notes} onChange={e => setForm({...form, general_notes: e.target.value})} />
+          <textarea value={nameMode === 'normal' ? form.general_notes : (nameMode === 'dummy' ? 'Notes hidden while demoing.' : HIDDEN_TEXT_MASK)}
+            onChange={e => setForm({...form, general_notes: e.target.value})} />
         </div>
         <div className="field">
           <Toggle checked={form.active} onChange={v => setForm({...form, active: v})} label="Active student" />
         </div>
+        </div>
 
         <div className="btn-row">
-          <button className="btn cancel" onClick={close}>Cancel</button>
-          <button className="btn save" onClick={handleSave} disabled={saving || !form.name}>
-            {saving ? 'Saving…' : 'Save'}
-          </button>
+          <button className="btn cancel" onClick={close}>{demo ? 'Close' : 'Cancel'}</button>
+          {!demo && (
+            <button className="btn save" onClick={handleSave} disabled={saving || !form.name}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -1375,14 +1464,19 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
 // shows what it will settle before you commit.
 function PaymentModal({ student, payment, lessons, currentRate, rateHistory = [],
                         allocations = [], onClose, onSaved }) {
-  // Everything below this line is a live data-entry form, so it always shows
-  // real amounts and lessons — masking a field you're about to save into the
-  // real books would be actively dangerous. Only the title's name is masked,
-  // since that's passive label text, not something being written anywhere.
   const N = useNameDisplay();
+  const M = useMoney();
+  const { moneyMode, nameMode } = usePrivacy();
   const [cls, close] = useAnimatedClose(onClose);
   const editing = !!payment;
   const today = new Date().toISOString().slice(0, 10);
+
+  // Read-only while privacy is on, for the same reason as the student form: a
+  // masked amount you can still submit is one tap away from being saved.
+  const demo = moneyMode !== 'normal' || nameMode !== 'normal';
+  const maskAmount = real => moneyMode === 'normal' ? real
+    : moneyMode === 'dummy' ? String(dummyRateFor(student.id))
+    : '•••';
 
   const [datePaid, setDatePaid]   = useState(payment?.date_paid || today);
   const [method, setMethod]       = useState(payment?.method || (student.pays_in_cash ? 'cash' : 'bank_transfer'));
@@ -1449,6 +1543,17 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
       <div className={`sheet${cls}`}>
         <h2>{editing ? 'Edit payment' : 'Log payment'} — {N(student.name, student.id)}</h2>
 
+        {demo && (
+          <div style={{
+            fontSize:'0.76rem', fontWeight:600, color:'#fff', background:'var(--gold)',
+            padding:'8px 11px', borderRadius:8, marginBottom:14, lineHeight:1.4
+          }}>
+            Privacy mode is on, so this form is masked and read-only. Turn it off
+            in Tools to log or edit a payment.
+          </div>
+        )}
+        <div style={demo ? { pointerEvents: 'none', opacity: 0.9 } : undefined}>
+
         <div className="field">
           <label>Method</label>
           <div className="seg">
@@ -1465,10 +1570,11 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
 
         <div className="field">
           <label>Amount</label>
-          <input type="number" min="0" step="0.01" value={amount} placeholder="0.00"
-                 onChange={e => { setTouched(true); setAmount(e.target.value); }} />
+          <input type={demo ? 'text' : 'number'} min="0" step="0.01"
+                 value={maskAmount(amount)} placeholder="0.00"
+                 onChange={e => setAmount(e.target.value)} />
           <div style={{fontSize:'0.78rem', color:'var(--muted)', marginTop:4}}>
-            Current rate £{rate} per session.
+            Current rate {M(rate)} per session.
           </div>
         </div>
 
@@ -1489,7 +1595,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
                     {l.start_time ? ` · ${l.start_time}` : ''}
                   </span>
                   <span style={{fontSize:'0.74rem', color: partial ? 'var(--gold)' : 'var(--accent)'}}>
-                    £{take.toFixed(2)}{partial ? ' (part)' : ''}
+                    {M(take)}{partial ? ' (part)' : ''}
                   </span>
                   <span style={{fontSize:'0.72rem', color: l.status === 'scheduled' ? 'var(--gold)' : 'var(--muted)'}}>
                     {l.status === 'scheduled' ? 'upcoming' : l.status}
@@ -1500,19 +1606,22 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
           )}
           {leftOver > 0.005 && (
             <div style={{fontSize:'0.78rem', color:'var(--gold)', marginTop:6}}>
-              £{leftOver.toFixed(2)} left over — held as credit against future lessons.
+              {M(leftOver)} left over — held as credit against future lessons.
             </div>
           )}
           <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:6, lineHeight:1.45}}>
             Payments always go to the oldest unpaid lesson first.
           </div>
         </div>
+        </div>
 
         <div className="btn-row">
-          <button className="btn cancel" onClick={close}>Cancel</button>
-          <button className="btn save" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : editing ? 'Save changes' : 'Log payment'}
-          </button>
+          <button className="btn cancel" onClick={close}>{demo ? 'Close' : 'Cancel'}</button>
+          {!demo && (
+            <button className="btn save" onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : editing ? 'Save changes' : 'Log payment'}
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -2400,7 +2509,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v2.5</div>}
+        {!loading && <div className="version-tag">v2.6</div>}
       </div>
 
       {showAddModal && (
