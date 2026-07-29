@@ -373,6 +373,106 @@ function rateForLesson(lesson, rateHistory, fallback = 90) {
   return getRateOnDate(lesson.student_id, rateHistory, lesson.lesson_date, fallback);
 }
 
+// ---------- Privacy (show / hide / fake, for money and names independently) ----------
+// Modes: 'normal' (real data), 'hidden' (fixed-width mask, reveals nothing —
+// not even digit count), 'dummy' (plausible fake, stable per element so it
+// doesn't flicker between renders or make totals look inconsistent).
+//
+// Deliberately scoped to DISPLAY ONLY. Nothing that feeds an editable form
+// field or a "Copy as text" meant for a parent ever goes through these — a
+// demo mode must never risk writing a fake number into the real books, or
+// sending a parent a fake balance.
+const PrivacyContext = React.createContext({ moneyMode: 'normal', nameMode: 'normal' });
+function usePrivacy() { return React.useContext(PrivacyContext); }
+
+function hashStr(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+const DUMMY_FIRST = ['Alex','Jordan','Taylor','Morgan','Casey','Riley','Jamie','Charlie','Sam','Drew','Avery','Rowan','Skyler','Reese','Quinn','Harper'];
+const DUMMY_LAST  = ['Turner','Bennett','Hayes','Reed','Morris','Sullivan','Foster','Pearce','Doyle','Whitfield','Grant','Marsh','Underwood','Voss','Kane','Ellery'];
+
+function dummyNameFor(seedKey) {
+  const h = hashStr(String(seedKey) + ':name');
+  return `${DUMMY_FIRST[h % DUMMY_FIRST.length]} ${DUMMY_LAST[(h >>> 8) % DUMMY_LAST.length]}`;
+}
+
+function hiddenNameFor(seedKey) {
+  return `Student ${1000 + (hashStr(String(seedKey)) % 9000)}`;
+}
+
+// A fake amount in roughly the same magnitude bracket as the real one (0.6x-1.4x),
+// so a weekly total still looks like a weekly total rather than pocket change —
+// without ever being the real figure. Stable per seedKey so it doesn't jump
+// around as the page re-renders.
+//
+// A per-session rate (seed contains ':rate') is rounded to the nearest £5,
+// because a real rate always is — a fake "£64.40 per session" would be an
+// obvious tell to anyone who's ever set a tutoring rate.
+function dummyAmountFor(seedKey, real) {
+  const h = hashStr(String(seedKey) + ':amt:' + Math.round((real || 0) * 100));
+  const jitter = 0.6 + (h % 1000) / 1000 * 0.8;
+  const fake = Math.max(1, (real || 0) * jitter);
+  if (String(seedKey).includes(':rate') && !String(seedKey).includes(':paid') && !String(seedKey).includes(':outstanding')) {
+    return Math.max(5, Math.round(fake / 5) * 5);
+  }
+  return fake;
+}
+
+const HIDDEN_MONEY_MASK = '£•••';
+
+// Money display wrapper. `real` is the true number; `seedKey` ties dummy
+// generation to a stable entity (student id, payment id, lesson id, or a
+// fixed slot name for aggregates) so the same thing always fakes the same way.
+// `formatter` defaults to a plain £ with pennies trimmed when whole.
+function useMoney() {
+  const { moneyMode } = usePrivacy();
+  return (real, seedKey, formatter) => {
+    const fmt = formatter || (n => `£${Number(n).toFixed(2).replace(/\.00$/, '')}`);
+    if (moneyMode === 'hidden') return HIDDEN_MONEY_MASK;
+    if (moneyMode === 'dummy') return fmt(dummyAmountFor(seedKey ?? 'x', real));
+    return fmt(real);
+  };
+}
+
+// Name display wrapper. seedKey should be the student's id so the same
+// person shows the same fake/hidden label everywhere on screen.
+function useNameDisplay() {
+  const { nameMode } = usePrivacy();
+  return (real, seedKey) => {
+    if (nameMode === 'hidden') return hiddenNameFor(seedKey ?? real);
+    if (nameMode === 'dummy') return dummyNameFor(seedKey ?? real);
+    return real;
+  };
+}
+
+// The three-way switch itself: dummy (left) — normal (middle) — hidden (right).
+function PrivacyToggle3({ icon, label, value, onChange }) {
+  const OPTIONS = [
+    ['dummy', 'Fake'],
+    ['normal', 'Show'],
+    ['hidden', 'Hide'],
+  ];
+  return (
+    <div style={{display:'flex', alignItems:'center', gap:6}}>
+      <span style={{fontSize:'0.78rem', color:'var(--muted)', whiteSpace:'nowrap'}}>{icon} {label}</span>
+      <div className="seg" style={{minWidth:0}}>
+        {OPTIONS.map(([v, lab]) => (
+          <button key={v} className={value === v ? 'sel' : ''} onClick={() => onChange(v)}
+                  style={{padding:'6px 9px', fontSize:'0.74rem'}}>
+            {lab}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ---------- Toggle ----------
 function Toggle({ checked, onChange, label }) {
   return (
@@ -387,6 +487,7 @@ function Toggle({ checked, onChange, label }) {
 
 // ---------- Summary Widget ----------
 function SummaryWidget({ students, rateHistory }) {
+  const M = useMoney();
   const active = students.filter(s => s.active);
 
   const weeklyNet = active.reduce((sum, s) => {
@@ -403,8 +504,8 @@ function SummaryWidget({ students, rateHistory }) {
 
   const stats = [
     { label: 'students', value: active.length,  accent: false },
-    { label: 'net/week', value: fmt(weeklyNet),  accent: true  },
-    { label: 'net/year', value: fmt(annualNet),  accent: true  },
+    { label: 'net/week', value: M(weeklyNet, 'summary-week', fmt),  accent: true  },
+    { label: 'net/year', value: M(annualNet, 'summary-year', fmt),  accent: true  },
   ];
 
   return (
@@ -481,6 +582,7 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
   const addNetW   = e * er * (ec ? 1 : 0.6);
 
   const fmt = n => n >= 1000000 ? `£${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
+  const M = useMoney();
 
   const rows = [
     { label: 'Students',  curr: active.length,    add: e,      isCount: true },
@@ -513,9 +615,9 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
         {rows.map(({ label, curr, add, isCount }) => (
           <React.Fragment key={label}>
             <div className="calc-grid-cell" style={{color:'var(--muted)'}}>{label}</div>
-            <div className="calc-grid-cell">{isCount ? curr : fmt(curr)}</div>
-            <div className="calc-grid-cell" style={{color:'var(--accent)'}}>+{isCount ? add : fmt(add)}</div>
-            <div className="calc-grid-cell" style={{fontWeight:600}}>{isCount ? curr+add : fmt(curr+add)}</div>
+            <div className="calc-grid-cell">{isCount ? curr : M(curr, `growth-curr-${label}`, fmt)}</div>
+            <div className="calc-grid-cell" style={{color:'var(--accent)'}}>+{isCount ? add : M(add, `growth-add-${label}`, fmt)}</div>
+            <div className="calc-grid-cell" style={{fontWeight:600}}>{isCount ? curr+add : M(curr+add, `growth-total-${label}`, fmt)}</div>
           </React.Fragment>
         ))}
       </div>
@@ -543,15 +645,27 @@ function PerspectiveCalculator({ addNetW }) {
   ];
 
   const fmt = n => n >= 1000000 ? `£${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
+  const { moneyMode } = usePrivacy();
+
+  if (moneyMode === 'hidden') {
+    return (
+      <div style={{fontSize:'0.9rem', color:'var(--muted)', padding:'8px 0'}}>
+        🎯 Amounts hidden — every count on this screen is derived from the figure above, so hiding one means hiding all of them.
+      </div>
+    );
+  }
+  // In dummy mode, substitute the root figure once so every item count below
+  // stays proportional and self-consistent, rather than faking each item.
+  const shownNetY = moneyMode === 'dummy' ? dummyAmountFor('perspective-addnet', addNetY) : addNetY;
 
   return (
     <div>
       <div style={{fontSize:'0.9rem', color:'var(--ink-dim)', marginBottom:14, lineHeight:1.5}}>
-        With this growth, you'd pocket an extra <span style={{fontWeight:600, color:'var(--ink)'}}>{fmt(addNetY)}/year</span>. That's:
+        With this growth, you'd pocket an extra <span style={{fontWeight:600, color:'var(--ink)'}}>{fmt(shownNetY)}/year</span>. That's:
       </div>
       <div className="perspective-grid">
         {items.map(item => {
-          const count = Math.floor(addNetY / item.price);
+          const count = Math.floor(shownNetY / item.price);
           return (
             <div className="perspective-item" key={item.name}>
               <div className="emoji">{item.emoji}</div>
@@ -570,6 +684,9 @@ function PerspectiveCalculator({ addNetW }) {
 const FN_BASE = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
 
 function MonzoPanel({ students, onDataChanged }) {
+  const M = useMoney();
+  const N = useNameDisplay();
+  const nameModeIsNormal = usePrivacy().nameMode === 'normal';
   const [status, setStatus] = useState(null);
   const [pending, setPending] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -671,12 +788,15 @@ function MonzoPanel({ students, onDataChanged }) {
           opacity: working[t.transaction_id] ? 0.45 : 1
         }}>
           <div style={{display:'flex', justifyContent:'space-between', alignItems:'baseline', gap:10}}>
-            <span style={{fontWeight:600, fontSize:'0.9rem'}}>{t.from || 'Unknown sender'}</span>
-            <span style={{fontWeight:700, fontSize:'0.95rem'}}>£{t.amount.toFixed(2)}</span>
+            <span style={{fontWeight:600, fontSize:'0.9rem'}}>{N(t.from || 'Unknown sender', t.from || 'unknown-sender')}</span>
+            <span style={{fontWeight:700, fontSize:'0.95rem'}}>{M(t.amount, t.transaction_id)}</span>
           </div>
           <div style={{fontSize:'0.75rem', color:'var(--muted)', marginTop:2}}>
             {new Date(t.date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}
-            {t.reference && t.reference !== t.from ? ` · ${t.reference}` : ''}
+            {/* Free-text bank reference can contain a name, so it's hidden
+                entirely rather than shown in privacy mode — there's no safe
+                way to partially redact arbitrary text. */}
+            {nameModeIsNormal && t.reference && t.reference !== t.from ? ` · ${t.reference}` : ''}
           </div>
           <div style={{display:'flex', gap:6, marginTop:8}}>
             <select
@@ -686,7 +806,7 @@ function MonzoPanel({ students, onDataChanged }) {
               style={{flex:1, fontSize:'0.82rem', padding:'7px 8px'}}
             >
               <option value="">Assign to student…</option>
-              {activeStudents.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              {activeStudents.map(s => <option key={s.id} value={s.id}>{N(s.name, s.id)}</option>)}
             </select>
             <button
               className="btn cancel"
@@ -703,6 +823,7 @@ function MonzoPanel({ students, onDataChanged }) {
 
 // ---------- Global Tools Sheet ----------
 function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
+  const N = useNameDisplay();
   const [tool, setTool] = useState(null);
   const archived = students.filter(s => !s.active);
 
@@ -782,7 +903,7 @@ function GlobalToolsSheet({ students, rateHistory, onClose, onDataChanged }) {
             ) : (
               archived.map(s => (
                 <div key={s.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--line)'}}>
-                  <span style={{fontSize:'0.95rem'}}>{s.name}</span>
+                  <span style={{fontSize:'0.95rem'}}>{N(s.name, s.id)}</span>
                   <button className="btn save" style={{flex:'0 0 auto',minWidth:'auto',padding:'6px 14px',fontSize:'0.82rem'}} onClick={() => unarchive(s.id)}>
                     Unarchive
                   </button>
@@ -1091,6 +1212,11 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
 // shows what it will settle before you commit.
 function PaymentModal({ student, payment, lessons, currentRate, rateHistory = [],
                         allocations = [], onClose, onSaved }) {
+  // Everything below this line is a live data-entry form, so it always shows
+  // real amounts and lessons — masking a field you're about to save into the
+  // real books would be actively dangerous. Only the title's name is masked,
+  // since that's passive label text, not something being written anywhere.
+  const N = useNameDisplay();
   const editing = !!payment;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -1157,7 +1283,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
-        <h2>{editing ? 'Edit payment' : 'Log payment'} — {student.name}</h2>
+        <h2>{editing ? 'Edit payment' : 'Log payment'} — {N(student.name, student.id)}</h2>
 
         <div className="field">
           <label>Method</label>
@@ -1231,6 +1357,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
 
 // ---------- Payment Detail Sheet ----------
 function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdit, onDeleted }) {
+  const M = useMoney();
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
@@ -1257,7 +1384,7 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
-        <h2 style={{fontSize:'1.5rem', marginBottom:2, letterSpacing:'-0.02em'}}>£{parseFloat(payment.amount).toFixed(2)}</h2>
+        <h2 style={{fontSize:'1.5rem', marginBottom:2, letterSpacing:'-0.02em'}}>{M(parseFloat(payment.amount), payment.id)}</h2>
         <div style={{fontSize:'0.86rem', color:'var(--muted)', marginBottom:14}}>
           {new Date(payment.date_paid + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
         </div>
@@ -1282,7 +1409,7 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
                   {l.start_time ? ` · ${l.start_time}` : ''}
                 </span>
                 <span style={{display:'flex', alignItems:'center', gap:8}}>
-                  <span style={{fontSize:'0.78rem', fontWeight:600, color:'var(--accent)'}}>£{amount.toFixed(2)}</span>
+                  <span style={{fontSize:'0.78rem', fontWeight:600, color:'var(--accent)'}}>{M(amount, l.id + ':rate')}</span>
                   <span className={`lesson-status ${l.status}`}>{l.status}</span>
                 </span>
               </div>
@@ -1291,7 +1418,7 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
         )}
         {unallocated > 0.005 && (
           <div style={{fontSize:'0.8rem', color:'var(--gold)', marginBottom:10}}>
-            £{unallocated.toFixed(2)} of this payment is unused credit.
+            {M(unallocated, payment.id + ':unalloc')} of this payment is unused credit.
           </div>
         )}
 
@@ -1319,6 +1446,9 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
 // money settled it — the thing to read out when a parent asks "when did I pay
 // for that?". Copyable as text so it can be pasted straight into WhatsApp.
 function StatementSheet({ student, lessons, rateHistory, payState, onClose }) {
+  const M = useMoney();
+  const N = useNameDisplay();
+  const { moneyMode } = usePrivacy();
   const [copied, setCopied] = useState(false);
 
   const rows = lessons
@@ -1329,6 +1459,22 @@ function StatementSheet({ student, lessons, rateHistory, payState, onClose }) {
   const totalCharged = rows.reduce((s, r) => s + r.st.rate, 0);
   const totalPaidHere = rows.reduce((s, r) => s + Math.min(r.st.paid, r.st.rate), 0);
   const outstanding = totalCharged - totalPaidHere;
+
+  // Totals shown on screen are summed from the SAME per-row fake rate used
+  // in the row list above, scaled by the real paid fraction — so "charged",
+  // "paid" and "outstanding" always reconcile with each other and with the
+  // rows, instead of three independently-faked numbers that don't add up.
+  const dispCharged = moneyMode === 'dummy'
+    ? rows.reduce((s, r) => s + dummyAmountFor(r.lesson.id + ':rate', r.st.rate), 0)
+    : totalCharged;
+  const dispPaid = moneyMode === 'dummy'
+    ? rows.reduce((s, r) => {
+        const fakeRate = dummyAmountFor(r.lesson.id + ':rate', r.st.rate);
+        const fraction = r.st.rate > 0 ? Math.min(r.st.paid, r.st.rate) / r.st.rate : 0;
+        return s + fakeRate * fraction;
+      }, 0)
+    : totalPaidHere;
+  const dispOutstanding = Math.max(0, dispCharged - dispPaid);
 
   const fmtDate = d => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
 
@@ -1362,9 +1508,10 @@ function StatementSheet({ student, lessons, rateHistory, payState, onClose }) {
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
-        <h2 style={{marginBottom:4}}>Payment record — {student.name}</h2>
+        <h2 style={{marginBottom:4}}>Payment record — {N(student.name, student.id)}</h2>
         <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14}}>
           Every lesson since 27 July 2026, and when it was paid for.
+          {' '}"Copy as text" always copies the real figures — this screen may be masked, the copied text never is.
         </div>
 
         {rows.length === 0 && (
@@ -1379,30 +1526,37 @@ function StatementSheet({ student, lessons, rateHistory, payState, onClose }) {
               <span style={{fontSize:'0.87rem', fontWeight:500}}>
                 {fmtDate(l.lesson_date)}{l.start_time ? ` · ${l.start_time}` : ''}
               </span>
-              <span style={{fontSize:'0.87rem', fontWeight:600}}>£{st.rate}</span>
+              <span style={{fontSize:'0.87rem', fontWeight:600}}>{M(st.rate, l.id + ':rate')}</span>
             </div>
             <div style={{fontSize:'0.78rem', marginTop:3,
                          color: st.settled ? 'var(--accent)' : st.partial ? 'var(--gold)' : 'var(--warn)'}}>
               {st.settled && st.payments.length > 0
                 ? `Paid ${st.payments.map(p => fmtDate(p.date_paid)).join(', ')}`
                 : st.settled ? 'Paid'
-                : st.partial ? `Part paid — £${st.paid.toFixed(2)} of £${st.rate}`
+                : st.partial ? `Part paid — ${M(st.paid, l.id + ':rate:paid')} of ${M(st.rate, l.id + ':rate')}`
                 : l.status === 'scheduled' ? 'Not yet due' : 'Unpaid'}
             </div>
           </div>
         ))}
 
+        {/* dispCharged/dispPaid/dispOutstanding are already the correct
+            value for the current mode (real, or pre-summed fake) — shown
+            directly rather than through M(), which would fake them a
+            second time and break the reconciliation. Hidden mode still
+            needs its own mask applied here explicitly. */}
         <div style={{marginTop:14, paddingTop:12, borderTop:'2px solid var(--line)', fontSize:'0.88rem'}}>
           <div style={{display:'flex', justifyContent:'space-between'}}>
-            <span style={{color:'var(--muted)'}}>Total charged</span><span>£{totalCharged.toFixed(2)}</span>
+            <span style={{color:'var(--muted)'}}>Total charged</span>
+            <span>{moneyMode === 'hidden' ? '£•••' : `£${dispCharged.toFixed(2)}`}</span>
           </div>
           <div style={{display:'flex', justifyContent:'space-between', marginTop:3}}>
-            <span style={{color:'var(--muted)'}}>Total paid</span><span>£{totalPaidHere.toFixed(2)}</span>
+            <span style={{color:'var(--muted)'}}>Total paid</span>
+            <span>{moneyMode === 'hidden' ? '£•••' : `£${dispPaid.toFixed(2)}`}</span>
           </div>
           <div style={{display:'flex', justifyContent:'space-between', marginTop:5, fontWeight:700,
                        color: outstanding > 0.005 ? 'var(--warn)' : 'var(--accent)'}}>
             <span>{outstanding > 0.005 ? 'Outstanding' : 'Settled'}</span>
-            <span>£{Math.max(0, outstanding).toFixed(2)}</span>
+            <span>{moneyMode === 'hidden' ? '£•••' : `£${dispOutstanding.toFixed(2)}`}</span>
           </div>
         </div>
 
@@ -1417,10 +1571,11 @@ function StatementSheet({ student, lessons, rateHistory, payState, onClose }) {
 
 // ---------- More Tools Sheet ----------
 function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive }) {
+  const N = useNameDisplay();
   return (
     <div className="overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
-        <h2>More tools — {student.name}</h2>
+        <h2>More tools — {N(student.name, student.id)}</h2>
         <div className="tools-menu">
           <button onClick={onTrackCash}>💷 Log a payment</button>
           <button onClick={onStatement}>🧾 Payment record — what was paid when</button>
@@ -1448,12 +1603,15 @@ function groupByMonth(lessons) {
 }
 
 function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree, toggling }) {
+  const M = useMoney();
+  const { nameMode } = usePrivacy();
   const d = new Date(lesson.lesson_date + 'T12:00:00');
   const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   const statusClass = lesson.is_complimentary ? 'ok' : lesson.status === 'completed' ? 'ok' : lesson.status === 'missed' ? 'warn' : 'neutral';
   const statusLabel = lesson.is_complimentary ? 'Free lesson' : lesson.status;
   const METHODS = { cash:'cash', bank_transfer:'bank transfer', monzo_auto:'bank transfer', other:'payment' };
   const st = payState || { rate: lessonRate, paid: 0, payments: [], settled: false, partial: false };
+  const moneySeed = lesson.id + ':rate';
   return (
     <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="sheet">
@@ -1464,12 +1622,12 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
         <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
           <span className={`pill ${statusClass}`}>{statusLabel}</span>
           {!lesson.is_complimentary && lessonRate != null && (
-            <span className="pill neutral">£{lessonRate}</span>
+            <span className="pill neutral">{M(lessonRate, moneySeed)}</span>
           )}
           {lesson.is_complimentary ? null
             : lesson.pre_settled ? <span className="pill ok">settled before 27 Jul</span>
             : st.settled ? <span className="pill ok">paid</span>
-            : st.partial ? <span className="pill warn">part paid · £{st.paid.toFixed(2)} of £{st.rate}</span>
+            : st.partial ? <span className="pill warn">part paid · {M(st.paid, moneySeed + ':paid')} of {M(st.rate, moneySeed)}</span>
             : <span className="pill warn">unpaid</span>}
         </div>
 
@@ -1487,19 +1645,21 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
               .sort((a, b) => a.date_paid.localeCompare(b.date_paid))
               .map(p => (
                 <div key={p.id} style={{fontSize:'0.83rem', color:'var(--ink-dim)', lineHeight:1.5}}>
-                  £{p.allocated.toFixed(2)} received {new Date(p.date_paid + 'T12:00:00')
+                  {M(p.allocated, moneySeed)} received {new Date(p.date_paid + 'T12:00:00')
                     .toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
                   {' '}by {METHODS[p.method] || p.method}
                 </div>
               ))}
             {st.partial && (
               <div style={{fontSize:'0.8rem', color:'var(--gold)', marginTop:4}}>
-                £{(st.rate - st.paid).toFixed(2)} still outstanding on this lesson.
+                {M(st.rate - st.paid, moneySeed + ':outstanding')} still outstanding on this lesson.
               </div>
             )}
           </div>
         )}
-        {lesson.lesson_notes && (
+        {/* Lesson notes come straight from the calendar event title, which
+            usually contains the student's name — hidden whenever names are. */}
+        {lesson.lesson_notes && nameMode === 'normal' && (
           <div style={{fontSize:'0.83rem',color:'var(--ink-dim)',marginBottom:16,lineHeight:1.55,background:'var(--card-2)',padding:'10px 12px',borderRadius:8,border:'1px solid var(--line)'}}>
             {lesson.lesson_notes}
           </div>
@@ -1523,6 +1683,8 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
 }
 
 function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, onEdit, onDataChanged }) {
+  const M = useMoney();
+  const N = useNameDisplay();
   const [open, setOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [showMoreTools, setShowMoreTools] = useState(false);
@@ -1644,22 +1806,22 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
     <div className="card">
       <div className="card-header" onClick={() => setOpen(!open)}>
         <div>
-          <div className="student-name">{student.name}{!student.active && ' (inactive)'}</div>
+          <div className="student-name">{N(student.name, student.id)}{!student.active && ' (inactive)'}</div>
           <div className="status-row">
             {balance > 0 && (
               <span className={`pill ${isOverdue ? 'warn' : 'neutral'}`}>
-                {isOverdue ? `Overdue £${balance.toFixed(2)}` : `Owes £${balance.toFixed(2)}`}
+                {isOverdue ? `Overdue ${M(balance, student.id + ':balance')}` : `Owes ${M(balance, student.id + ':balance')}`}
               </span>
             )}
             {balance <= 0 && <span className="pill ok">Paid up</span>}
             {creditInHand > 0.005 && (
-              <span className="pill ok">£{creditInHand.toFixed(2)} credit</span>
+              <span className="pill ok">{M(creditInHand, student.id + ':credit')} credit</span>
             )}
             {nextLesson && (
               <span className="pill neutral">Next: {new Date(nextLesson.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
             )}
             {displayYear && <span className="pill neutral">Y{displayYear}</span>}
-            <span className="pill neutral">£{currentRate}</span>
+            <span className="pill neutral">{M(currentRate, student.id + ':rate')}</span>
             {student.is_zoom && <span className="pill neutral">Zoom</span>}
           </div>
         </div>
@@ -1687,11 +1849,11 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                 return <div style={{fontSize:'0.76rem', color:'var(--muted)', marginBottom:4}}>{`Y${displayYear}${startedLabel}${updateLabel}`}</div>;
               })()}
               {referredBy && (
-                <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>Referred by {referredBy.name.split(' ')[0]}</div>
+                <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>Referred by {N(referredBy.name, referredBy.id).split(' ')[0]}</div>
               )}
               {referrals.length > 0 && (
                 <div style={{ fontSize: '0.82rem', color: 'var(--accent)', marginTop: 2 }}>
-                  Referred {referrals.map(s => s.name.split(' ')[0]).join(', ')} — use "mark free" on their next lesson
+                  Referred {referrals.map(s => N(s.name, s.id).split(' ')[0]).join(', ')} — use "mark free" on their next lesson
                 </div>
               )}
             </React.Fragment>
@@ -1745,7 +1907,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                       return null;
                     })()}
                     <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={l.is_complimentary ? {color:'var(--accent)'} : {}}>
-                      {l.is_complimentary ? 'free' : `${l.status} · £${rateForLesson(l, rateHistory)}`}
+                      {l.is_complimentary ? 'free' : `${l.status} · ${M(rateForLesson(l, rateHistory), l.id + ':rate')}`}
                     </span>
                     <span className="chev">›</span>
                   </span>
@@ -1758,7 +1920,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
             <span className="section-label" style={{margin:0}}>Payments</span>
             <div style={{display:'flex',alignItems:'center',gap:8}}>
               <span style={{fontSize:'0.72rem',color:'var(--muted)'}}>
-                {studentPayments.length === 0 ? 'none' : `${studentPayments.length} · £${totalPaid.toFixed(2)} total`}
+                {studentPayments.length === 0 ? 'none' : `${studentPayments.length} · ${M(totalPaid, student.id + ':totalpaid')} total`}
               </span>
               <span className="month-chevron" style={{transform:paymentsOpen?'rotate(90deg)':'none'}}>›</span>
             </div>
@@ -1781,7 +1943,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                       <span style={{fontSize:'0.72rem',color:'var(--muted)',marginRight:8}}>
                         {n > 0 ? `${n} lesson${n !== 1 ? 's' : ''}` : 'unlinked'}
                       </span>
-                      <span style={{fontWeight:600,color:'var(--ink)'}}>£{parseFloat(p.amount).toFixed(2)}</span>
+                      <span style={{fontWeight:600,color:'var(--ink)'}}>{M(parseFloat(p.amount), p.id)}</span>
                       <span className="chev">›</span>
                     </span>
                   </div>
@@ -1892,6 +2054,8 @@ function App() {
   const [editingStudent, setEditingStudent] = useState(null);
   const [showGlobalTools, setShowGlobalTools] = useState(false);
   const [monzoStatus, setMonzoStatus] = useState(null);
+  const [moneyMode, setMoneyMode] = useState('normal');
+  const [nameMode, setNameMode] = useState('normal');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -1942,7 +2106,10 @@ function App() {
     ? `synced ${lastSynced.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
     : '';
 
+  const privacyOn = moneyMode !== 'normal' || nameMode !== 'normal';
+
   return (
+    <PrivacyContext.Provider value={{ moneyMode, nameMode }}>
     <div>
       {monzoStatus && (
         <div style={{
@@ -1969,6 +2136,19 @@ function App() {
             <button className="add-btn" onClick={() => setShowAddModal(true)}>+ Add</button>
           </div>
         </div>
+        <div style={{
+          display:'flex', flexWrap:'wrap', gap:'10px 18px', marginTop:12, paddingTop:12,
+          borderTop:'1px solid var(--line)'
+        }}>
+          <PrivacyToggle3 icon="💰" label="Amounts" value={moneyMode} onChange={setMoneyMode} />
+          <PrivacyToggle3 icon="🧑" label="Names" value={nameMode} onChange={setNameMode} />
+        </div>
+        {privacyOn && (
+          <div style={{fontSize:'0.72rem', color:'var(--gold)', marginTop:8, lineHeight:1.4}}>
+            Privacy mode is on — forms you open to add or edit still show real numbers, since
+            that's live bookkeeping, not display. Everything else on screen is masked.
+          </div>
+        )}
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -1988,7 +2168,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v2.3</div>}
+        {!loading && <div className="version-tag">v2.4</div>}
       </div>
 
       {showAddModal && (
@@ -2016,6 +2196,7 @@ function App() {
         />
       )}
     </div>
+    </PrivacyContext.Provider>
   );
 }
 
