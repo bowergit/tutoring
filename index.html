@@ -18,38 +18,64 @@
 <style>
   /* ── Light mode (default) ── */
   :root {
-    --bg: #f4f3f0;
+    --bg: #f5f4f1;
+    --bg-tint: #ecebe6;
     --card: #ffffff;
     --card-2: #f7f6f3;
-    --line: #e8e4dc;
-    --ink: #1c1a17;
-    --ink-dim: #6e6a62;
-    --accent: #2a5c38;
-    --accent-light: #edf4ef;
-    --warn: #b84f1c;
-    --warn-light: #fef1ec;
-    --muted: #9c9890;
-    --gold: #96752e;
+    --card-3: #f1efea;
+    --line: #e7e3db;
+    --line-soft: #f0ede6;
+    --ink: #16150f;
+    --ink-dim: #605c53;
+    --accent: #1f7a45;
+    --accent-2: #2b9757;
+    --accent-light: #e9f4ed;
+    --warn: #b8481c;
+    --warn-light: #fdf0ea;
+    --muted: #9a958c;
+    --gold: #8f701f;
+    --gold-light: #faf2df;
     --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
+    /* Layered shadows read as real depth; a single blurred box never does. */
+    --sh-1: 0 1px 2px rgba(22,21,15,.06);
+    --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
+    --sh-3: 0 2px 6px rgba(22,21,15,.06), 0 16px 40px -12px rgba(22,21,15,.22);
+    --ring: 0 0 0 3px rgba(31,122,69,.16);
   }
 
   /* ── Dark mode ── */
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #161412;
-      --card: #1e1c19;
-      --card-2: #262320;
-      --line: #333028;
-      --ink: #f0ece4;
-      --ink-dim: #9c9890;
-      --accent: #4aad6b;
-      --accent-light: #122018;
-      --warn: #d4703a;
-      --warn-light: #261408;
-      --muted: #6e6a62;
-      --gold: #d3b890;
+      --bg: #131210;
+      --bg-tint: #191714;
+      --card: #1d1b18;
+      --card-2: #24211d;
+      --card-3: #2b2823;
+      --line: #34302a;
+      --line-soft: #262320;
+      --ink: #f2eee6;
+      --ink-dim: #a8a297;
+      --accent: #4fb877;
+      --accent-2: #63c98a;
+      --accent-light: #13251a;
+      --warn: #e07d46;
+      --warn-light: #2a1408;
+      --muted: #78736a;
+      --gold: #d9bf94;
+      --gold-light: #2a2317;
       --shadow: 0 1px 3px rgba(0,0,0,0.3);
+      --sh-1: 0 1px 2px rgba(0,0,0,.4);
+      --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
+      --sh-3: 0 2px 8px rgba(0,0,0,.5), 0 20px 48px -14px rgba(0,0,0,.75);
+      --ring: 0 0 0 3px rgba(79,184,119,.22);
     }
+  }
+
+  /* Radii and motion, shared across both themes. */
+  :root {
+    --r-sm: 9px; --r-md: 13px; --r-lg: 17px; --r-xl: 24px;
+    --ease: cubic-bezier(.2,.8,.2,1);
+    --ease-spring: cubic-bezier(.34,1.4,.64,1);
   }
 
   * { box-sizing: border-box; }
@@ -70,82 +96,168 @@
 
   /* ── Header ── */
   .app-header {
-    background: var(--card);
-    padding: 16px 16px 12px;
+    background: color-mix(in srgb, var(--card) 82%, transparent);
+    -webkit-backdrop-filter: saturate(180%) blur(16px);
+    backdrop-filter: saturate(180%) blur(16px);
+    padding: 15px 16px 13px;
     border-bottom: 1px solid var(--line);
     position: sticky; top: 0; z-index: 40;
   }
+  @supports not (backdrop-filter: blur(1px)) { .app-header { background: var(--card); } }
   .header-row { display: flex; justify-content: space-between; align-items: center; }
-  .header-title { font-size: 1.3rem; font-weight: 700; color: var(--ink); letter-spacing: -0.02em; line-height: 1; }
-  .header-sub { font-size: 0.74rem; color: var(--muted); margin-top: 3px; }
+  .header-title {
+    font-size: 1.32rem; font-weight: 700; color: var(--ink);
+    letter-spacing: -0.028em; line-height: 1;
+  }
+  .header-sub { font-size: 0.735rem; color: var(--muted); margin-top: 4px; letter-spacing: 0.005em; }
   .header-right { display: flex; align-items: center; gap: 8px; }
   .refresh-btn {
     background: var(--card-2); border: 1px solid var(--line); color: var(--ink-dim);
-    border-radius: 8px; padding: 7px 11px; font-size: 0.82rem; cursor: pointer;
-    font-family: inherit;
+    border-radius: var(--r-sm); width: 34px; height: 34px; font-size: 0.9rem; cursor: pointer;
+    font-family: inherit; display: grid; place-items: center;
+    transition: background .18s var(--ease), transform .18s var(--ease);
   }
-  .refresh-btn:active { opacity: 0.6; }
+  .refresh-btn:active { transform: scale(.92); background: var(--card-3); }
   .add-btn {
     background: var(--accent); color: white; border: none;
-    border-radius: 8px; padding: 8px 14px; font-size: 0.82rem;
-    font-weight: 600; cursor: pointer; font-family: inherit;
+    border-radius: var(--r-sm); padding: 9px 15px; font-size: 0.82rem;
+    font-weight: 650; cursor: pointer; font-family: inherit;
+    box-shadow: var(--sh-1), inset 0 1px 0 rgba(255,255,255,.14);
+    transition: transform .18s var(--ease), filter .18s var(--ease);
   }
-  .add-btn:active { opacity: 0.85; }
+  .add-btn:active { transform: scale(.95); filter: brightness(1.08); }
 
   /* ── Content ── */
   .content { padding: 14px 16px; }
+
+  /* ── Search ── */
+  .search-wrap { position: relative; margin-bottom: 12px; }
+  .search-wrap input {
+    width: 100%; padding: 11px 36px 11px 36px; border-radius: var(--r-md);
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+    font-size: 0.9rem; font-family: inherit; box-shadow: var(--sh-1);
+    transition: border-color .18s var(--ease), box-shadow .18s var(--ease);
+  }
+  .search-wrap input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+  .search-wrap .s-icon {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-size: 0.9rem; pointer-events: none;
+  }
+  .search-wrap .s-clear {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: var(--card-3); border: none; color: var(--ink-dim); cursor: pointer;
+    width: 22px; height: 22px; border-radius: 11px; font-size: 0.8rem; line-height: 1;
+    display: grid; place-items: center; font-family: inherit;
+  }
 
   /* ── Cards ── */
   .card {
     background: var(--card);
     border: 1px solid var(--line);
-    border-radius: 14px;
-    margin-bottom: 10px;
+    border-radius: var(--r-lg);
+    margin-bottom: 11px;
     overflow: hidden;
-    box-shadow: var(--shadow);
+    box-shadow: var(--sh-2);
+    transition: box-shadow .25s var(--ease), transform .25s var(--ease), border-color .25s var(--ease);
   }
+  .card.is-open { box-shadow: var(--sh-3); border-color: color-mix(in srgb, var(--accent) 26%, var(--line)); }
+  @media (hover:hover) { .card:hover { box-shadow: var(--sh-3); } }
   .card-header {
-    padding: 14px 16px;
+    padding: 15px 16px;
     display: flex; justify-content: space-between; align-items: center; cursor: pointer;
+    gap: 10px;
+    transition: background .18s var(--ease);
   }
   .card-header:active { background: var(--card-2); }
-  .student-name { font-weight: 600; font-size: 1rem; color: var(--ink); }
-  .status-row { display: flex; gap: 5px; margin-top: 5px; flex-wrap: wrap; }
+  .student-name {
+    font-weight: 650; font-size: 1.02rem; color: var(--ink); letter-spacing: -0.015em;
+    display: flex; align-items: center; gap: 7px;
+  }
+  /* Coloured dot carries paid/owing state before any text is read. */
+  .dot { width: 7px; height: 7px; border-radius: 4px; flex-shrink: 0; }
+  .dot.ok { background: var(--accent-2); box-shadow: 0 0 0 3px var(--accent-light); }
+  .dot.warn { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-light); }
+  .dot.idle { background: var(--muted); opacity: .55; }
+  .status-row { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; }
   .pill {
-    font-size: 0.67rem; padding: 2px 8px; border-radius: 20px; font-weight: 600; letter-spacing: 0.02em;
+    font-size: 0.665rem; padding: 3px 9px; border-radius: 20px; font-weight: 650;
+    letter-spacing: 0.015em; line-height: 1.45; white-space: nowrap;
   }
   .pill.ok { background: var(--accent-light); color: var(--accent); }
   .pill.warn { background: var(--warn-light); color: var(--warn); }
   .pill.neutral { background: var(--card-2); color: var(--ink-dim); border: 1px solid var(--line); }
+  .pill.gold { background: var(--gold-light); color: var(--gold); }
+
+  /* ── Skeleton loading ── */
+  @keyframes shimmer { 0% { background-position: -420px 0; } 100% { background-position: 420px 0; } }
+  .sk {
+    border-radius: var(--r-lg); height: 74px; margin-bottom: 11px;
+    background: linear-gradient(90deg, var(--card) 0%, var(--card-3) 45%, var(--card) 90%);
+    background-size: 420px 100%;
+    animation: shimmer 1.25s linear infinite;
+    border: 1px solid var(--line);
+  }
   .chevron { font-size: 1rem; color: var(--muted); transition: transform 0.25s cubic-bezier(0.4,0,0.2,1); }
   .chevron.open { transform: rotate(90deg); }
   .card-body { overflow: hidden; max-height: 0; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); }
   .card-body.open { max-height: 3000px; }
   .card-body-inner { padding: 0 16px 16px; border-top: 1px solid var(--line); }
   .section-label {
-    font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--muted); margin: 14px 0 6px; font-weight: 600;
+    font-size: 0.645rem; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--muted); margin: 16px 0 6px; font-weight: 700;
   }
   .lesson-row {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 7px 0; font-size: 0.86rem; border-bottom: 1px solid var(--line);
+    padding: 8px 0; font-size: 0.86rem; border-bottom: 1px solid var(--line-soft);
   }
   .lesson-row:last-child { border-bottom: none; }
   .lesson-date { color: var(--ink-dim); }
-  .lesson-status { font-size: 0.74rem; font-weight: 500; }
+  .lesson-status { font-size: 0.74rem; font-weight: 550; }
   .lesson-status.completed { color: var(--accent); }
   .lesson-status.scheduled { color: var(--gold); }
   .lesson-status.missed { color: var(--warn); }
-  .actions { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
   .btn {
-    flex: 1; min-width: 90px; padding: 10px 12px; border-radius: 10px; border: none;
-    font-size: 0.83rem; font-weight: 600; cursor: pointer; text-align: center;
+    flex: 1; min-width: 90px; padding: 11px 13px; border-radius: var(--r-md); border: none;
+    font-size: 0.83rem; font-weight: 650; cursor: pointer; text-align: center;
     text-decoration: none; color: white; font-family: inherit;
+    transition: transform .16s var(--ease), filter .16s var(--ease), background .16s var(--ease);
+    -webkit-tap-highlight-color: transparent;
   }
-  .btn.whatsapp { background: #25D366; color: #0a2e14; }
+  .btn:active { transform: scale(.96); }
+  @media (hover:hover) { .btn:hover { filter: brightness(1.06); } }
+  .btn:disabled { opacity: .5; cursor: default; transform: none; filter: none; }
+  .btn.whatsapp { background: #25D366; color: #07300f; box-shadow: inset 0 1px 0 rgba(255,255,255,.22); }
   .btn.notes { background: var(--card-2); color: var(--ink-dim); border: 1px solid var(--line); }
   .btn.more  { background: var(--card-2); color: var(--ink);     border: 1px solid var(--line); }
   .btn.edit  { background: var(--card-2); color: var(--ink);     border: 1px solid var(--line); }
+
+  /* ── Needs attention ── */
+  .attn {
+    background: var(--warn-light); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
+    border-radius: var(--r-lg); padding: 13px 15px; margin-bottom: 12px;
+    box-shadow: var(--sh-1);
+  }
+  .attn-title {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em;
+    font-weight: 700; color: var(--warn); margin-bottom: 8px;
+  }
+  .attn-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    padding: 6px 0; font-size: 0.85rem; cursor: pointer; color: var(--ink);
+    border-radius: 6px; transition: background .15s var(--ease);
+  }
+  .attn-item:active { background: color-mix(in srgb, var(--warn) 10%, transparent); }
+  .attn-why { font-size: 0.74rem; color: var(--warn); font-weight: 600; white-space: nowrap; }
+
+  /* ── Exam countdown ── */
+  .exam-chip {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    background: var(--gold-light); border: 1px solid color-mix(in srgb, var(--gold) 32%, transparent);
+    color: var(--gold); border-radius: var(--r-sm); padding: 6px 10px;
+    font-size: 0.75rem; font-weight: 600; margin-top: 8px;
+  }
+  .exam-chip b { font-size: 0.92rem; font-weight: 750; letter-spacing: -0.01em; }
   .notes-box {
     font-size: 0.84rem; color: var(--ink-dim); background: var(--card-2);
     padding: 10px 12px; border-radius: 8px; margin-top: 8px; line-height: 1.5;
@@ -182,12 +294,13 @@
     margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
   }
   .field input[type="text"], .field input[type="date"], .field input[type="number"], .field select, .field textarea {
-    width: 100%; padding: 10px 12px; border: 1px solid var(--line);
-    border-radius: 10px; font-size: 0.95rem; font-family: inherit;
+    width: 100%; padding: 11px 13px; border: 1px solid var(--line);
+    border-radius: var(--r-md); font-size: 0.95rem; font-family: inherit;
     background: var(--card-2); color: var(--ink);
+    transition: border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
   }
   .field input:focus, .field select:focus, .field textarea:focus {
-    outline: none; border-color: var(--accent);
+    outline: none; border-color: var(--accent); box-shadow: var(--ring); background: var(--card);
   }
   .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
   .field textarea { min-height: 70px; resize: vertical; }
@@ -204,24 +317,27 @@
   .session-pick-row input { width: 18px; height: 18px; accent-color: var(--accent); }
   .tools-menu { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
   .tools-menu button {
-    text-align: left; padding: 13px 15px; border-radius: 10px;
+    text-align: left; padding: 14px 15px; border-radius: var(--r-md);
     border: 1px solid var(--line); background: var(--card-2); font-size: 0.88rem;
-    cursor: pointer; color: var(--ink); font-family: inherit; font-weight: 500;
+    cursor: pointer; color: var(--ink); font-family: inherit; font-weight: 550;
+    transition: background .16s var(--ease), transform .16s var(--ease), border-color .16s var(--ease);
+    -webkit-tap-highlight-color: transparent;
   }
-  .tools-menu button:active { opacity: 0.7; }
+  .tools-menu button:active { transform: scale(.985); background: var(--card-3); }
+  @media (hover:hover) { .tools-menu button:hover { border-color: var(--accent); background: var(--card-3); } }
 
   /* ── Global tools button ── */
   .global-tools-btn {
     position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
-    background: var(--ink); color: var(--bg); border: none; border-radius: 24px;
-    padding: 12px 26px; font-size: 0.86rem; font-weight: 700; cursor: pointer;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.18); z-index: 50; white-space: nowrap;
+    background: var(--ink); color: var(--bg); border: none; border-radius: var(--r-xl);
+    padding: 13px 28px; font-size: 0.86rem; font-weight: 700; cursor: pointer;
+    box-shadow: var(--sh-3); z-index: 50; white-space: nowrap;
     font-family: inherit; letter-spacing: 0.01em;
+    transition: transform .2s var(--ease-spring), box-shadow .2s var(--ease);
+    -webkit-tap-highlight-color: transparent;
   }
-  .global-tools-btn:active { opacity: 0.85; }
-  @media (prefers-color-scheme: dark) {
-    .global-tools-btn { box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-  }
+  .global-tools-btn:active { transform: translateX(-50%) scale(.94); }
+  @media (hover:hover) { .global-tools-btn:hover { transform: translateX(-50%) translateY(-2px); } }
 
   /* ── Growth calculator ── */
   .calc-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; font-size: 0.82rem; }
@@ -416,6 +532,27 @@ function currentSchoolYear(baseYear, asOfDate) {
 }
 
 const PRESET_BOARDS = ['Edexcel', 'AQA', 'Edexcel IGCSE', 'OCR'];
+
+// Year 11 sit GCSEs and Year 13 sit A-levels, both in the May/June window at
+// the end of that academic year. Maths papers land around mid-May, which is
+// close enough to be useful as a countdown without needing a date per student.
+function examCountdown(displayYear) {
+  if (displayYear !== 11 && displayYear !== 13) return null;
+  const label = displayYear === 11 ? 'GCSEs' : 'A-levels';
+  const now = new Date();
+  // Academic years run Sept-Aug, so before August the exams are this calendar
+  // year; from August onwards they're next May.
+  const examYear = now.getMonth() >= 7 ? now.getFullYear() + 1 : now.getFullYear();
+  const examDate = new Date(examYear, 4, 15); // 15 May
+  const days = Math.ceil((examDate - now) / 86400000);
+  if (days < 0) return null;
+  return {
+    label,
+    days,
+    weeks: Math.round(days / 7),
+    dateLabel: examDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+  };
+}
 
 // Set once per render from App. Faking is applied at the RATE level rather
 // than at each place a number is printed, because rates are what every other
@@ -668,13 +805,21 @@ function SummaryWidget({ students, rateHistory }) {
   ];
 
   return (
-    <div className="summary-widget" style={{background:'var(--card)',border:'1px solid var(--line)',borderTop:'3px solid var(--gold)',borderRadius:14,padding:'16px',marginBottom:14}}>
+    <div className="summary-widget" style={{
+      background:'linear-gradient(165deg, var(--card) 0%, var(--card-2) 100%)',
+      border:'1px solid var(--line)', borderRadius:'var(--r-lg)',
+      padding:'18px 17px', marginBottom:14, boxShadow:'var(--sh-2)',
+      position:'relative', overflow:'hidden'
+    }}>
+      {/* Hairline of colour rather than a heavy 3px slab across the top. */}
+      <div style={{position:'absolute',top:0,left:0,right:0,height:3,
+        background:'linear-gradient(90deg, var(--gold), var(--accent-2))'}} />
       {/* Stats row */}
       {active.length > 0 && (
-        <div style={{display:'flex',gap:0,flexWrap:'wrap',marginBottom:16,paddingBottom:14,borderBottom:'1px solid var(--line)'}}>
+        <div style={{display:'flex',gap:0,flexWrap:'wrap',marginBottom:16,paddingBottom:15,borderBottom:'1px solid var(--line)'}}>
           {stats.map(({label, value, accent}) => (
             <div key={label} style={{flex:'1 1 70px',minWidth:60}}>
-              <div style={{fontSize:'1.85rem',fontWeight:700,color:accent?'var(--gold)':'var(--ink)',letterSpacing:'-0.03em',lineHeight:1}}>{value}</div>
+              <div style={{fontSize:'1.95rem',fontWeight:750,color:accent?'var(--gold)':'var(--ink)',letterSpacing:'-0.035em',lineHeight:1}}>{value}</div>
               <div style={{fontSize:'0.66rem',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginTop:4}}>{label}</div>
             </div>
           ))}
@@ -975,6 +1120,75 @@ function MonzoPanel({ students, onDataChanged }) {
               onClick={() => act(t.transaction_id, { dismiss: true })}
             >Not tutoring</button>
           </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ---------- Needs attention ----------
+// Surfaces the two things that actually cost money if missed: someone owing
+// for a while, and an active student with nothing in the diary. Hidden
+// entirely when there's nothing wrong, so it never becomes wallpaper.
+function NeedsAttention({ students, lessons, payments, allocations, rateHistory, onJump }) {
+  const M = useMoney();
+  const N = useNameDisplay();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const items = [];
+  students.filter(s => s.active).forEach(s => {
+    const mine = lessons.filter(l => l.student_id === s.id);
+    const lessonIds = new Set(mine.map(l => l.id));
+    const scale = moneyScaleFor(s.id, rateHistory);
+
+    const owed = mine
+      .filter(l => l.status === 'completed' && !l.is_complimentary && !l.pre_settled)
+      .reduce((sum, l) => sum + rateForLesson(l, rateHistory), 0);
+    const paid = payments
+      .filter(p => p.student_id === s.id)
+      .reduce((sum, p) => sum + parseFloat(p.amount) * scale, 0);
+    const balance = owed - paid;
+
+    const oldestUnpaid = mine
+      .filter(l => l.status === 'completed' && !l.is_complimentary && !l.pre_settled)
+      .filter(l => {
+        const covered = allocations
+          .filter(a => a.lesson_id === l.id)
+          .reduce((sum, a) => sum + parseFloat(a.amount) * scale, 0);
+        return covered < rateForLesson(l, rateHistory) - 0.005;
+      })
+      .sort((a, b) => a.lesson_date.localeCompare(b.lesson_date))[0];
+
+    if (balance > 0.005 && oldestUnpaid) {
+      const days = Math.floor((new Date(today) - new Date(oldestUnpaid.lesson_date)) / 86400000);
+      if (days >= 7) {
+        items.push({
+          id: s.id + ':owing', studentId: s.id, name: s.name,
+          why: `${M(balance, s.id + ':balance')} · ${days}d`,
+          sort: 1000 - days,
+        });
+      }
+    }
+
+    const hasUpcoming = mine.some(l => l.status === 'scheduled' && l.lesson_date >= today);
+    if (!hasUpcoming) {
+      items.push({
+        id: s.id + ':nolesson', studentId: s.id, name: s.name,
+        why: 'nothing booked', sort: 2000,
+      });
+    }
+  });
+
+  if (items.length === 0) return null;
+  items.sort((a, b) => a.sort - b.sort);
+
+  return (
+    <div className="attn">
+      <div className="attn-title">Needs attention · {items.length}</div>
+      {items.slice(0, 6).map(it => (
+        <div className="attn-item" key={it.id} onClick={() => onJump(it.studentId)}>
+          <span>{N(it.name, it.studentId)}</span>
+          <span className="attn-why">{it.why}</span>
         </div>
       ))}
     </div>
@@ -2008,7 +2222,7 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
   );
 }
 
-function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, onEdit, onDataChanged }) {
+function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, focused, onEdit, onDataChanged }) {
   const M = useMoney();
   const N = useNameDisplay();
   const [open, setOpen] = useState(false);
@@ -2131,11 +2345,20 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
   const bundleWaLink = null;
 
+  const examSoon = examCountdown(displayYear);
+
   return (
-    <div className="card">
+    <div
+      className={`card${open ? ' is-open' : ''}`}
+      id={'student-' + student.id}
+      style={focused ? { borderColor: 'var(--accent)', boxShadow: 'var(--sh-3), var(--ring)' } : undefined}
+    >
       <div className="card-header" onClick={() => setOpen(!open)}>
-        <div>
-          <div className="student-name">{N(student.name, student.id)}{!student.active && ' (inactive)'}</div>
+        <div style={{minWidth:0}}>
+          <div className="student-name">
+            <span className={`dot ${balance > 0.005 ? 'warn' : nextLesson ? 'ok' : 'idle'}`} />
+            {N(student.name, student.id)}{!student.active && ' (inactive)'}
+          </div>
           <div className="status-row">
             {balance > 0 && (
               <span className={`pill ${isOverdue ? 'warn' : 'neutral'}`}>
@@ -2183,6 +2406,11 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               {referrals.length > 0 && (
                 <div style={{ fontSize: '0.82rem', color: 'var(--accent)', marginTop: 2 }}>
                   Referred {referrals.map(s => N(s.name, s.id).split(' ')[0]).join(', ')} — use "mark free" on their next lesson
+                </div>
+              )}
+              {examSoon && (
+                <div className="exam-chip">
+                  🎓 {examSoon.label} <b>{examSoon.weeks} weeks</b> away · {examSoon.dateLabel}
                 </div>
               )}
             </React.Fragment>
@@ -2387,6 +2615,8 @@ function App() {
   const [monzoStatus, setMonzoStatus] = useState(null);
   const [moneyMode, setMoneyMode] = useState('normal');
   const [nameMode, setNameMode] = useState('normal');
+  const [query, setQuery] = useState('');
+  const [focusStudentId, setFocusStudentId] = useState(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -2444,6 +2674,25 @@ function App() {
   // child reads it.
   PRIVACY_MONEY_MODE = moneyMode;
 
+  // Search matches name or school, so "Hasmonean" finds everyone there.
+  const q = query.trim().toLowerCase();
+  const shownStudents = q
+    ? activeStudents.filter(s =>
+        (s.name || '').toLowerCase().includes(q) ||
+        (s.school || '').toLowerCase().includes(q))
+    : activeStudents;
+
+  function jumpToStudent(id) {
+    setQuery('');
+    setFocusStudentId(id);
+    // Let the filter clear before scrolling, or the card may not be mounted yet.
+    setTimeout(() => {
+      const el = document.getElementById('student-' + id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+    setTimeout(() => setFocusStudentId(null), 2200);
+  }
+
   return (
     <PrivacyContext.Provider value={{ moneyMode, nameMode }}>
     <div>
@@ -2495,21 +2744,50 @@ function App() {
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
       <div className="content">
+        {loading && (
+          <>
+            <div className="sk" style={{height:132, marginBottom:14}} />
+            <div className="sk" /><div className="sk" /><div className="sk" />
+          </>
+        )}
+
         {!loading && <SummaryWidget students={students} rateHistory={rateHistory} />}
 
-        {loading && <div className="loading">Loading…</div>}
+        {!loading && (
+          <NeedsAttention
+            students={students} lessons={lessons} payments={payments}
+            allocations={allocations} rateHistory={rateHistory}
+            onJump={jumpToStudent}
+          />
+        )}
+
+        {!loading && activeStudents.length > 3 && (
+          <div className="search-wrap">
+            <span className="s-icon">⌕</span>
+            <input
+              type="text" value={query} onChange={e => setQuery(e.target.value)}
+              placeholder="Search students or schools…"
+            />
+            {query && <button className="s-clear" onClick={() => setQuery('')}>✕</button>}
+          </div>
+        )}
 
         {!loading && activeStudents.length === 0 && (
           <div className="empty">No active students. Tap "+ Add" to get started.</div>
         )}
 
-        {!loading && activeStudents.map(s => (
+        {!loading && activeStudents.length > 0 && shownStudents.length === 0 && (
+          <div className="empty">No one matches "{query}".</div>
+        )}
+
+        {!loading && shownStudents.map(s => (
           <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
             allocations={allocations} allStudents={students} rateHistory={rateHistory}
+            focused={focusStudentId === s.id}
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v2.6</div>}
+        {!loading && <div className="version-tag">v2.7</div>}
       </div>
 
       {showAddModal && (
