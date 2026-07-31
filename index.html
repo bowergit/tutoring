@@ -535,7 +535,17 @@ const { useState, useEffect } = React;
 
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    // Keep the session in localStorage and refresh it silently, so signing in
+    // is a rare event rather than something to do every visit.
+    persistSession: true,
+    autoRefreshToken: true,
+    // The magic link comes back with tokens in the URL fragment; let the
+    // client consume them and then tidy the address bar.
+    detectSessionInUrl: true,
+  },
+});
 
 function daysBetween(dateStr) {
   const d = new Date(dateStr);
@@ -1167,6 +1177,85 @@ function MonzoPanel({ students, onDataChanged }) {
   );
 }
 
+// ---------- Sign in ----------
+// Magic link rather than a password: one user, rarely signing in, and nothing
+// to forget or leak. The session is kept in localStorage and refreshed
+// silently, so this screen should be a once-in-a-blue-moon appearance.
+function LoginGate() {
+  const [email, setEmail] = useState('');
+  const [state, setState] = useState('idle');   // idle | sending | sent | error
+  const [detail, setDetail] = useState('');
+
+  async function sendLink(e) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setState('sending');
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: window.location.href.split('#')[0] },
+    });
+    if (error) { setState('error'); setDetail(error.message); }
+    else { setState('sent'); }
+  }
+
+  return (
+    <div style={{
+      minHeight:'100dvh', display:'flex', alignItems:'center', justifyContent:'center',
+      padding:'24px 18px'
+    }}>
+      <div style={{
+        width:'100%', maxWidth:380, background:'var(--card)', border:'1px solid var(--line)',
+        borderRadius:'var(--r-xl)', padding:'28px 24px', boxShadow:'var(--sh-3)',
+        position:'relative', overflow:'hidden'
+      }}>
+        <div style={{position:'absolute',top:0,left:0,right:0,height:3,
+          background:'linear-gradient(90deg, var(--gold), var(--accent-2))'}} />
+
+        <div style={{fontSize:'1.35rem', fontWeight:750, letterSpacing:'-0.03em', marginBottom:5}}>
+          Maths Tutoring
+        </div>
+        <div style={{fontSize:'0.85rem', color:'var(--muted)', marginBottom:22, lineHeight:1.5}}>
+          Sign in to see your students. We'll email you a link — no password to remember.
+        </div>
+
+        {state === 'sent' ? (
+          <div style={{
+            background:'var(--accent-light)', border:'1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+            color:'var(--accent)', borderRadius:'var(--r-md)', padding:'14px 15px',
+            fontSize:'0.87rem', lineHeight:1.5, fontWeight:550
+          }}>
+            Link sent to <b>{email}</b>. Open it on this device and you'll land back here signed in.
+            <div style={{marginTop:10}}>
+              <button className="btn cancel" style={{width:'100%'}} onClick={() => setState('idle')}>
+                Use a different email
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={sendLink}>
+            <div className="field">
+              <label>Email</label>
+              <input
+                type="email" value={email} onChange={e => setEmail(e.target.value)}
+                placeholder="you@example.com" autoComplete="email" autoFocus
+              />
+            </div>
+            {state === 'error' && (
+              <div style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:12, lineHeight:1.45}}>
+                {detail || 'Could not send the link. Check the address and try again.'}
+              </div>
+            )}
+            <button className="btn save" style={{width:'100%'}} type="submit"
+                    disabled={state === 'sending' || !email.trim()}>
+              {state === 'sending' ? 'Sending…' : 'Email me a sign-in link'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ---------- Revenue trend ----------
 // Money actually received, by month. Built from payment dates rather than
 // lessons taught, so it reflects cash in hand rather than what's owed.
@@ -1332,7 +1421,7 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
 }
 
 // ---------- Global Tools Sheet ----------
-function GlobalToolsSheet({ students, rateHistory, payments = [], moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onDataChanged }) {
+function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onDataChanged }) {
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
   const [tool, setTool] = useState(null);
@@ -1381,6 +1470,9 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], moneyMode, set
                 🕶 Privacy mode{privacyOn ? ' — on' : ''}
               </button>
               <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
+              <button onClick={() => supabase.auth.signOut()} style={{color:'var(--muted)'}}>
+                ⏻ Sign out{userEmail ? ` — ${userEmail}` : ''}
+              </button>
             </div>
           </>
         )}
@@ -2774,6 +2866,14 @@ function App() {
   const [nameMode, setNameMode] = useState('normal');
   const [query, setQuery] = useState('');
   const [focusStudentId, setFocusStudentId] = useState(null);
+  // undefined = still checking; null = signed out; object = signed in.
+  const [session, setSession] = useState(undefined);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => setSession(s ?? null));
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -2815,7 +2915,9 @@ function App() {
     setRefreshing(false);
   }
 
-  useEffect(() => { loadAll(); }, []);
+  // Only fetch once signed in — with RLS on, an anonymous fetch returns
+  // nothing anyway, and firing it would just show a misleading empty state.
+  useEffect(() => { if (session) loadAll(); }, [session]);
 
   const activeStudents = students.filter(s => s.active);
   const archivedCount = students.filter(s => !s.active).length;
@@ -2832,6 +2934,8 @@ function App() {
   PRIVACY_MONEY_MODE = moneyMode;
 
   // Search matches name or school, so "Hasmonean" finds everyone there.
+  // (auth gate is applied at the end of this component, after all hooks have
+  // run — bailing out earlier would change the hook order between renders)
   const q = query.trim().toLowerCase();
   const shownStudents = q
     ? activeStudents.filter(s =>
@@ -2849,6 +2953,12 @@ function App() {
     }, 60);
     setTimeout(() => setFocusStudentId(null), 2200);
   }
+
+  // Still restoring the session from storage: hold a blank screen for the
+  // instant it takes, rather than flashing the sign-in form at someone who is
+  // already signed in.
+  if (session === undefined) return <div style={{minHeight:'100dvh'}} />;
+  if (session === null) return <LoginGate />;
 
   return (
     <PrivacyContext.Provider value={{ moneyMode, nameMode }}>
@@ -2944,7 +3054,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v2.8</div>}
+        {!loading && <div className="version-tag">v2.9</div>}
       </div>
 
       {showAddModal && (
@@ -2963,6 +3073,7 @@ function App() {
           students={students}
           rateHistory={rateHistory}
           payments={payments}
+          userEmail={session?.user?.email}
           moneyMode={moneyMode} setMoneyMode={setMoneyMode}
           nameMode={nameMode} setNameMode={setNameMode}
           onClose={() => setShowGlobalTools(false)}
