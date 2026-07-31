@@ -258,6 +258,32 @@
     font-size: 0.75rem; font-weight: 600; margin-top: 8px;
   }
   .exam-chip b { font-size: 0.92rem; font-weight: 750; letter-spacing: -0.01em; }
+
+  /* ── Recent past paper ── */
+  @keyframes sparkle {
+    0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    50%      { transform: scale(1.22) rotate(9deg); opacity: .82; }
+  }
+  .sparkle { display: inline-block; animation: sparkle 2.4s ease-in-out infinite; font-size: 0.92rem; }
+  @media (prefers-reduced-motion: reduce) { .sparkle { animation: none; } }
+  .paper-chip {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    color: var(--accent); border-radius: var(--r-sm); padding: 6px 10px;
+    font-size: 0.75rem; font-weight: 600; margin-top: 8px;
+  }
+  .paper-chip b { font-size: 0.9rem; font-weight: 750; }
+
+  /* ── Revenue trend ── */
+  .rev-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
+  .rev-month { font-size: 0.75rem; color: var(--muted); width: 54px; flex-shrink: 0; }
+  .rev-track { flex: 1; height: 22px; background: var(--card-2); border-radius: 6px; overflow: hidden; }
+  .rev-fill {
+    height: 100%; border-radius: 6px;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    transition: width .5s var(--ease);
+  }
+  .rev-val { font-size: 0.78rem; font-weight: 650; width: 62px; text-align: right; flex-shrink: 0; }
   .notes-box {
     font-size: 0.84rem; color: var(--ink-dim); background: var(--card-2);
     padding: 10px 12px; border-radius: 8px; margin-top: 8px; line-height: 1.5;
@@ -532,6 +558,21 @@ function currentSchoolYear(baseYear, asOfDate) {
 }
 
 const PRESET_BOARDS = ['Edexcel', 'AQA', 'Edexcel IGCSE', 'OCR'];
+
+// A paper done in the last week earns a sparkle on the card. Written nightly
+// from the student's own tracker sheet by the Apps Script.
+function recentPaper(student, withinDays = 7) {
+  if (!student.last_paper_date) return null;
+  const done = new Date(student.last_paper_date + 'T12:00:00');
+  const days = Math.floor((Date.now() - done) / 86400000);
+  if (days < 0 || days > withinDays) return null;
+  return {
+    days,
+    score: student.last_paper_score,
+    name: student.last_paper_name,
+    label: days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`,
+  };
+}
 
 // Year 11 sit GCSEs and Year 13 sit A-levels, both in the May/June window at
 // the end of that academic year. Maths papers land around mid-May, which is
@@ -1126,6 +1167,101 @@ function MonzoPanel({ students, onDataChanged }) {
   );
 }
 
+// ---------- Revenue trend ----------
+// Money actually received, by month. Built from payment dates rather than
+// lessons taught, so it reflects cash in hand rather than what's owed.
+function RevenueTrend({ payments, students, rateHistory }) {
+  const M = useMoney();
+  const MONTHS_SHOWN = 6;
+
+  const scaleByStudent = {};
+  students.forEach(s => { scaleByStudent[s.id] = moneyScaleFor(s.id, rateHistory); });
+
+  const buckets = {};
+  const now = new Date();
+  for (let i = MONTHS_SHOWN - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    // Built from local parts, not toISOString: midnight on the 1st in BST is
+    // still the previous month in UTC, which silently merged July into June.
+    buckets[`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`] = 0;
+  }
+
+  payments.forEach(p => {
+    const key = String(p.date_paid || '').slice(0, 7);
+    if (!(key in buckets)) return;
+    buckets[key] += parseFloat(p.amount) * (scaleByStudent[p.student_id] ?? 1);
+  });
+
+  const rows = Object.entries(buckets).map(([key, total]) => ({
+    key, total,
+    label: new Date(key + '-01T12:00:00').toLocaleDateString('en-GB', { month: 'short' }),
+  }));
+
+  const peak = Math.max(...rows.map(r => r.total), 1);
+  const received = rows.reduce((s, r) => s + r.total, 0);
+  const monthsWithMoney = rows.filter(r => r.total > 0).length;
+  const average = monthsWithMoney > 0 ? received / monthsWithMoney : 0;
+
+  // Compare the two most recent complete months, ignoring the current partial
+  // one — otherwise every month looks like a collapse until it's over.
+  const prior = rows.slice(0, -1);
+  const lastFull = prior[prior.length - 1];
+  const prevFull = prior[prior.length - 2];
+  const change = lastFull && prevFull && prevFull.total > 0
+    ? Math.round(((lastFull.total - prevFull.total) / prevFull.total) * 100)
+    : null;
+
+  return (
+    <div>
+      <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
+        Money received each month. The current month is still filling up, so the
+        change below compares the last two complete months.
+      </div>
+
+      {rows.map(r => (
+        <div className="rev-row" key={r.key}>
+          <span className="rev-month">{r.label}</span>
+          <span className="rev-track">
+            <span className="rev-fill" style={{width: `${Math.max(2, (r.total / peak) * 100)}%`}} />
+          </span>
+          <span className="rev-val" style={{color: r.total > 0 ? 'var(--ink)' : 'var(--muted)'}}>
+            {r.total > 0 ? M(r.total) : '—'}
+          </span>
+        </div>
+      ))}
+
+      <div style={{
+        display:'flex', gap:14, marginTop:16, paddingTop:14,
+        borderTop:'1px solid var(--line)', flexWrap:'wrap'
+      }}>
+        <div style={{flex:'1 1 90px'}}>
+          <div style={{fontSize:'1.15rem', fontWeight:750, letterSpacing:'-0.02em'}}>{M(received)}</div>
+          <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.07em', marginTop:2}}>
+            last {MONTHS_SHOWN} months
+          </div>
+        </div>
+        <div style={{flex:'1 1 90px'}}>
+          <div style={{fontSize:'1.15rem', fontWeight:750, letterSpacing:'-0.02em'}}>{M(average)}</div>
+          <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.07em', marginTop:2}}>
+            monthly average
+          </div>
+        </div>
+        {change !== null && (
+          <div style={{flex:'1 1 90px'}}>
+            <div style={{fontSize:'1.15rem', fontWeight:750, letterSpacing:'-0.02em',
+                         color: change >= 0 ? 'var(--accent)' : 'var(--warn)'}}>
+              {change >= 0 ? '+' : ''}{change}%
+            </div>
+            <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.07em', marginTop:2}}>
+              {prevFull.label} → {lastFull.label}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ---------- Needs attention ----------
 // Surfaces the two things that actually cost money if missed: someone owing
 // for a while, and an active student with nothing in the diary. Hidden
@@ -1196,7 +1332,7 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
 }
 
 // ---------- Global Tools Sheet ----------
-function GlobalToolsSheet({ students, rateHistory, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onDataChanged }) {
+function GlobalToolsSheet({ students, rateHistory, payments = [], moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onDataChanged }) {
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
   const [tool, setTool] = useState(null);
@@ -1237,6 +1373,7 @@ function GlobalToolsSheet({ students, rateHistory, moneyMode, setMoneyMode, name
           <>
             <h2>Tools</h2>
             <div className="tools-menu">
+              <button onClick={() => setTool('revenue')}>💹 Revenue trend — what's actually come in</button>
               <button onClick={() => setTool('growth')}>📈 Growth calculator — what if I had more students?</button>
               <button onClick={() => setTool('archived')}>🗂 Archived students{archived.length > 0 ? ` (${archived.length})` : ''}</button>
               <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>
@@ -1276,6 +1413,15 @@ function GlobalToolsSheet({ students, rateHistory, moneyMode, setMoneyMode, name
               could still save would put fake data in your real records. The text
               the payment record copies for a parent stays real either way.
             </div>
+          </>
+        )}
+        {tool === 'revenue' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Revenue trend</h2>
+            </div>
+            <RevenueTrend payments={payments} students={students} rateHistory={rateHistory} />
           </>
         )}
         {tool === 'growth' && (
@@ -2346,6 +2492,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const bundleWaLink = null;
 
   const examSoon = examCountdown(displayYear);
+  const paperRecent = recentPaper(student);
 
   return (
     <div
@@ -2358,6 +2505,9 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           <div className="student-name">
             <span className={`dot ${balance > 0.005 ? 'warn' : nextLesson ? 'ok' : 'idle'}`} />
             {N(student.name, student.id)}{!student.active && ' (inactive)'}
+            {paperRecent && (
+              <span className="sparkle" title={`Past paper ${paperRecent.label}`}>✨</span>
+            )}
           </div>
           <div className="status-row">
             {balance > 0 && (
@@ -2411,6 +2561,13 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               {examSoon && (
                 <div className="exam-chip">
                   🎓 {examSoon.label} <b>{examSoon.weeks} weeks</b> away · {examSoon.dateLabel}
+                </div>
+              )}
+              {paperRecent && (
+                <div className="paper-chip">
+                  ✨ Past paper {paperRecent.label}
+                  {paperRecent.score != null && <b>{paperRecent.score}%</b>}
+                  {paperRecent.name && <span style={{color:'var(--muted)'}}>· {paperRecent.name}</span>}
                 </div>
               )}
             </React.Fragment>
@@ -2787,7 +2944,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v2.7</div>}
+        {!loading && <div className="version-tag">v2.8</div>}
       </div>
 
       {showAddModal && (
@@ -2805,6 +2962,7 @@ function App() {
         <GlobalToolsSheet
           students={students}
           rateHistory={rateHistory}
+          payments={payments}
           moneyMode={moneyMode} setMoneyMode={setMoneyMode}
           nameMode={nameMode} setNameMode={setNameMode}
           onClose={() => setShowGlobalTools(false)}
