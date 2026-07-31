@@ -1178,24 +1178,45 @@ function MonzoPanel({ students, onDataChanged }) {
 }
 
 // ---------- Sign in ----------
-// Magic link rather than a password: one user, rarely signing in, and nothing
-// to forget or leak. The session is kept in localStorage and refreshed
-// silently, so this screen should be a once-in-a-blue-moon appearance.
+// Email and password, in a real <form> with the right autocomplete hints so a
+// password manager offers to fill and save it. There is deliberately no
+// sign-up here: the account is created once in the Supabase dashboard, so this
+// screen can only ever let an existing owner back in.
 function LoginGate() {
   const [email, setEmail] = useState('');
-  const [state, setState] = useState('idle');   // idle | sending | sent | error
+  const [password, setPassword] = useState('');
+  const [state, setState] = useState('idle');   // idle | busy | error | reset-sent
   const [detail, setDetail] = useState('');
 
-  async function sendLink(e) {
+  async function signIn(e) {
     e.preventDefault();
-    if (!email.trim()) return;
-    setState('sending');
-    const { error } = await supabase.auth.signInWithOtp({
+    if (!email.trim() || !password) return;
+    setState('busy');
+    const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
-      options: { emailRedirectTo: window.location.href.split('#')[0] },
+      password,
+    });
+    if (error) {
+      setState('error');
+      setDetail(error.message === 'Invalid login credentials'
+        ? 'That email and password combination was not recognised.'
+        : error.message);
+    }
+    // On success the auth listener in App swaps this screen out.
+  }
+
+  async function sendReset() {
+    if (!email.trim()) {
+      setState('error');
+      setDetail('Enter your email address first, then tap this again.');
+      return;
+    }
+    setState('busy');
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.href.split('#')[0],
     });
     if (error) { setState('error'); setDetail(error.message); }
-    else { setState('sent'); }
+    else { setState('reset-sent'); }
   }
 
   return (
@@ -1215,44 +1236,110 @@ function LoginGate() {
           Maths Tutoring
         </div>
         <div style={{fontSize:'0.85rem', color:'var(--muted)', marginBottom:22, lineHeight:1.5}}>
-          Sign in to see your students. We'll email you a link — no password to remember.
+          Sign in to see your students.
         </div>
 
-        {state === 'sent' ? (
+        {state === 'reset-sent' ? (
           <div style={{
             background:'var(--accent-light)', border:'1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
             color:'var(--accent)', borderRadius:'var(--r-md)', padding:'14px 15px',
             fontSize:'0.87rem', lineHeight:1.5, fontWeight:550
           }}>
-            Link sent to <b>{email}</b>. Open it on this device and you'll land back here signed in.
+            Reset link sent to <b>{email}</b>. Opening it signs you straight in — then
+            set a new password from Tools.
             <div style={{marginTop:10}}>
               <button className="btn cancel" style={{width:'100%'}} onClick={() => setState('idle')}>
-                Use a different email
+                Back to sign in
               </button>
             </div>
           </div>
         ) : (
-          <form onSubmit={sendLink}>
+          <form onSubmit={signIn}>
             <div className="field">
               <label>Email</label>
               <input
                 type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com" autoComplete="email" autoFocus
+                placeholder="you@example.com" autoComplete="username" name="email" autoFocus
+              />
+            </div>
+            <div className="field">
+              <label>Password</label>
+              <input
+                type="password" value={password} onChange={e => setPassword(e.target.value)}
+                placeholder="••••••••" autoComplete="current-password" name="password"
               />
             </div>
             {state === 'error' && (
               <div style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:12, lineHeight:1.45}}>
-                {detail || 'Could not send the link. Check the address and try again.'}
+                {detail}
               </div>
             )}
             <button className="btn save" style={{width:'100%'}} type="submit"
-                    disabled={state === 'sending' || !email.trim()}>
-              {state === 'sending' ? 'Sending…' : 'Email me a sign-in link'}
+                    disabled={state === 'busy' || !email.trim() || !password}>
+              {state === 'busy' ? 'Signing in…' : 'Sign in'}
+            </button>
+            <button
+              type="button"
+              onClick={sendReset}
+              style={{
+                display:'block', margin:'14px auto 0', background:'none', border:'none',
+                color:'var(--muted)', fontSize:'0.78rem', fontFamily:'inherit',
+                cursor:'pointer', textDecoration:'underline'
+              }}>
+              Forgot password?
             </button>
           </form>
         )}
       </div>
     </div>
+  );
+}
+
+// ---------- Change password ----------
+function ChangePassword() {
+  const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
+  const [state, setState] = useState('idle');
+  const [detail, setDetail] = useState('');
+
+  async function save(e) {
+    e.preventDefault();
+    if (pw.length < 8) { setState('error'); setDetail('Use at least 8 characters.'); return; }
+    if (pw !== pw2)    { setState('error'); setDetail('The two passwords do not match.'); return; }
+    setState('busy');
+    const { error } = await supabase.auth.updateUser({ password: pw });
+    if (error) { setState('error'); setDetail(error.message); }
+    else { setState('done'); setPw(''); setPw2(''); }
+  }
+
+  return (
+    <form onSubmit={save}>
+      <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
+        Sets the password for the account you're signed in as. Your password
+        manager should offer to update its saved copy.
+      </div>
+      <div className="field">
+        <label>New password</label>
+        <input type="password" value={pw} onChange={e => setPw(e.target.value)}
+               autoComplete="new-password" placeholder="At least 8 characters" />
+      </div>
+      <div className="field">
+        <label>Confirm new password</label>
+        <input type="password" value={pw2} onChange={e => setPw2(e.target.value)}
+               autoComplete="new-password" placeholder="Type it again" />
+      </div>
+      {state === 'error' && (
+        <div style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:12}}>{detail}</div>
+      )}
+      {state === 'done' && (
+        <div style={{fontSize:'0.82rem', color:'var(--accent)', marginBottom:12, fontWeight:600}}>
+          Password updated.
+        </div>
+      )}
+      <button className="btn save" style={{width:'100%'}} type="submit" disabled={state === 'busy'}>
+        {state === 'busy' ? 'Saving…' : 'Set password'}
+      </button>
+    </form>
   );
 }
 
@@ -1470,6 +1557,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, mon
                 🕶 Privacy mode{privacyOn ? ' — on' : ''}
               </button>
               <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
+              <button onClick={() => setTool('password')}>🔑 Change password</button>
               <button onClick={() => supabase.auth.signOut()} style={{color:'var(--muted)'}}>
                 ⏻ Sign out{userEmail ? ` — ${userEmail}` : ''}
               </button>
@@ -1505,6 +1593,15 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, mon
               could still save would put fake data in your real records. The text
               the payment record copies for a parent stays real either way.
             </div>
+          </>
+        )}
+        {tool === 'password' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Change password</h2>
+            </div>
+            <ChangePassword />
           </>
         )}
         {tool === 'revenue' && (
@@ -3054,7 +3151,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v2.9</div>}
+        {!loading && <div className="version-tag">v3.0</div>}
       </div>
 
       {showAddModal && (
