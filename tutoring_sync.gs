@@ -27,6 +27,15 @@ const IGNORE_PATTERNS = [
   /^tutoring call/i,
 ];
 
+/**
+ * Kept so a trigger still pointing at the old name keeps working. Without it
+ * an un-updated trigger fails nightly with "function not found", and nothing
+ * surfaces that — lessons just quietly stop appearing.
+ */
+function syncTutoringCalendar() {
+  syncTutoring();
+}
+
 /** The only function the trigger needs to call. */
 function syncTutoring() {
   const config = getSupabaseConfig_();
