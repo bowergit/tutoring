@@ -353,8 +353,13 @@
   @media (hover:hover) { .tools-menu button:hover { border-color: var(--accent); background: var(--card-3); } }
 
   /* ── Global tools button ── */
+  /* Centred with auto margins rather than translateX(-50%): a transform on a
+     fixed element gives iOS a compositing layer it mispositions during
+     momentum scrolling, which is what made this drift up the screen. */
   .global-tools-btn {
-    position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%);
+    position: fixed;
+    left: 0; right: 0; margin-inline: auto; width: fit-content;
+    bottom: max(20px, env(safe-area-inset-bottom, 0px));
     background: var(--ink); color: var(--bg); border: none; border-radius: var(--r-xl);
     padding: 13px 28px; font-size: 0.86rem; font-weight: 700; cursor: pointer;
     box-shadow: var(--sh-3); z-index: 50; white-space: nowrap;
@@ -362,8 +367,8 @@
     transition: transform .2s var(--ease-spring), box-shadow .2s var(--ease);
     -webkit-tap-highlight-color: transparent;
   }
-  .global-tools-btn:active { transform: translateX(-50%) scale(.94); }
-  @media (hover:hover) { .global-tools-btn:hover { transform: translateX(-50%) translateY(-2px); } }
+  .global-tools-btn:active { transform: scale(.94); }
+  @media (hover:hover) { .global-tools-btn:hover { transform: translateY(-2px); } }
 
   /* ── Growth calculator ── */
   .calc-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 0; font-size: 0.82rem; }
@@ -2736,7 +2741,11 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                 const nextDisplayYear = Math.min(displayYear + 1, 13);
                 const daysToUpdate = Math.ceil((nextAug - now) / 86400000);
                 const startedLabel = student.school_year !== displayYear ? ` · started Y${student.school_year}` : '';
-                const updateLabel = nextDisplayYear <= 13 ? ` · Y${nextDisplayYear} in ${daysToUpdate}d` : '';
+                // Only worth mentioning when it's imminent — "Y12 in 360d" is
+                // noise for eleven and a half months of the year.
+                const updateLabel = (nextDisplayYear <= 13 && daysToUpdate <= 14)
+                  ? ` · Y${nextDisplayYear} in ${daysToUpdate}d`
+                  : '';
                 return <div style={{fontSize:'0.76rem', color:'var(--muted)', marginBottom:4}}>{`Y${displayYear}${startedLabel}${updateLabel}`}</div>;
               })()}
               {referredBy && (
@@ -3151,7 +3160,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v3.0</div>}
+        {!loading && <div className="version-tag">v3.1</div>}
       </div>
 
       {showAddModal && (
