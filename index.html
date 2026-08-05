@@ -1822,11 +1822,18 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
       active: form.active,
     };
 
+    // owner_id must be set explicitly on every insert: the column DEFAULT
+    // points at Daniel's canonical account, so a second tenant's insert would
+    // otherwise be silently rejected by the RLS WITH CHECK clause (owner_id
+    // from the default wouldn't match their own auth.uid()).
+    const ownerId = (await supabase.auth.getUser()).data.user?.id;
+
     let studentId = student?.id;
     if (isEdit) {
       await supabase.from('tutoring_students').update(payload).eq('id', student.id);
     } else {
-      const { data: newStudent } = await supabase.from('tutoring_students').insert(payload).select().single();
+      const { data: newStudent } = await supabase.from('tutoring_students')
+        .insert({ ...payload, owner_id: ownerId }).select().single();
       studentId = newStudent?.id;
     }
 
@@ -1840,6 +1847,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         student_id: studentId,
         rate: rateNum,
         effective_from_date: rateFrom,
+        owner_id: ownerId,
       }, { onConflict: 'student_id,effective_from_date' });
     }
 
@@ -2091,8 +2099,12 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
         .update({ amount: amt, date_paid: datePaid, method })
         .eq('id', payment.id);
     } else {
+      // owner_id set explicitly: see the comment on the same pattern in
+      // StudentFormModal — the column DEFAULT belongs to Daniel's account, so
+      // a second tenant's insert would otherwise fail the RLS WITH CHECK.
+      const ownerId = (await supabase.auth.getUser()).data.user?.id;
       await supabase.from('tutoring_payments').insert({
-        student_id: student.id, amount: amt, date_paid: datePaid, method
+        student_id: student.id, amount: amt, date_paid: datePaid, method, owner_id: ownerId
       });
     }
 
@@ -3162,7 +3174,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v3.2</div>}
+        {!loading && <div className="version-tag">v3.3</div>}
       </div>
 
       {showAddModal && (
