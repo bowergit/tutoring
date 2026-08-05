@@ -82,6 +82,25 @@ after seeing it, that is when to find out how thin the shared core really is.
 - App sets `owner_id` on insert.
 - Nothing else changes. It still looks and behaves exactly as it does now.
 
+**DONE — 3 Aug 2026** (migration `phase0_owner_id`), with two deliberate
+deviations from the plan above:
+
+- The policy is `owner_id = auth.uid() OR is_app_owner()`, not a pure uid
+  check. Daniel has two personal accounts on this project, and a strict
+  policy would show an empty app — indistinguishable from data loss — when
+  signed in with the "wrong" one. The override doubles as an operator view
+  of tenant data; drop `is_app_owner()` from the policy before promising
+  anyone data privacy in writing.
+- The app does NOT set `owner_id` on insert. Every current writer (app,
+  calendar sync, Monzo functions) is Daniel, so the column DEFAULT owns new
+  rows — and an app-set `auth.uid()` would have fragmented his data across
+  his two accounts. Phase 1 drops the default and makes writers explicit.
+  `allocate_payment()` already copies the payment's owner properly.
+
+Verified by simulating JWTs in-database: both of Daniel's accounts see all
+rows, a stranger's account sees zero and cannot insert, anonymous requests
+get `[]`/401, and Edge Functions (service role) are unaffected.
+
 After this, adding a second user is a row in a table, not a migration.
 
 ### Phase 1 — only once someone has said yes, ~1 week
