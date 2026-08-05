@@ -250,15 +250,6 @@
   .attn-item:active { background: color-mix(in srgb, var(--warn) 10%, transparent); }
   .attn-why { font-size: 0.74rem; color: var(--warn); font-weight: 600; white-space: nowrap; }
 
-  /* ── Exam countdown ── */
-  .exam-chip {
-    display: inline-flex; align-items: baseline; gap: 6px;
-    background: var(--gold-light); border: 1px solid color-mix(in srgb, var(--gold) 32%, transparent);
-    color: var(--gold); border-radius: var(--r-sm); padding: 6px 10px;
-    font-size: 0.75rem; font-weight: 600; margin-top: 8px;
-  }
-  .exam-chip b { font-size: 0.92rem; font-weight: 750; letter-spacing: -0.01em; }
-
   /* ── Recent past paper ── */
   @keyframes sparkle {
     0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
@@ -586,27 +577,6 @@ function recentPaper(student, withinDays = 7) {
     score: student.last_paper_score,
     name: student.last_paper_name,
     label: days === 0 ? 'today' : days === 1 ? 'yesterday' : `${days} days ago`,
-  };
-}
-
-// Year 11 sit GCSEs and Year 13 sit A-levels, both in the May/June window at
-// the end of that academic year. Maths papers land around mid-May, which is
-// close enough to be useful as a countdown without needing a date per student.
-function examCountdown(displayYear) {
-  if (displayYear !== 11 && displayYear !== 13) return null;
-  const label = displayYear === 11 ? 'GCSEs' : 'A-levels';
-  const now = new Date();
-  // Academic years run Sept-Aug, so before August the exams are this calendar
-  // year; from August onwards they're next May.
-  const examYear = now.getMonth() >= 7 ? now.getFullYear() + 1 : now.getFullYear();
-  const examDate = new Date(examYear, 4, 15); // 15 May
-  const days = Math.ceil((examDate - now) / 86400000);
-  if (days < 0) return null;
-  return {
-    label,
-    days,
-    weeks: Math.round(days / 7),
-    dateLabel: examDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
   };
 }
 
@@ -1050,6 +1020,7 @@ function MonzoPanel({ students, onDataChanged }) {
   const nameModeIsNormal = usePrivacy().nameMode === 'normal';
   const [status, setStatus] = useState(null);
   const [pending, setPending] = useState(null);
+  const [blocked, setBlocked] = useState([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [working, setWorking] = useState({});
@@ -1065,10 +1036,21 @@ function MonzoPanel({ students, onDataChanged }) {
       setStatus(s);
       const p = await fetch(`${FN_BASE}/monzo-review`).then(r => r.json());
       setPending(p.pending || []);
+      setBlocked(p.blocked || []);
     } catch (e) {
       setStatus({ connected: false, problem: String(e) });
       setPending([]);
     }
+  }
+
+  async function unblock(key) {
+    setBlocked(b => b.filter(x => x.key !== key));
+    await fetch(`${FN_BASE}/monzo-review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unblock_key: key }),
+    });
+    refresh();
   }
 
   async function syncNow() {
@@ -1133,9 +1115,10 @@ function MonzoPanel({ students, onDataChanged }) {
         Unrecognised transfers{pending ? ` (${pending.length})` : ''}
       </div>
       <div style={{fontSize:'0.78rem', color:'var(--muted)', marginBottom:10, lineHeight:1.45}}>
-        Money that came in but doesn't match a student. Assign one to a student and
-        every future transfer from that account is logged automatically. These are
-        read live from Monzo — nothing here is stored unless you assign it.
+        Money that came in but doesn't match a student. Assign one and every future
+        transfer from that account is logged automatically; "Never tutoring" hides
+        that payer for good. Read live from Monzo — nothing is stored unless you
+        assign it.
       </div>
 
       {pending === null && <div style={{fontSize:'0.85rem', color:'var(--muted)'}}>Loading…</div>}
@@ -1173,11 +1156,36 @@ function MonzoPanel({ students, onDataChanged }) {
               className="btn cancel"
               style={{flex:'0 0 auto', minWidth:'auto', padding:'7px 12px', fontSize:'0.8rem'}}
               disabled={working[t.transaction_id]}
+              title={`Never ask about money from ${t.from || 'this payer'} again`}
               onClick={() => act(t.transaction_id, { dismiss: true })}
-            >Not tutoring</button>
+            >Never tutoring</button>
           </div>
         </div>
       ))}
+
+      {blocked.length > 0 && (
+        <>
+          <div className="section-label" style={{marginTop:20}}>
+            Never tutoring · {blocked.length}
+          </div>
+          <div style={{fontSize:'0.78rem', color:'var(--muted)', marginBottom:8, lineHeight:1.45}}>
+            Money from these accounts is skipped without asking.
+          </div>
+          {blocked.map(b => (
+            <div key={b.key} style={{
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              padding:'8px 0', borderBottom:'1px solid var(--line-soft)', fontSize:'0.85rem'
+            }}>
+              <span>{N(b.name || 'Unnamed account', b.key, true)}</span>
+              <button
+                className="btn cancel"
+                style={{flex:'0 0 auto', minWidth:'auto', padding:'5px 11px', fontSize:'0.76rem'}}
+                onClick={() => unblock(b.key)}
+              >Unblock</button>
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
@@ -2685,7 +2693,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
   const bundleWaLink = null;
 
-  const examSoon = examCountdown(displayYear);
   const paperRecent = recentPaper(student);
 
   return (
@@ -2754,11 +2761,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               {referrals.length > 0 && (
                 <div style={{ fontSize: '0.82rem', color: 'var(--accent)', marginTop: 2 }}>
                   Referred {referrals.map(s => N(s.name, s.id).split(' ')[0]).join(', ')} — use "mark free" on their next lesson
-                </div>
-              )}
-              {examSoon && (
-                <div className="exam-chip">
-                  🎓 {examSoon.label} <b>{examSoon.weeks} weeks</b> away · {examSoon.dateLabel}
                 </div>
               )}
               {paperRecent && (
@@ -3160,7 +3162,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v3.1</div>}
+        {!loading && <div className="version-tag">v3.2</div>}
       </div>
 
       {showAddModal && (
