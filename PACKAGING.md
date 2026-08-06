@@ -113,6 +113,21 @@ After this, adding a second user is a row in a table, not a migration.
 - Still no billing. Charge them by bank transfer if it comes to it; Stripe is
   a week of work to avoid one invoice a month.
 
+**Google Calendar OAuth — DONE, 6 Aug 2026**, ahead of the "once someone has
+said yes" gate above, because the Apps Script bridge (share-your-calendar-
+with-Daniel) turned out not to survive contact with a real second tutor —
+every new person meant Daniel manually editing a config array and manually
+subscribing to their calendar. Full details in `GOOGLE_CALENDAR_SETUP.md`,
+short version: seven Edge Functions (`google-calendar-connect/auth/list/
+select/status/disconnect/sync`), two new tables
+(`tutoring_google_calendar_auth`, `tutoring_oauth_state`), a `pg_cron` job
+calling the sync function nightly via a key stored in Supabase Vault (never
+pasted into a migration or seen by the assistant). Any signed-in tutor
+connects their own calendar from inside the app; no admin step per user.
+`tutoring_sync.gs` keeps running Daniel's own calendar sync in parallel until
+he's verified the new path and chooses to retire it — nothing forced the
+switch. Past-paper sync is unaffected and still Apps-Script-only.
+
 ### Phase 2 — only at ~5 paying users, ~2 weeks
 
 - Stripe subscriptions and a billing page.

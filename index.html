@@ -1011,6 +1011,153 @@ function PerspectiveCalculator({ addNetW }) {
   );
 }
 
+// ---------- Google Calendar ----------
+// Self-serve, per-account: unlike the old Apps Script (Daniel's own Google
+// login, manually edited to add each new tutor), any signed-in user connects
+// their own calendar here with no one else's involvement. All calls carry
+// the caller's own Supabase session, and the sync Edge Function only ever
+// touches that same account's rows — see google-calendar-connect's comments
+// for how the OAuth state param prevents this being spoofable.
+function GoogleCalendarPanel({ session }) {
+  const [status, setStatus] = useState(null);
+  const [calendars, setCalendars] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  async function authedFetch(path, opts = {}) {
+    const token = session?.access_token;
+    return fetch(`${FN_BASE}/${path}`, {
+      ...opts,
+      headers: { ...(opts.headers || {}), Authorization: `Bearer ${token}` },
+    }).then(r => r.json());
+  }
+
+  useEffect(() => { refresh(); }, []);
+
+  async function refresh() {
+    setStatus(null);
+    const s = await authedFetch('google-calendar-status').catch(e => ({ ok: false, problem: String(e) }));
+    setStatus(s);
+    if (s.connected && !s.calendar_chosen) {
+      const l = await authedFetch('google-calendar-list').catch(() => null);
+      setCalendars(l?.calendars || []);
+    } else {
+      setCalendars(null);
+    }
+  }
+
+  async function connect() {
+    setBusy(true);
+    const r = await authedFetch('google-calendar-connect').catch(e => ({ ok: false, problem: String(e) }));
+    setBusy(false);
+    if (r.ok && r.authorize_url) window.location.href = r.authorize_url;
+    else setMsg('Could not start the connection — try again.');
+  }
+
+  async function pick(cal) {
+    setBusy(true);
+    await authedFetch('google-calendar-select', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ calendar_id: cal.id, calendar_summary: cal.summary }),
+    });
+    setBusy(false);
+    refresh();
+  }
+
+  async function syncNow() {
+    setBusy(true); setMsg(null);
+    const r = await authedFetch('google-calendar-sync').catch(e => ({ ok: false, problem: String(e) }));
+    setBusy(false);
+    const mine = r.results?.[0];
+    setMsg(r.ok && mine?.ok
+      ? `Synced ${mine.synced} lesson${mine.synced === 1 ? '' : 's'}, matched against ${mine.students_matched} student${mine.students_matched === 1 ? '' : 's'}.`
+      : `Problem: ${mine?.problem || r.problem || 'unknown'}`);
+    refresh();
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    await authedFetch('google-calendar-disconnect', { method: 'POST' });
+    setBusy(false);
+    refresh();
+  }
+
+  return (
+    <div>
+      <div style={{
+        display:'flex', alignItems:'center', gap:8, padding:'10px 12px', borderRadius:10,
+        background:'var(--card-2)', border:'1px solid var(--line)', marginBottom:12, fontSize:'0.85rem'
+      }}>
+        <span style={{
+          width:9, height:9, borderRadius:5, flexShrink:0,
+          background: status === null ? 'var(--muted)' : status.connected ? 'var(--accent)' : 'var(--warn)'
+        }} />
+        <span style={{flex:1}}>
+          {status === null ? 'Checking…'
+            : status.connected && status.calendar_chosen ? `Connected · ${status.calendar_summary}`
+            : status.connected ? 'Connected — pick a calendar below'
+            : 'Not connected'}
+        </span>
+      </div>
+
+      {!status?.connected && (
+        <>
+          <button className="btn save" style={{width:'100%'}} onClick={connect} disabled={busy || status === null}>
+            {busy ? 'Opening Google…' : '📅 Connect Google Calendar'}
+          </button>
+          <div style={{fontSize:'0.78rem', color:'var(--muted)', marginTop:10, lineHeight:1.45}}>
+            Google will ask you to approve read-only access to your calendars.
+            Nothing is shared with anyone else — this connects only your own account.
+          </div>
+        </>
+      )}
+
+      {status?.connected && !status.calendar_chosen && (
+        <>
+          <div className="section-label">Which calendar has your lessons?</div>
+          {calendars === null && <div style={{fontSize:'0.85rem', color:'var(--muted)'}}>Loading your calendars…</div>}
+          {calendars?.length === 0 && <div style={{fontSize:'0.85rem', color:'var(--muted)'}}>No calendars found on that Google account.</div>}
+          {calendars?.map(c => (
+            <button key={c.id} style={{
+              display:'block', width:'100%', textAlign:'left', padding:'12px 14px', marginBottom:7,
+              borderRadius:'var(--r-md)', border:'1px solid var(--line)', background:'var(--card-2)',
+              fontSize:'0.88rem', cursor:'pointer', fontFamily:'inherit', color:'var(--ink)'
+            }} disabled={busy} onClick={() => pick(c)}>
+              {c.summary}{c.primary ? ' (main calendar)' : ''}
+            </button>
+          ))}
+        </>
+      )}
+
+      {status?.connected && status.calendar_chosen && (
+        <>
+          <button className="btn save" style={{width:'100%', marginBottom:8}} onClick={syncNow} disabled={busy}>
+            {busy ? 'Syncing…' : '↻ Sync now'}
+          </button>
+          {msg && <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:10}}>{msg}</div>}
+          <div style={{fontSize:'0.78rem', color:'var(--muted)', marginBottom:14, lineHeight:1.5}}>
+            Also syncs automatically overnight. Matches events whose title
+            contains a student's "name in your calendar" (set on their profile),
+            same as before — nothing to reconfigure there.
+            {status.last_synced_at && (
+              <> Last automatic sync: {new Date(status.last_synced_at).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}.</>
+            )}
+          </div>
+          {status.last_sync_error && (
+            <div style={{fontSize:'0.78rem', color:'var(--warn)', marginBottom:14}}>
+              Last sync had a problem: {status.last_sync_error}
+            </div>
+          )}
+          <button className="btn cancel" style={{width:'100%'}} onClick={disconnect} disabled={busy}>
+            Disconnect
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ---------- Monzo ----------
 const FN_BASE = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
 
@@ -1605,6 +1752,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
               <button onClick={() => setTool('revenue')}>💹 Revenue trend — what's actually come in</button>
               <button onClick={() => setTool('growth')}>📈 Growth calculator — what if I had more students?</button>
               <button onClick={() => setTool('archived')}>🗂 Archived students{archived.length > 0 ? ` (${archived.length})` : ''}</button>
+              <button onClick={() => setTool('gcal')}>📅 Google Calendar</button>
               <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>
               <button onClick={() => setTool('privacy')}>
                 🕶 Privacy mode{privacyOn ? ' — on' : ''}
@@ -1705,6 +1853,15 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
                 </div>
               )}
             </div>
+          </>
+        )}
+        {tool === 'gcal' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Google Calendar</h2>
+            </div>
+            <GoogleCalendarPanel session={session} />
           </>
         )}
         {tool === 'monzo' && (
@@ -3032,6 +3189,7 @@ function App() {
   const [editingStudent, setEditingStudent] = useState(null);
   const [showGlobalTools, setShowGlobalTools] = useState(false);
   const [monzoStatus, setMonzoStatus] = useState(null);
+  const [googleStatus, setGoogleStatus] = useState(null);
   const [moneyMode, setMoneyMode] = useState('normal');
   const [nameMode, setNameMode] = useState('normal');
   const [query, setQuery] = useState('');
@@ -3052,6 +3210,12 @@ function App() {
       setMonzoStatus(monzo);
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => setMonzoStatus(null), 6000);
+    }
+    const google = params.get('google');
+    if (google) {
+      setGoogleStatus(google);
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => setGoogleStatus(null), 6000);
     }
   }, []);
 
@@ -3143,6 +3307,16 @@ function App() {
           {monzoStatus === 'connected' ? '🏦 Monzo connected successfully' : 'Monzo connection was cancelled or denied'}
         </div>
       )}
+      {googleStatus && (
+        <div style={{
+          position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
+          padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600,
+          background: googleStatus === 'connected' ? 'var(--accent)' : 'var(--warn)',
+          color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
+        }}>
+          {googleStatus === 'connected' ? '📅 Google Calendar connected — pick a calendar in Tools to finish' : 'Google Calendar connection was cancelled or denied'}
+        </div>
+      )}
       <div className="app-header">
         <div className="header-row">
           <div>
@@ -3228,7 +3402,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v3.4</div>}
+        {!loading && <div className="version-tag">v3.5</div>}
       </div>
 
       {showAddModal && (
