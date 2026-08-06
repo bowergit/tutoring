@@ -1356,6 +1356,46 @@ function ChangePassword() {
   );
 }
 
+// ---------- Your name ----------
+// Sets the header from "Maths Tutoring" to "{name}'s Maths Tutoring" — useful
+// now that more than one tutor's account exists on the same app, so each
+// person's own copy is visibly theirs. Stored in Supabase Auth's own user
+// metadata (auth.updateUser({ data })), not a new table: it's private to the
+// account by construction, nobody else can read or set another user's copy.
+function YourName({ session }) {
+  const [name, setName] = useState(session?.user?.user_metadata?.display_name || '');
+  const [state, setState] = useState('idle');
+
+  async function save(e) {
+    e.preventDefault();
+    setState('busy');
+    const { error } = await supabase.auth.updateUser({ data: { display_name: name.trim() } });
+    setState(error ? 'error' : 'done');
+  }
+
+  return (
+    <form onSubmit={save}>
+      <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
+        Shown in the header as "{name.trim() || '…'}'s Maths Tutoring" — just for
+        this account, nobody else's copy changes.
+      </div>
+      <div className="field">
+        <label>Your first name</label>
+        <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daniel" />
+      </div>
+      {state === 'done' && (
+        <div style={{fontSize:'0.82rem', color:'var(--accent)', marginBottom:12, fontWeight:600}}>Saved.</div>
+      )}
+      {state === 'error' && (
+        <div style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:12}}>Could not save — try again.</div>
+      )}
+      <button className="btn save" style={{width:'100%'}} type="submit" disabled={state === 'busy'}>
+        {state === 'busy' ? 'Saving…' : 'Save name'}
+      </button>
+    </form>
+  );
+}
+
 // ---------- Revenue trend ----------
 // Money actually received, by month. Built from payment dates rather than
 // lessons taught, so it reflects cash in hand rather than what's owed.
@@ -1521,7 +1561,7 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
 }
 
 // ---------- Global Tools Sheet ----------
-function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onDataChanged }) {
+function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, session, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onDataChanged }) {
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
   const [tool, setTool] = useState(null);
@@ -1570,6 +1610,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, mon
                 🕶 Privacy mode{privacyOn ? ' — on' : ''}
               </button>
               <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
+              <button onClick={() => setTool('yourname')}>✏️ Your name (shown in the header)</button>
               <button onClick={() => setTool('password')}>🔑 Change password</button>
               <button onClick={() => supabase.auth.signOut()} style={{color:'var(--muted)'}}>
                 ⏻ Sign out{userEmail ? ` — ${userEmail}` : ''}
@@ -1606,6 +1647,15 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, mon
               could still save would put fake data in your real records. The text
               the payment record copies for a parent stays real either way.
             </div>
+          </>
+        )}
+        {tool === 'yourname' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Your name</h2>
+            </div>
+            <YourName session={session} />
           </>
         )}
         {tool === 'password' && (
@@ -3096,7 +3146,11 @@ function App() {
       <div className="app-header">
         <div className="header-row">
           <div>
-            <div className="header-title">Maths Tutoring</div>
+            <div className="header-title">
+              {session?.user?.user_metadata?.display_name
+                ? `${session.user.user_metadata.display_name}'s Maths Tutoring`
+                : 'Maths Tutoring'}
+            </div>
             <div className="header-sub">
               {activeStudents.length} active{archivedCount > 0 ? ` · ${archivedCount} archived` : ''}{syncLabel ? ` · ${syncLabel}` : ''}
             </div>
@@ -3174,7 +3228,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v3.3</div>}
+        {!loading && <div className="version-tag">v3.4</div>}
       </div>
 
       {showAddModal && (
@@ -3194,6 +3248,7 @@ function App() {
           rateHistory={rateHistory}
           payments={payments}
           userEmail={session?.user?.email}
+          session={session}
           moneyMode={moneyMode} setMoneyMode={setMoneyMode}
           nameMode={nameMode} setNameMode={setNameMode}
           onClose={() => setShowGlobalTools(false)}
