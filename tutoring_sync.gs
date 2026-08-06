@@ -1,20 +1,56 @@
 /**
  * Tutoring sync — Google Calendar + past-paper sheets → Supabase
+ * Multi-tenant: each tutor's calendar syncs only into their own account.
  *
- * SETUP
+ * SETUP (once, on Daniel's Apps Script project — this script only ever runs
+ * as Daniel; no other tutor logs into Google Apps Script or handles the
+ * Supabase key)
  * 1. Script Properties: SUPABASE_URL, SUPABASE_SERVICE_KEY.
  *    Use the service_role legacy JWT key, not the sb_secret_ one — UrlFetchApp
  *    gets blocked by Supabase's browser detection on the new keys.
  * 2. Services (＋) → Google Calendar API → Add, identifier "Calendar".
  * 3. One daily time-driven trigger on syncTutoring.
+ *
+ * ADDING ANOTHER TUTOR — see DJAVHAN_SETUP.md for the full instructions to
+ * send them. Short version:
+ * 1. They create a lessons calendar in their OWN Google account, named
+ *    something no one else's calendar shares (e.g. "Djavhan Lessons" —
+ *    NOT "Tutoring"). getCalendarsByName only ever uses the first match, so
+ *    two calendars with the same name silently collide.
+ * 2. They share it with Daniel's Google account (Settings and sharing →
+ *    Share with specific people → "See all event details" is enough).
+ * 3. Daniel opens Google Calendar, finds it under "Other calendars", and
+ *    clicks it once to subscribe — sharing alone doesn't make it visible to
+ *    getCalendarsByName, only actually adding it does.
+ * 4. Once their Supabase account exists (Authentication → Users), copy their
+ *    user id and add a row to ACCOUNTS below.
  */
 
-const CALENDAR_NAME = 'Tutoring';
+const ACCOUNTS = [
+  {
+    label: 'Daniel',
+    calendarName: 'Tutoring',
+    ownerId: 'babb06b5-b5e0-4436-8b72-bc5556814956',
+    // Everything before this date was already settled in the 27 Jul 2026
+    // clean-slate reset and must never re-appear as owing. A new tutor has
+    // had no such reset, so their entry should keep resetDate in the past —
+    // see the ACCOUNTS entry template below.
+    resetDate: '2026-07-27',
+  },
+  // Uncomment and fill in once Djavhan's Supabase account exists.
+  // resetDate stays in the past (nothing of his should ever read as
+  // pre-settled) — do NOT copy Daniel's 2026-07-27, that would wipe out
+  // his real balances the moment his lessons start syncing.
+  // {
+  //   label: 'Djavhan',
+  //   calendarName: 'Djavhan Lessons',
+  //   ownerId: 'PASTE-HIS-SUPABASE-USER-ID-HERE',
+  //   resetDate: '2000-01-01',
+  // },
+];
+
 const SYNC_WINDOW_DAYS_PAST = 7;
 const SYNC_WINDOW_DAYS_FUTURE = 90;
-
-// Lessons before this date are already paid for and never count as owing.
-const RESET_DATE = '2026-07-27';
 
 const DELETE_CHUNK_SIZE = 50;
 const PAPER_HEADER_PATTERN = /date\s*taken/i;
@@ -36,21 +72,27 @@ function syncTutoringCalendar() {
   syncTutoring();
 }
 
-/** The only function the trigger needs to call. */
+/** The only function the trigger needs to call. Runs every account in turn. */
 function syncTutoring() {
   const config = getSupabaseConfig_();
   if (!config.url || !config.key) {
     throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY script properties.');
   }
 
-  syncCalendar_(config);
-
-  // A broken or unshared sheet must not take the calendar sync down with it.
-  try {
-    syncPastPapers_(config);
-  } catch (err) {
-    Logger.log('Past paper sync failed: ' + err);
-  }
+  ACCOUNTS.forEach(account => {
+    // One account's missing calendar or broken sheet must not take the rest
+    // down with it — each is independent.
+    try {
+      syncCalendar_(config, account);
+    } catch (err) {
+      Logger.log('[' + account.label + '] Calendar sync failed: ' + err);
+    }
+    try {
+      syncPastPapers_(config, account);
+    } catch (err) {
+      Logger.log('[' + account.label + '] Past paper sync failed: ' + err);
+    }
+  });
 }
 
 // ─── Shared ──────────────────────────────────────────────────────────────
@@ -72,13 +114,13 @@ function supabaseHeaders_(config) {
 
 // ─── Calendar ────────────────────────────────────────────────────────────
 
-function syncCalendar_(config) {
-  const matchers = fetchStudentMatchers_(config);
-  Logger.log('Loaded ' + matchers.length + ' student matchers.');
+function syncCalendar_(config, account) {
+  const matchers = fetchStudentMatchers_(config, account.ownerId);
+  Logger.log('[' + account.label + '] Loaded ' + matchers.length + ' student matchers.');
 
-  const calendars = CalendarApp.getCalendarsByName(CALENDAR_NAME);
+  const calendars = CalendarApp.getCalendarsByName(account.calendarName);
   if (calendars.length === 0) {
-    throw new Error('No calendar found named "' + CALENDAR_NAME + '"');
+    throw new Error('No calendar found named "' + account.calendarName + '"');
   }
 
   const tz = Session.getScriptTimeZone();
@@ -114,6 +156,8 @@ function syncCalendar_(config) {
     const isAllDay = !(item.start && item.start.dateTime);
     const ok = upsertLesson_(config, {
       studentId: match.studentId,
+      ownerId: account.ownerId,
+      resetDate: account.resetDate,
       lessonDate: Utilities.formatDate(start, tz, 'yyyy-MM-dd'),
       startTime: isAllDay ? null : Utilities.formatDate(start, tz, 'HH:mm'),
       status: start < now ? 'completed' : 'scheduled',
@@ -123,18 +167,26 @@ function syncCalendar_(config) {
     if (ok) synced++; else failed++;
   });
 
-  const removed = reconcileDeletions_(config, seenKeys, startDate, endDate);
+  const removed = reconcileDeletions_(config, seenKeys, startDate, endDate, account.ownerId);
 
-  Logger.log('Lessons — synced: ' + synced + ' | failed: ' + failed +
+  Logger.log('[' + account.label + '] Lessons — synced: ' + synced + ' | failed: ' + failed +
              ' | deleted: ' + removed + ' | unmatched: ' + unmatched.length);
   if (unmatched.length > 0) {
-    Logger.log('Unmatched events:\n' + unmatched.join('\n'));
+    Logger.log('[' + account.label + '] Unmatched events:\n' + unmatched.join('\n'));
   }
 }
 
-function fetchStudentMatchers_(config) {
+/**
+ * Scoped to one tutor's own students. Without this filter, one tutor's
+ * calendar could match against another tutor's student — the sync runs on
+ * the service key, which bypasses the app's normal per-account isolation, so
+ * this filter is the only thing enforcing it here.
+ */
+function fetchStudentMatchers_(config, ownerId) {
   const url = config.url + '/rest/v1/tutoring_students' +
-    '?select=id,name,calendar_title_pattern&active=eq.true&calendar_title_pattern=not.is.null';
+    '?select=id,name,calendar_title_pattern' +
+    '&active=eq.true&calendar_title_pattern=not.is.null' +
+    '&owner_id=eq.' + ownerId;
   const response = UrlFetchApp.fetch(url, {
     method: 'get',
     headers: supabaseHeaders_(config),
@@ -206,12 +258,17 @@ function upsertLesson_(config, l) {
       }),
       payload: JSON.stringify({
         student_id: l.studentId,
+        // Set explicitly, not left to the column default: this runs on the
+        // service key, which bypasses the RLS check that would normally
+        // catch a missing owner_id. Omitting it wouldn't error here — it
+        // would silently file the lesson under the wrong tutor's account.
+        owner_id: l.ownerId,
         lesson_date: l.lessonDate,
         status: l.status,
         google_event_id: l.eventKey,
         lesson_notes: l.title,
         start_time: l.startTime,
-        pre_settled: l.lessonDate < RESET_DATE
+        pre_settled: l.lessonDate < l.resetDate
       }),
       muteHttpExceptions: true
     }
@@ -227,12 +284,14 @@ function upsertLesson_(config, l) {
  * Deletes lessons in the window whose calendar occurrence is gone. Only rows
  * with a google_event_id are touched, so anything added by hand in the app is
  * safe, and a lesson with a payment attached is kept rather than orphaning it.
+ * Scoped to one tutor's own rows, same reasoning as fetchStudentMatchers_.
  */
-function reconcileDeletions_(config, seenKeys, startDate, endDate) {
+function reconcileDeletions_(config, seenKeys, startDate, endDate, ownerId) {
   const tz = Session.getScriptTimeZone();
   const url = config.url + '/rest/v1/tutoring_lessons'
     + '?select=id,google_event_id,lesson_date,bundle_id,lesson_notes'
     + '&google_event_id=not.is.null'
+    + '&owner_id=eq.' + ownerId
     + '&lesson_date=gte.' + Utilities.formatDate(startDate, tz, 'yyyy-MM-dd')
     + '&lesson_date=lte.' + Utilities.formatDate(endDate, tz, 'yyyy-MM-dd');
 
@@ -279,8 +338,8 @@ function reconcileDeletions_(config, seenKeys, startDate, endDate) {
 
 // ─── Past papers ─────────────────────────────────────────────────────────
 
-function syncPastPapers_(config) {
-  const students = fetchStudentsWithSheets_(config);
+function syncPastPapers_(config, account) {
+  const students = fetchStudentsWithSheets_(config, account.ownerId);
   let updated = 0;
   let failed = 0;
 
@@ -294,12 +353,13 @@ function syncPastPapers_(config) {
     }
   });
 
-  Logger.log('Papers — updated: ' + updated + ' | failed: ' + failed);
+  Logger.log('[' + account.label + '] Papers — updated: ' + updated + ' | failed: ' + failed);
 }
 
-function fetchStudentsWithSheets_(config) {
+function fetchStudentsWithSheets_(config, ownerId) {
   const url = config.url + '/rest/v1/tutoring_students' +
-    '?select=id,name,spreadsheet_url&active=eq.true&spreadsheet_url=not.is.null';
+    '?select=id,name,spreadsheet_url&active=eq.true&spreadsheet_url=not.is.null' +
+    '&owner_id=eq.' + ownerId;
   const response = UrlFetchApp.fetch(url, {
     method: 'get',
     headers: supabaseHeaders_(config),
