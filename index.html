@@ -310,7 +310,7 @@
     display: block; font-size: 0.68rem; color: var(--muted);
     margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
   }
-  .field input[type="text"], .field input[type="date"], .field input[type="number"], .field select, .field textarea {
+  .field input[type="text"], .field input[type="date"], .field input[type="number"], .field input[type="email"], .field input[type="password"], .field select, .field textarea {
     width: 100%; padding: 11px 13px; border: 1px solid var(--line);
     border-radius: var(--r-md); font-size: 0.95rem; font-family: inherit;
     background: var(--card-2); color: var(--ink);
@@ -2804,9 +2804,10 @@ function StatementSheet({ student, lessons, payments, allocations, payState, sca
 }
 
 // ---------- More Tools Sheet ----------
-function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive }) {
+function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive, onDelete }) {
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   return (
     <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && close()}>
       <div className={`sheet${cls}`}>
@@ -2814,7 +2815,16 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive 
         <div className="tools-menu">
           <button onClick={onTrackCash}>💷 Log a payment</button>
           <button onClick={onStatement}>🧾 Lessons &amp; payments — send to a parent</button>
-          <button onClick={onArchive} style={{color:'var(--warn)'}}>🗂 Archive student</button>
+          {student.active && (
+            <button onClick={onArchive} style={{color:'var(--warn)'}}>🗂 Archive student</button>
+          )}
+          {confirmingDelete ? (
+            <div style={{padding:'2px 0 4px'}}>
+              <SlideToConfirm onConfirm={onDelete} />
+            </div>
+          ) : (
+            <button onClick={() => setConfirmingDelete(true)} style={{color:'var(--warn)'}}>🗑 Delete student</button>
+          )}
         </div>
         <div className="btn-row">
           <button className="btn cancel" onClick={close}>Close</button>
@@ -3007,6 +3017,14 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
 
   async function archiveStudent() {
     await supabase.from('tutoring_students').update({ active: false }).eq('id', student.id);
+    setShowMoreTools(false);
+    onDataChanged();
+  }
+
+  async function deleteStudent() {
+    await supabase.from('tutoring_monzo_transactions')
+      .update({ matched_student_id: null }).eq('matched_student_id', student.id);
+    await supabase.from('tutoring_students').delete().eq('id', student.id);
     setShowMoreTools(false);
     onDataChanged();
   }
@@ -3251,6 +3269,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           onTrackCash={() => { setShowMoreTools(false); setEditPayment(null); setShowCashModal(true); }}
           onStatement={() => { setShowMoreTools(false); setShowStatement(true); }}
           onArchive={archiveStudent}
+          onDelete={deleteStudent}
         />
       )}
 
@@ -3531,7 +3550,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v3.8</div>}
+        {!loading && <div className="version-tag">v3.9</div>}
       </div>
 
       {showAddModal && (
