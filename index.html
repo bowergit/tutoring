@@ -1754,6 +1754,53 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
   );
 }
 
+// Deliberately harder to trigger than a tap — this fires a permanent delete,
+// so a drag past 90% of the track is the confirmation, not a click.
+function SlideToConfirm({ onConfirm }) {
+  const trackRef = React.useRef(null);
+  const [dragX, setDragX] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const [done, setDone] = useState(false);
+  const HANDLE = 34;
+
+  function clampAndMaybeFire(clientX) {
+    const rect = trackRef.current.getBoundingClientRect();
+    const max = rect.width - HANDLE - 4;
+    const x = Math.min(Math.max(clientX - rect.left - HANDLE / 2, 0), max);
+    setDragX(x);
+    if (x >= max * 0.9) {
+      setDragging(false);
+      setDone(true);
+      onConfirm();
+    }
+  }
+
+  return (
+    <div ref={trackRef} style={{
+      position:'relative', height:38, borderRadius:19, background:'var(--card-2)',
+      border:'1.5px solid var(--warn)', overflow:'hidden', userSelect:'none', touchAction:'none',
+    }}
+      onPointerMove={e => dragging && clampAndMaybeFire(e.clientX)}
+      onPointerUp={() => { if (dragging && !done) { setDragging(false); setDragX(0); } }}
+      onPointerLeave={() => { if (dragging && !done) { setDragging(false); setDragX(0); } }}>
+      <div style={{
+        position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center',
+        fontSize:'0.8rem', color:'var(--warn)', pointerEvents:'none',
+      }}>
+        {done ? 'Deleting…' : 'Slide to permanently delete →'}
+      </div>
+      <div
+        onPointerDown={e => { if (!done) { setDragging(true); e.target.setPointerCapture(e.pointerId); } }}
+        style={{
+          position:'absolute', top:2, left:2, width:HANDLE, height:HANDLE, borderRadius:HANDLE / 2,
+          background:'var(--warn)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center',
+          transform:`translateX(${dragX}px)`, transition: dragging ? 'none' : 'transform 0.2s',
+          cursor: done ? 'default' : 'grab', touchAction:'none', fontSize:'1rem',
+        }}>🗑</div>
+    </div>
+  );
+}
+
 // ---------- Global Tools Sheet ----------
 function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, session, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onDataChanged }) {
   const N = useNameDisplay();
@@ -1782,6 +1829,20 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
 
   async function unarchive(id) {
     await supabase.from('tutoring_students').update({ active: true }).eq('id', id);
+    onDataChanged();
+  }
+
+  const [deletingId, setDeletingId] = useState(null);
+
+  // Monzo transactions aren't owned by the student the way lessons/payments
+  // are — they're real bank history — so unmatch rather than let the delete
+  // cascade take them. Everything else (lessons, payments, rate history,
+  // bundles) has ON DELETE CASCADE and goes with the student.
+  async function deleteStudent(id) {
+    await supabase.from('tutoring_monzo_transactions')
+      .update({ matched_student_id: null }).eq('matched_student_id', id);
+    await supabase.from('tutoring_students').delete().eq('id', id);
+    setDeletingId(null);
     onDataChanged();
   }
 
@@ -1930,11 +1991,32 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
               <div style={{color:'var(--muted)', fontSize:'0.88rem', padding:'10px 0'}}>No archived students.</div>
             ) : (
               archived.map(s => (
-                <div key={s.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'10px 0',borderBottom:'1px solid var(--line)'}}>
-                  <span style={{fontSize:'0.95rem'}}>{N(s.name, s.id)}</span>
-                  <button className="btn save" style={{flex:'0 0 auto',minWidth:'auto',padding:'6px 14px',fontSize:'0.82rem'}} onClick={() => unarchive(s.id)}>
-                    Unarchive
-                  </button>
+                <div key={s.id} style={{padding:'10px 0',borderBottom:'1px solid var(--line)'}}>
+                  {deletingId === s.id ? (
+                    <div style={{display:'flex', alignItems:'center', gap:8}}>
+                      <span style={{fontSize:'0.95rem', flex:1}}>{N(s.name, s.id)}</span>
+                      <div style={{flex:'0 0 220px'}}>
+                        <SlideToConfirm onConfirm={() => deleteStudent(s.id)} />
+                      </div>
+                      <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'0.8rem'}}
+                        onClick={() => setDeletingId(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <span style={{fontSize:'0.95rem'}}>{N(s.name, s.id)}</span>
+                      <div style={{display:'flex', gap:8, flex:'0 0 auto'}}>
+                        <button className="btn save" style={{minWidth:'auto',padding:'6px 14px',fontSize:'0.82rem'}} onClick={() => unarchive(s.id)}>
+                          Unarchive
+                        </button>
+                        <button style={{minWidth:'auto',padding:'6px 14px',fontSize:'0.82rem',borderRadius:'var(--r-md)',border:'1px solid var(--warn)',background:'none',color:'var(--warn)',cursor:'pointer',fontFamily:'inherit'}}
+                          onClick={() => setDeletingId(s.id)}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))
             )}
@@ -3449,7 +3531,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v3.7</div>}
+        {!loading && <div className="version-tag">v3.8</div>}
       </div>
 
       {showAddModal && (
