@@ -42,18 +42,26 @@
     background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
     box-shadow: var(--sh-2); overflow: hidden;
   }
+  .lesson { border-bottom: 1px solid var(--line); }
+  .lesson:last-child { border-bottom: none; }
   .row {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 13px 15px; border-bottom: 1px solid var(--line); font-size: 0.9rem;
+    padding: 13px 15px; font-size: 0.9rem; cursor: pointer;
   }
-  .row:last-child { border-bottom: none; }
   .row .time { color: var(--muted); font-size: 0.82rem; }
+  .detail { padding: 0 15px 13px; color: var(--muted); font-size: 0.82rem; }
   .pill {
     font-size: 0.72rem; font-weight: 650; padding: 4px 10px; border-radius: 100px; flex-shrink: 0;
   }
-  .pill.paid    { background: var(--accent-light); color: var(--accent); }
-  .pill.partial { background: var(--gold-light); color: var(--gold); }
-  .pill.unpaid  { background: var(--warn-light); color: var(--warn); }
+  .pill.paid      { background: var(--accent-light); color: var(--accent); }
+  .pill.partial   { background: var(--gold-light); color: var(--gold); }
+  .pill.unpaid    { background: var(--warn-light); color: var(--warn); }
+  .pill.scheduled { background: var(--card-2); color: var(--ink-dim); border: 1px solid var(--line); }
+  .showmore {
+    display: block; width: 100%; text-align: center; padding: 11px 0; margin-top: 8px;
+    background: none; border: none; color: var(--muted); font-size: 0.82rem;
+    font-family: inherit; cursor: pointer;
+  }
   .empty { text-align: center; color: var(--muted); padding: 30px 20px; font-size: 0.88rem; }
   .state { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 0.9rem; line-height: 1.6; }
 </style>
@@ -65,8 +73,12 @@
 <script>
 (async function () {
   const FN_BASE = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
+  const UPCOMING_SHOWN = 8;
   const app = document.getElementById('app');
   const token = new URLSearchParams(window.location.search).get('t');
+
+  let portalData = null;
+  let upcomingExpanded = false;
 
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -75,19 +87,60 @@
     const dt = new Date(d + 'T12:00:00');
     return dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   }
-  function pill(status) {
-    const label = status === 'paid' ? 'Paid' : status === 'partial' ? 'Partly paid' : 'Not yet paid';
-    return `<span class="pill ${status}">${label}</span>`;
+  function fmtPaidDate(d) {
+    if (!d) return null;
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   }
-  function renderList(lessons) {
+  function pillHTML(l, scheduled) {
+    if (scheduled) return '<span class="pill scheduled">Scheduled</span>';
+    const label = l.pay_status === 'paid' ? 'Paid' : l.pay_status === 'partial' ? 'Partly paid' : 'Not yet paid';
+    return `<span class="pill ${l.pay_status}">${label}</span>`;
+  }
+  function detailText(l) {
+    const dates = (l.paid_dates || []).filter(p => p.date);
+    if (!dates.length) return 'Not paid yet.';
+    if (dates.length === 1) return `Paid on ${fmtPaidDate(dates[0].date)}.`;
+    return 'Paid across: ' + dates.map(p => fmtPaidDate(p.date)).join(', ') + '.';
+  }
+  function renderList(lessons, prefix, scheduled) {
     if (!lessons.length) return '<div class="empty">Nothing here.</div>';
-    return '<div class="card">' + lessons.map(l => `
-      <div class="row">
-        <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}</span>
-        ${pill(l.pay_status)}
-      </div>
-    `).join('') + '</div>';
+    return '<div class="card">' + lessons.map((l, i) => {
+      const key = prefix + i;
+      return `
+        <div class="lesson">
+          <div class="row" data-detail="${key}">
+            <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}</span>
+            ${pillHTML(l, scheduled)}
+          </div>
+          <div class="detail" id="detail-${key}" hidden>${esc(detailText(l))}</div>
+        </div>
+      `;
+    }).join('') + '</div>';
   }
+
+  function renderUpcoming() {
+    const container = document.getElementById('upcoming-section');
+    const all = portalData.upcoming;
+    const shown = upcomingExpanded ? all : all.slice(0, UPCOMING_SHOWN);
+    let html = renderList(shown, 'up-', true);
+    if (all.length > UPCOMING_SHOWN) {
+      html += `<button class="showmore" id="upcoming-toggle">${
+        upcomingExpanded ? 'Show fewer' : `Show ${all.length - UPCOMING_SHOWN} more`
+      }</button>`;
+    }
+    container.innerHTML = html;
+    const toggle = document.getElementById('upcoming-toggle');
+    if (toggle) toggle.addEventListener('click', () => { upcomingExpanded = !upcomingExpanded; renderUpcoming(); });
+  }
+
+  // One delegated listener handles every row, including ones added later by
+  // "Show more" — no need to re-bind click handlers on every re-render.
+  app.addEventListener('click', e => {
+    const row = e.target.closest('[data-detail]');
+    if (!row) return;
+    const detail = document.getElementById('detail-' + row.dataset.detail);
+    if (detail) detail.hidden = !detail.hidden;
+  });
 
   if (!token) {
     app.innerHTML = '<div class="state">This link is missing something — ask your tutor for the correct one.</div>';
@@ -108,14 +161,16 @@
     return;
   }
 
+  portalData = data;
   app.innerHTML = `
     <h1>${esc(data.name)}</h1>
     <div class="sub">Your lessons and payment status</div>
     <div class="section-label">Upcoming</div>
-    ${renderList(data.upcoming)}
+    <div id="upcoming-section"></div>
     <div class="section-label">Recent</div>
-    ${renderList(data.recent)}
+    ${renderList(data.recent, 'rec-', false)}
   `;
+  renderUpcoming();
 })();
 </script>
 </body>
