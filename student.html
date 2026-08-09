@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Your lessons</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+<meta name="theme-color" content="#0d1b3e">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f4f1; --card: #ffffff; --card-2: #f7f6f3; --line: #e7e3db;
+    --ink: #16150f; --ink-dim: #605c53; --accent: #1f7a45; --accent-light: #e9f4ed;
+    --warn: #b8481c; --warn-light: #fdf0ea; --muted: #9a958c; --gold: #8f701f; --gold-light: #faf2df;
+    --r-sm: 9px; --r-md: 13px; --r-lg: 17px; --r-xl: 24px;
+    --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131210; --card: #1d1b18; --card-2: #24211d; --line: #34302a;
+      --ink: #f2eee6; --ink-dim: #a8a297; --accent: #4fb877; --accent-light: #13251a;
+      --warn: #e07d46; --warn-light: #2a1408; --muted: #78736a; --gold: #d9bf94; --gold-light: #2a2317;
+      --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'General Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 24px 16px 60px;
+  }
+  .wrap { max-width: 460px; margin: 0 auto; }
+  h1 { font-size: 1.3rem; font-weight: 750; letter-spacing: -0.02em; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 22px; }
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); margin: 22px 0 8px;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+    box-shadow: var(--sh-2); overflow: hidden;
+  }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 15px; border-bottom: 1px solid var(--line); font-size: 0.9rem;
+  }
+  .row:last-child { border-bottom: none; }
+  .row .time { color: var(--muted); font-size: 0.82rem; }
+  .pill {
+    font-size: 0.72rem; font-weight: 650; padding: 4px 10px; border-radius: 100px; flex-shrink: 0;
+  }
+  .pill.paid    { background: var(--accent-light); color: var(--accent); }
+  .pill.partial { background: var(--gold-light); color: var(--gold); }
+  .pill.unpaid  { background: var(--warn-light); color: var(--warn); }
+  .empty { text-align: center; color: var(--muted); padding: 30px 20px; font-size: 0.88rem; }
+  .state { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 0.9rem; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="state">Loading your lessons…</div>
+</div>
+<script>
+(async function () {
+  const FN_BASE = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
+  const app = document.getElementById('app');
+  const token = new URLSearchParams(window.location.search).get('t');
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function fmtDate(d) {
+    const dt = new Date(d + 'T12:00:00');
+    return dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+  function pill(status) {
+    const label = status === 'paid' ? 'Paid' : status === 'partial' ? 'Partly paid' : 'Not yet paid';
+    return `<span class="pill ${status}">${label}</span>`;
+  }
+  function renderList(lessons) {
+    if (!lessons.length) return '<div class="empty">Nothing here.</div>';
+    return '<div class="card">' + lessons.map(l => `
+      <div class="row">
+        <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}</span>
+        ${pill(l.pay_status)}
+      </div>
+    `).join('') + '</div>';
+  }
+
+  if (!token) {
+    app.innerHTML = '<div class="state">This link is missing something — ask your tutor for the correct one.</div>';
+    return;
+  }
+
+  let data;
+  try {
+    const res = await fetch(`${FN_BASE}/student-portal?t=${encodeURIComponent(token)}`);
+    data = await res.json();
+  } catch (e) {
+    app.innerHTML = '<div class="state">Couldn\'t load your lessons right now — try again shortly.</div>';
+    return;
+  }
+
+  if (!data.ok) {
+    app.innerHTML = '<div class="state">This link doesn\'t look right — ask your tutor for a fresh one.</div>';
+    return;
+  }
+
+  app.innerHTML = `
+    <h1>${esc(data.name)}</h1>
+    <div class="sub">Your lessons and payment status</div>
+    <div class="section-label">Upcoming</div>
+    ${renderList(data.upcoming)}
+    <div class="section-label">Recent</div>
+    ${renderList(data.recent)}
+  `;
+})();
+</script>
+</body>
+</html>

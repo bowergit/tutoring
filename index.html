@@ -1041,6 +1041,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [unmatched, setUnmatched] = useState([]);
+  const [confirmingTitles, setConfirmingTitles] = useState({});
   const [editingTitles, setEditingTitles] = useState({});
   const [editedNames, setEditedNames] = useState({});
 
@@ -1196,7 +1197,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
                           + Add
                         </button>
                       </div>
-                    ) : (
+                    ) : confirmingTitles[u.title] ? (
                       <div style={{display:'flex', alignItems:'center', gap:8}}>
                         <span style={{flex:1, fontSize:'0.85rem'}}>
                           Is their name <b>{guess}</b>? <span style={{color:'var(--muted)'}}>× {u.count}</span>
@@ -1208,6 +1209,16 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
                         <button className="btn cancel" style={{padding:'6px 10px', fontSize:'0.8rem', flexShrink:0, minWidth:'auto'}}
                           disabled={busy} onClick={() => setEditingTitles({...editingTitles, [u.title]: true})}>
                           No
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{display:'flex', alignItems:'center', gap:8}}>
+                        <span style={{flex:1, fontSize:'0.85rem'}}>
+                          {u.title} <span style={{color:'var(--muted)'}}>× {u.count}</span>
+                        </span>
+                        <button className="btn save" style={{padding:'6px 10px', fontSize:'0.8rem', flexShrink:0}}
+                          disabled={busy} onClick={() => setConfirmingTitles({...confirmingTitles, [u.title]: true})}>
+                          Add student
                         </button>
                       </div>
                     )}
@@ -1833,8 +1844,8 @@ function SlideToConfirm({ onConfirm }) {
           position:'absolute', top:2, left:2, width:HANDLE, height:HANDLE, borderRadius:HANDLE / 2,
           background:'var(--warn)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center',
           transform:`translateX(${dragX}px)`, transition: dragging ? 'none' : 'transform 0.2s',
-          cursor: done ? 'default' : 'grab', touchAction:'none', fontSize:'1rem',
-        }}>🗑</div>
+          cursor: done ? 'default' : 'grab', touchAction:'none', fontSize:'1rem', lineHeight:1,
+        }}><span style={{transform:'translateY(-1px)'}}>🗑</span></div>
     </div>
   );
 }
@@ -2846,6 +2857,16 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  function copyStudentLink() {
+    const url = `https://bowergit.github.io/tutoring/student.html?t=${student.public_token}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  }
+
   return (
     <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && close()}>
       <div className={`sheet${cls}`}>
@@ -2853,6 +2874,7 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
         <div className="tools-menu">
           <button onClick={onTrackCash}>💷 Log a payment</button>
           <button onClick={onStatement}>🧾 Lessons &amp; payments — send to a parent</button>
+          <button onClick={copyStudentLink}>{linkCopied ? '✓ Link copied' : '🔗 Copy their lesson link'}</button>
           {student.active && (
             <button onClick={onArchive} style={{color:'var(--warn)'}}>🗂 Archive student</button>
           )}
@@ -3598,7 +3620,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v4.0</div>}
+        {!loading && <div className="version-tag">v4.1</div>}
       </div>
 
       {showAddModal && (
