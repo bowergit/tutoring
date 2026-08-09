@@ -1018,11 +1018,12 @@ function PerspectiveCalculator({ addNetW }) {
 // the caller's own Supabase session, and the sync Edge Function only ever
 // touches that same account's rows — see google-calendar-connect's comments
 // for how the OAuth state param prevents this being spoofable.
-function GoogleCalendarPanel({ session }) {
+function GoogleCalendarPanel({ session, onDataChanged }) {
   const [status, setStatus] = useState(null);
   const [calendars, setCalendars] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
+  const [unmatched, setUnmatched] = useState([]);
 
   async function authedFetch(path, opts = {}) {
     const token = session?.access_token;
@@ -1073,7 +1074,25 @@ function GoogleCalendarPanel({ session }) {
     setMsg(r.ok && mine?.ok
       ? `Synced ${mine.synced} lesson${mine.synced === 1 ? '' : 's'}, matched against ${mine.students_matched} student${mine.students_matched === 1 ? '' : 's'}.`
       : `Problem: ${mine?.problem || r.problem || 'unknown'}`);
+    setUnmatched(mine?.unmatched_titles || []);
     refresh();
+  }
+
+  // Quick path for onboarding: turn a recurring calendar event nobody's
+  // claimed yet straight into a student, using the event title itself as
+  // both the name and the match pattern, then re-sync so their lessons
+  // land immediately instead of waiting for the next tap of "Sync now".
+  async function addStudentFromTitle(title) {
+    setBusy(true);
+    const ownerId = (await supabase.auth.getUser()).data.user?.id;
+    await supabase.from('tutoring_students').insert({
+      name: title.trim().slice(0, 80),
+      calendar_title_pattern: title,
+      active: true,
+      owner_id: ownerId,
+    });
+    onDataChanged?.();
+    await syncNow();
   }
 
   async function disconnect() {
@@ -1136,6 +1155,31 @@ function GoogleCalendarPanel({ session }) {
             {busy ? 'Syncing…' : '↻ Sync now'}
           </button>
           {msg && <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:10}}>{msg}</div>}
+          {unmatched.length > 0 && (
+            <div style={{marginBottom:14}}>
+              <div className="section-label">
+                {unmatched.length} name{unmatched.length === 1 ? '' : 's'} in your calendar aren't a student yet
+              </div>
+              {unmatched.map(u => (
+                <div key={u.title} style={{
+                  display:'flex', alignItems:'center', gap:8, padding:'9px 12px', marginBottom:6,
+                  borderRadius:'var(--r-md)', border:'1px solid var(--line)', background:'var(--card-2)',
+                }}>
+                  <span style={{flex:1, fontSize:'0.85rem'}}>
+                    {u.title} <span style={{color:'var(--muted)'}}>× {u.count}</span>
+                  </span>
+                  <button className="btn save" style={{padding:'6px 10px', fontSize:'0.8rem'}}
+                    disabled={busy} onClick={() => addStudentFromTitle(u.title)}>
+                    + Add as student
+                  </button>
+                </div>
+              ))}
+              <div style={{fontSize:'0.78rem', color:'var(--muted)', lineHeight:1.45}}>
+                Adds them with this exact calendar text as their match, pulls their lessons in
+                straight away, then you can fill in their details on their card.
+              </div>
+            </div>
+          )}
           <div style={{fontSize:'0.78rem', color:'var(--muted)', marginBottom:14, lineHeight:1.5}}>
             Also syncs automatically overnight. Matches events whose title
             contains a student's "name in your calendar" (set on their profile),
@@ -1861,7 +1905,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
               {backBtn}
               <h2 style={{margin:0}}>Google Calendar</h2>
             </div>
-            <GoogleCalendarPanel session={session} />
+            <GoogleCalendarPanel session={session} onDataChanged={onDataChanged} />
           </>
         )}
         {tool === 'monzo' && (
@@ -3402,7 +3446,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v3.5</div>}
+        {!loading && <div className="version-tag">v3.6</div>}
       </div>
 
       {showAddModal && (
