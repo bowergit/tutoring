@@ -1024,6 +1024,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [unmatched, setUnmatched] = useState([]);
+  const [editedNames, setEditedNames] = useState({});
 
   async function authedFetch(path, opts = {}) {
     const token = session?.access_token;
@@ -1165,18 +1166,20 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
                   display:'flex', alignItems:'center', gap:8, padding:'9px 12px', marginBottom:6,
                   borderRadius:'var(--r-md)', border:'1px solid var(--line)', background:'var(--card-2)',
                 }}>
-                  <span style={{flex:1, fontSize:'0.85rem'}}>
-                    {u.title} <span style={{color:'var(--muted)'}}>× {u.count}</span>
-                  </span>
-                  <button className="btn save" style={{padding:'6px 10px', fontSize:'0.8rem'}}
-                    disabled={busy} onClick={() => addStudentFromTitle(u.title)}>
-                    + Add as student
+                  <input type="text" value={editedNames[u.title] ?? u.title}
+                    onChange={e => setEditedNames({...editedNames, [u.title]: e.target.value})}
+                    style={{flex:1, fontSize:'0.85rem', padding:'6px 8px', borderRadius:8, border:'1px solid var(--line)', fontFamily:'inherit'}} />
+                  <span style={{color:'var(--muted)', fontSize:'0.78rem', flexShrink:0}}>× {u.count}</span>
+                  <button className="btn save" style={{padding:'6px 10px', fontSize:'0.8rem', flexShrink:0}}
+                    disabled={busy} onClick={() => addStudentFromTitle((editedNames[u.title] ?? u.title).trim())}>
+                    + Add
                   </button>
                 </div>
               ))}
               <div style={{fontSize:'0.78rem', color:'var(--muted)', lineHeight:1.45}}>
-                Adds them with this exact calendar text as their match, pulls their lessons in
-                straight away, then you can fill in their details on their card.
+                Trim this down to just their name if the calendar text has extra words — whatever's
+                left here is what future events get matched against, so shorter is safer. Pulls
+                their lessons in straight away, then you can fill in their details on their card.
               </div>
             </div>
           )}
@@ -3446,7 +3449,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v3.6</div>}
+        {!loading && <div className="version-tag">v3.7</div>}
       </div>
 
       {showAddModal && (
