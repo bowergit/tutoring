@@ -3340,7 +3340,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
         </div>
       </div>
 
-      {showMoreTools && (
+      {showMoreTools && ReactDOM.createPortal(
         <MoreToolsSheet
           student={student}
           onClose={() => setShowMoreTools(false)}
@@ -3348,10 +3348,10 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           onStatement={() => { setShowMoreTools(false); setShowStatement(true); }}
           onArchive={archiveStudent}
           onDelete={deleteStudent}
-        />
+        />, document.body
       )}
 
-      {showCashModal && (
+      {showCashModal && ReactDOM.createPortal(
         <PaymentModal
           student={student}
           payment={editPayment}
@@ -3361,10 +3361,10 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           allocations={studentAllocations}
           onClose={() => { setShowCashModal(false); setEditPayment(null); }}
           onSaved={() => { setShowCashModal(false); setEditPayment(null); onDataChanged(); }}
-        />
+        />, document.body
       )}
 
-      {detailPayment && (
+      {detailPayment && ReactDOM.createPortal(
         <PaymentDetailSheet
           payment={detailPayment}
           lessons={studentLessons}
@@ -3372,10 +3372,10 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           onClose={() => setDetailPayment(null)}
           onEdit={() => { setEditPayment(detailPayment); setDetailPayment(null); setShowCashModal(true); }}
           onDeleted={() => { setDetailPayment(null); onDataChanged(); }}
-        />
+        />, document.body
       )}
 
-      {showStatement && (
+      {showStatement && ReactDOM.createPortal(
         <StatementSheet
           student={student}
           lessons={studentLessons}
@@ -3384,10 +3384,10 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           payState={lessonPayState}
           scale={moneyScale}
           onClose={() => setShowStatement(false)}
-        />
+        />, document.body
       )}
 
-      {detailLesson && (
+      {detailLesson && ReactDOM.createPortal(
         <LessonDetailSheet
           lesson={detailLesson}
           payState={lessonPayState(detailLesson)}
@@ -3395,7 +3395,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           onClose={() => setDetailLesson(null)}
           onToggleFree={() => toggleComplimentary(detailLesson)}
           toggling={toggling}
-        />
+        />, document.body
       )}
     </div>
   );
@@ -3628,7 +3628,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v4.2</div>}
+        {!loading && <div className="version-tag">v4.3</div>}
       </div>
 
       {showAddModal && (
