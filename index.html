@@ -1608,13 +1608,23 @@ function ChangePassword() {
 function YourName({ session }) {
   const [name, setName] = useState(session?.user?.user_metadata?.display_name || '');
   const [phone, setPhone] = useState(session?.user?.user_metadata?.contact_phone || '');
+  const [email, setEmail] = useState(session?.user?.user_metadata?.contact_email || '');
   const [state, setState] = useState('idle');
+
+  const loginEmail = session?.user?.email || '';
 
   async function save(e) {
     e.preventDefault();
     setState('busy');
+    // Stored separately from the login email on purpose: the address parents
+    // write to has nothing to do with the one used to sign in, and changing
+    // an auth email would trigger a confirmation round-trip.
     const { error } = await supabase.auth.updateUser({
-      data: { display_name: name.trim(), contact_phone: normaliseUKPhone(phone) },
+      data: {
+        display_name: name.trim(),
+        contact_phone: normaliseUKPhone(phone),
+        contact_email: email.trim(),
+      },
     });
     setState(error ? 'error' : 'done');
   }
@@ -1622,13 +1632,22 @@ function YourName({ session }) {
   return (
     <form onSubmit={save}>
       <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
-        Shown in the header as "{name.trim() || '…'}'s Maths Tutoring". Your email
+        Shown in the header as "{name.trim() || '…'}'s Maths Tutoring". The email
         and phone here are what the "message the tutor" buttons on each student's
         lesson link use — nobody else's copy changes.
       </div>
       <div className="field">
         <label>Your first name</label>
         <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daniel" />
+      </div>
+      <div className="field">
+        <label>Contact email (for parents)</label>
+        <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+               autoComplete="off" placeholder={loginEmail || 'you@example.com'} />
+        <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
+          Doesn't have to be your login address. Leave blank to use{' '}
+          {loginEmail ? <b>{loginEmail}</b> : 'the address you sign in with'}.
+        </div>
       </div>
       <div className="field">
         <label>Your phone (for parents' WhatsApp button)</label>
@@ -2921,10 +2940,10 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
   const [cls, close] = useAnimatedClose(onClose);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const studentLink = `https://bowergit.github.io/tutoring/student.html?t=${student.public_token}`;
 
   function copyStudentLink() {
-    const url = `https://bowergit.github.io/tutoring/student.html?t=${student.public_token}`;
-    navigator.clipboard.writeText(url).then(() => {
+    navigator.clipboard.writeText(studentLink).then(() => {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     });
@@ -2937,7 +2956,15 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
         <div className="tools-menu">
           <button onClick={onTrackCash}>💷 Log a payment</button>
           <button onClick={onStatement}>🧾 Lessons &amp; payments — send to a parent</button>
-          <button onClick={copyStudentLink}>{linkCopied ? '✓ Link copied' : '🔗 Copy their lesson link'}</button>
+          <div style={{display:'flex', gap:7}}>
+            <button style={{flex:1, textAlign:'center'}} onClick={copyStudentLink}>
+              {linkCopied ? '✓ Copied' : '🔗 Copy link'}
+            </button>
+            <button style={{flex:1, textAlign:'center'}}
+              onClick={() => window.open(studentLink, '_blank', 'noopener')}>
+              ↗ Open
+            </button>
+          </div>
           {student.active && (
             <button onClick={onArchive} style={{color:'var(--warn)'}}>🗂 Archive student</button>
           )}
@@ -3720,7 +3747,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v4.5</div>}
+        {!loading && <div className="version-tag">v4.6</div>}
       </div>
 
       {showAddModal && (
