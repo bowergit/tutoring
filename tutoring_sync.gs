@@ -184,7 +184,14 @@ function latestPaperFromSheet_(spreadsheetUrl) {
 
           const nameParts = [];
           for (let cc = 0; cc < Math.min(c - 1, 4); cc++) {
-            const cell = String(values[rr][cc] || '').trim();
+            const raw = values[rr][cc];
+            // A date in these columns is the exam series ("June 2018"), not a
+            // timestamp. Left as-is it stringifies to the full JS date —
+            // "Fri Jun 01 2018 00:00:00 GMT+0100 (British Summer Time)" —
+            // which then shows up verbatim on the student's card.
+            const cell = (raw instanceof Date && !isNaN(raw))
+              ? Utilities.formatDate(raw, Session.getScriptTimeZone(), 'MMM yyyy')
+              : String(raw || '').trim();
             if (cell) nameParts.push(cell);
           }
 
