@@ -65,20 +65,27 @@ independently at any time.
 
 ---
 
-## 2. Let the sync actually run (~2 minutes)
+## 2. The scheduled sync — done, nothing to do
 
-The nightly sync is scheduled (2:17am UTC, already active) but needs your
-service_role key to call it. I can't see or set this myself — deliberately,
-it's your project's master key. In the **Supabase SQL Editor**, run:
+Runs every 2 hours (at :17), for every connected tutor at once.
 
-```sql
-select vault.create_secret('PASTE_YOUR_SERVICE_ROLE_KEY_HERE', 'service_role_key_for_cron');
-```
+This originally wanted your service_role key pasted into Vault, because the
+scheduler runs inside Postgres and has to prove to the sync function that it
+is the scheduler rather than a stranger hitting a public URL. That step is
+gone. The two sides now share a secret generated inside the database that
+never leaves it: cron reads it from Vault to send, and the function asks
+Postgres whether the value it was handed is correct rather than ever holding
+a copy. Worst case if it ever leaked, someone could trigger a calendar sync.
 
-Find the key: **Project Settings → API → service_role** (the legacy JWT one,
-same key you already used for the Apps Script). Paste it in place of the
-placeholder above, run once, done. The very next 2:17am run picks it up
-automatically — nothing else to redeploy or reconnect.
+Your service_role key is therefore never copied anywhere — not into Vault,
+not into a migration, not into this file.
+
+**Note on Edge Function secrets:** adding a secret named
+`service_role_key_for_cron` there does nothing for this. Edge Function
+secrets are Deno environment variables, readable only by the functions
+themselves; the scheduler runs in Postgres and cannot see them. It's also
+redundant — Supabase already provides `SUPABASE_SERVICE_ROLE_KEY` to every
+function automatically. Safe to delete if you added one.
 
 ---
 
