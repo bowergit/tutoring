@@ -2234,6 +2234,19 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
     const rateChanged = rateNum !== originalRate;
     const schedulingFutureRise = rateFrom !== todayStr;
     if (studentId && ratePerSession && !isNaN(rateNum) && (rateChanged || schedulingFutureRise)) {
+      // Backdating a correction must win over anything it's meant to replace.
+      // The rate lookup picks whichever row has the latest effective_from_date
+      // that's still on/before a lesson's date — so without this, an existing
+      // row dated after the new backdated date (but still in the past) would
+      // keep outranking it, and the correction would silently never apply.
+      // Future-scheduled rises (effective_from_date > today) are left alone.
+      if (rateFrom <= todayStr) {
+        await supabase.from('tutoring_rate_history')
+          .delete()
+          .eq('student_id', studentId)
+          .gt('effective_from_date', rateFrom)
+          .lte('effective_from_date', todayStr);
+      }
       // Upsert, not insert: editing a rate twice in one day must replace that
       // day's figure rather than leave two rows competing for the same date.
       await supabase.from('tutoring_rate_history').upsert({
@@ -2445,6 +2458,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
   const [method, setMethod]       = useState(payment?.method || (student.pays_in_cash ? 'cash' : 'bank_transfer'));
   const [amount, setAmount]       = useState(payment ? String(payment.amount) : '');
   const [saving, setSaving]       = useState(false);
+  const [savedCash, setSavedCash] = useState(null);
 
   const rate = currentRate || 90;
 
@@ -2502,7 +2516,48 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
     }
 
     setSaving(false);
-    onSaved();
+
+    // Cash leaves no paper trail the way a bank transfer does, so offer a
+    // WhatsApp receipt right away rather than closing straight out — only for
+    // a genuinely new cash payment, not edits, and only if there's a number
+    // to send it to.
+    if (!editing && method === 'cash' && normaliseUKPhone(student.parent_phone)) {
+      setSavedCash({ amount: amt, date: datePaid });
+    } else {
+      onSaved();
+    }
+  }
+
+  const studentFirstName = student.name.split(' ')[0];
+  const receiptWaLink = savedCash ? (() => {
+    const parentFirstName = (student.parent_name || '').split(' ')[0];
+    const greeting = parentFirstName ? `Hi ${parentFirstName}!` : 'Hi!';
+    const dateLabel = new Date(savedCash.date + 'T12:00:00')
+      .toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+    const msg = `${greeting} Just confirming I've received £${savedCash.amount.toFixed(2)} for ${studentFirstName}'s lessons on ${dateLabel}. Thanks a lot!`;
+    return `https://wa.me/${normaliseUKPhone(student.parent_phone)}?text=${encodeURIComponent(msg)}`;
+  })() : null;
+
+  if (savedCash) {
+    return (
+      <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && close()}>
+        <div className={`sheet${cls}`}>
+          <h2>Payment logged</h2>
+          <div style={{fontSize:'0.85rem', color:'var(--muted)', marginBottom:18, lineHeight:1.5}}>
+            £{savedCash.amount.toFixed(2)} from {N(student.name, student.id)} on{' '}
+            {new Date(savedCash.date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' })}.
+            Send a WhatsApp receipt to the parent?
+          </div>
+          <div className="btn-row">
+            <button className="btn cancel" onClick={onSaved}>Skip</button>
+            <a className="btn save" style={{textAlign:'center', textDecoration:'none'}}
+              href={receiptWaLink} target="_blank" rel="noopener" onClick={onSaved}>
+              💬 Send receipt
+            </a>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -3628,7 +3683,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v4.3</div>}
+        {!loading && <div className="version-tag">v4.4</div>}
       </div>
 
       {showAddModal && (
