@@ -2228,7 +2228,10 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
       zoom_link: form.is_zoom ? (form.zoom_link || null) : null,
       monzo_payer_name: form.monzo_payer_name || null,
       general_notes: form.general_notes,
-      calendar_title_pattern: form.calendar_title_pattern,
+      // Blank must be stored as null, not '': an empty string is a pattern
+      // that matches every event title, which would hand this student the
+      // tutor's entire calendar.
+      calendar_title_pattern: form.calendar_title_pattern.trim() || null,
       spreadsheet_url: form.spreadsheet_url || null,
       referred_by_student_id: form.referred_by_student_id || null,
       active: form.active,
@@ -2432,7 +2435,9 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
             onChange={e => setForm({...form, calendar_title_pattern: e.target.value})}
             placeholder="e.g. Saskia" />
           <div style={{fontSize: '0.78rem', color: 'var(--muted)', marginTop: 4}}>
-            The word that appears in your Google Calendar event titles for this student's lessons.
+            The word that appears in your Google Calendar event titles for this
+            student's lessons. Leave blank to just use their name — only worth
+            filling in if your calendar calls them something else.
           </div>
         </div>
         <div className="field">
@@ -3758,7 +3763,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v4.7</div>}
+        {!loading && <div className="version-tag">v4.8</div>}
       </div>
 
       {showAddModal && (
