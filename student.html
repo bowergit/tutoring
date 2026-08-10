@@ -64,6 +64,13 @@
   }
   .empty { text-align: center; color: var(--muted); padding: 30px 20px; font-size: 0.88rem; }
   .state { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 0.9rem; line-height: 1.6; }
+  .actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+  .action-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 16px; border-radius: var(--r-md); border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); font-size: 0.88rem; font-weight: 600;
+    text-decoration: none; font-family: inherit; box-shadow: var(--sh-2);
+  }
 </style>
 </head>
 <body>
@@ -161,10 +168,25 @@
     return;
   }
 
+  const tutor = data.tutor || {};
+  const tutorName = tutor.name || 'your tutor';
+  const waMessage = `Hi ${tutorName}, I'm messaging about ${data.name}'s lessons.`;
+  const waLink = tutor.phone
+    ? `https://wa.me/${tutor.phone}?text=${encodeURIComponent(waMessage)}` : null;
+  const mailLink = tutor.email
+    ? `mailto:${tutor.email}?subject=${encodeURIComponent(data.name + "'s lessons")}` : null;
+
+  const actions = [
+    waLink ? `<a class="action-btn" href="${waLink}" target="_blank" rel="noopener">💬 Message ${esc(tutorName)} on WhatsApp</a>` : '',
+    mailLink ? `<a class="action-btn" href="${mailLink}">✉️ Email ${esc(tutorName)}</a>` : '',
+    data.spreadsheet_url ? `<a class="action-btn" href="${esc(data.spreadsheet_url)}" target="_blank" rel="noopener">📈 View ${esc(data.name)}'s progress</a>` : '',
+  ].join('');
+
   portalData = data;
   app.innerHTML = `
     <h1>${esc(data.name)}</h1>
     <div class="sub">Your lessons and payment status</div>
+    ${actions ? `<div class="actions">${actions}</div>` : ''}
     <div class="section-label">Upcoming</div>
     <div id="upcoming-section"></div>
     <div class="section-label">Recent</div>

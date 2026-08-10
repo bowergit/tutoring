@@ -489,7 +489,7 @@
   .stmt-big { font-size:1.6rem; font-weight:800; letter-spacing:-0.03em; line-height:1; }
 
   /* ── Animations ── */
-  @keyframes fadeInUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+  @keyframes fadeInUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
   @keyframes fadeIn   { from { opacity:0; } to { opacity:1; } }
   .summary-widget { animation: fadeInUp 0.35s cubic-bezier(0.4,0,0.2,1) both; }
   .card { animation: fadeInUp 0.32s cubic-bezier(0.4,0,0.2,1) both; }
@@ -1607,24 +1607,32 @@ function ChangePassword() {
 // account by construction, nobody else can read or set another user's copy.
 function YourName({ session }) {
   const [name, setName] = useState(session?.user?.user_metadata?.display_name || '');
+  const [phone, setPhone] = useState(session?.user?.user_metadata?.contact_phone || '');
   const [state, setState] = useState('idle');
 
   async function save(e) {
     e.preventDefault();
     setState('busy');
-    const { error } = await supabase.auth.updateUser({ data: { display_name: name.trim() } });
+    const { error } = await supabase.auth.updateUser({
+      data: { display_name: name.trim(), contact_phone: normaliseUKPhone(phone) },
+    });
     setState(error ? 'error' : 'done');
   }
 
   return (
     <form onSubmit={save}>
       <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
-        Shown in the header as "{name.trim() || '…'}'s Maths Tutoring" — just for
-        this account, nobody else's copy changes.
+        Shown in the header as "{name.trim() || '…'}'s Maths Tutoring". Your email
+        and phone here are what the "message the tutor" buttons on each student's
+        lesson link use — nobody else's copy changes.
       </div>
       <div className="field">
         <label>Your first name</label>
         <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Daniel" />
+      </div>
+      <div className="field">
+        <label>Your phone (for parents' WhatsApp button)</label>
+        <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 07787 112345" />
       </div>
       {state === 'done' && (
         <div style={{fontSize:'0.82rem', color:'var(--accent)', marginBottom:12, fontWeight:600}}>Saved.</div>
@@ -1633,7 +1641,7 @@ function YourName({ session }) {
         <div style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:12}}>Could not save — try again.</div>
       )}
       <button className="btn save" style={{width:'100%'}} type="submit" disabled={state === 'busy'}>
-        {state === 'busy' ? 'Saving…' : 'Save name'}
+        {state === 'busy' ? 'Saving…' : 'Save'}
       </button>
     </form>
   );
@@ -1915,7 +1923,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
                 🕶 Privacy mode{privacyOn ? ' — on' : ''}
               </button>
               <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
-              <button onClick={() => setTool('yourname')}>✏️ Your name (shown in the header)</button>
+              <button onClick={() => setTool('yourname')}>✏️ Your name &amp; contact details</button>
               <button onClick={() => setTool('password')}>🔑 Change password</button>
               <button onClick={() => supabase.auth.signOut()} style={{color:'var(--muted)'}}>
                 ⏻ Sign out{userEmail ? ` — ${userEmail}` : ''}
@@ -1958,7 +1966,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
           <>
             <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
               {backBtn}
-              <h2 style={{margin:0}}>Your name</h2>
+              <h2 style={{margin:0}}>Your name &amp; contact details</h2>
             </div>
             <YourName session={session} />
           </>
@@ -3620,7 +3628,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v4.1</div>}
+        {!loading && <div className="version-tag">v4.2</div>}
       </div>
 
       {showAddModal && (
