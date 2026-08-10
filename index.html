@@ -3466,6 +3466,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [lastSynced, setLastSynced] = useState(null);
+  const [loadError, setLoadError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [showGlobalTools, setShowGlobalTools] = useState(false);
@@ -3500,34 +3501,50 @@ function App() {
     }
   }, []);
 
+  // A failed read must never look like an empty diary. Every result is checked
+  // for an error, and if any table fails the previous data is left on screen
+  // with a banner saying so — `data || []` on a failed query yields [], which
+  // renders as "no lessons" and is indistinguishable from genuinely having
+  // none. That is exactly how a momentary connection drop once emptied the
+  // whole app while the database was perfectly intact.
   async function loadAll(isManualRefresh = false) {
     if (isManualRefresh) setRefreshing(true);
-    // Auto-complete lessons that have already happened. Two passes, because a
-    // lesson earlier TODAY has passed too — checking the date alone left this
-    // morning's lesson showing as upcoming until tomorrow.
-    const today = new Date().toISOString().slice(0, 10);
-    const nowHHMM = new Date().toTimeString().slice(0, 5);
-    await supabase.from('tutoring_lessons').update({ status: 'completed' })
-      .eq('status', 'scheduled').lt('lesson_date', today);
-    await supabase.from('tutoring_lessons').update({ status: 'completed' })
-      .eq('status', 'scheduled').eq('lesson_date', today).lt('start_time', nowHHMM);
-    const [s, l, p, b, r, a] = await Promise.all([
-      supabase.from('tutoring_students').select('*').order('active', { ascending: false }).order('name'),
-      supabase.from('tutoring_lessons').select('*'),
-      supabase.from('tutoring_payments').select('*'),
-      supabase.from('tutoring_bundles').select('*'),
-      supabase.from('tutoring_rate_history').select('*'),
-      supabase.from('tutoring_payment_allocations').select('*')
-    ]);
-    setStudents(s.data || []);
-    setLessons(l.data || []);
-    setPayments(p.data || []);
-    setBundles(b.data || []);
-    setRateHistory(r.data || []);
-    setAllocations(a.data || []);
-    setLastSynced(new Date());
-    setLoading(false);
-    setRefreshing(false);
+    try {
+      // Auto-complete lessons that have already happened. Two passes, because a
+      // lesson earlier TODAY has passed too — checking the date alone left this
+      // morning's lesson showing as upcoming until tomorrow.
+      const today = new Date().toISOString().slice(0, 10);
+      const nowHHMM = new Date().toTimeString().slice(0, 5);
+      await supabase.from('tutoring_lessons').update({ status: 'completed' })
+        .eq('status', 'scheduled').lt('lesson_date', today);
+      await supabase.from('tutoring_lessons').update({ status: 'completed' })
+        .eq('status', 'scheduled').eq('lesson_date', today).lt('start_time', nowHHMM);
+      const [s, l, p, b, r, a] = await Promise.all([
+        supabase.from('tutoring_students').select('*').order('active', { ascending: false }).order('name'),
+        supabase.from('tutoring_lessons').select('*'),
+        supabase.from('tutoring_payments').select('*'),
+        supabase.from('tutoring_bundles').select('*'),
+        supabase.from('tutoring_rate_history').select('*'),
+        supabase.from('tutoring_payment_allocations').select('*')
+      ]);
+
+      const failed = [s, l, p, b, r, a].find(res => res.error);
+      if (failed) throw new Error(failed.error.message || 'Could not read your data');
+
+      setStudents(s.data || []);
+      setLessons(l.data || []);
+      setPayments(p.data || []);
+      setBundles(b.data || []);
+      setRateHistory(r.data || []);
+      setAllocations(a.data || []);
+      setLastSynced(new Date());
+      setLoadError(null);
+    } catch (err) {
+      setLoadError(String(err && err.message ? err.message : err));
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }
 
   // Only fetch once signed in — with RLS on, an anonymous fetch returns
@@ -3639,6 +3656,26 @@ function App() {
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
 
+      {loadError && (
+        <div style={{
+          margin:'0 auto 4px', maxWidth:680, padding:'11px 14px',
+          background:'var(--warn-light)', border:'1px solid var(--warn)',
+          borderRadius:'var(--r-md)', color:'var(--warn)', fontSize:'0.82rem', lineHeight:1.45
+        }}>
+          <b>Couldn't reach your data.</b>{' '}
+          {lastSynced
+            ? 'Showing what was last loaded — nothing has been lost or changed.'
+            : 'Nothing is loaded yet, so this page is empty — that is not your real data.'}
+          <button onClick={() => loadAll(true)} disabled={refreshing} style={{
+            marginLeft:8, padding:'3px 10px', borderRadius:8, cursor:'pointer',
+            border:'1px solid var(--warn)', background:'none', color:'var(--warn)',
+            fontFamily:'inherit', fontSize:'0.78rem', fontWeight:600
+          }}>
+            {refreshing ? 'Retrying…' : 'Retry'}
+          </button>
+        </div>
+      )}
+
       <div className="content">
         {loading && (
           <>
@@ -3683,7 +3720,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v4.4</div>}
+        {!loading && <div className="version-tag">v4.5</div>}
       </div>
 
       {showAddModal && (
