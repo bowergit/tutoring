@@ -171,6 +171,7 @@
   const tutor = data.tutor || {};
   const tutorName = tutor.name || 'your tutor';
   const firstName = data.name.trim().split(/\s+/)[0];
+  document.title = `${firstName}'s lessons`;
   const waMessage = `Hi ${tutorName}, I'm messaging about ${firstName}'s lessons.`;
   const waLink = tutor.phone
     ? `https://wa.me/${tutor.phone}?text=${encodeURIComponent(waMessage)}` : null;
