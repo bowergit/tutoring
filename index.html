@@ -2274,6 +2274,12 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         effective_from_date: rateFrom,
         owner_id: ownerId,
       }, { onConflict: 'student_id,effective_from_date' });
+
+      // Changing a rate changes what each lesson costs, so money already
+      // spread across lessons has to be spread again. Without this a lesson
+      // stays over-allocated at the old rate and the next stays short, which
+      // shows as "part paid" even though the total received is exactly right.
+      await supabase.rpc('reallocate_student_payments', { p_student_id: studentId });
     }
 
     setSaving(false);
@@ -3161,6 +3167,11 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   async function toggleComplimentary(lesson) {
     setToggling(true);
     await supabase.from('tutoring_lessons').update({ is_complimentary: !lesson.is_complimentary }).eq('id', lesson.id);
+    // Same reason as a rate change: this moves what's owed, so anything
+    // already allocated to this lesson has to be redistributed — otherwise
+    // making a lesson free strands its payment there instead of letting it
+    // settle the next one.
+    await supabase.rpc('reallocate_student_payments', { p_student_id: student.id });
     setToggling(false);
     setDetailLesson(null);
     onDataChanged();
@@ -3747,7 +3758,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v4.6</div>}
+        {!loading && <div className="version-tag">v4.7</div>}
       </div>
 
       {showAddModal && (
