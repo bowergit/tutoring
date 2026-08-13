@@ -879,6 +879,14 @@ function SummaryWidget({ students, rateHistory }) {
   );
 }
 
+// "£81" rather than "£81.00", but "£81.50" kept intact — pennies only appear
+// when there actually are any. Matches how amounts already read everywhere
+// else in the app; the messages sent to parents were the one place still
+// showing a trailing .00.
+function moneyText(n) {
+  return `£${Number(n).toFixed(2).replace(/\.00$/, '')}`;
+}
+
 function normaliseUKPhone(raw) {
   const digits = (raw || '').replace(/\D/g, '');
   if (!digits) return '';
@@ -2585,7 +2593,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
     const greeting = parentFirstName ? `Hi ${parentFirstName}!` : 'Hi!';
     const dateLabel = new Date(savedCash.date + 'T12:00:00')
       .toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-    const msg = `${greeting} Just confirming I've received £${savedCash.amount.toFixed(2)} for ${studentFirstName}'s lessons on ${dateLabel}. Thanks a lot!`;
+    const msg = `${greeting} Just confirming I've received ${moneyText(savedCash.amount)} for ${studentFirstName}'s lessons on ${dateLabel}. Thanks a lot!`;
     return `https://wa.me/${normaliseUKPhone(student.parent_phone)}?text=${encodeURIComponent(msg)}`;
   })() : null;
 
@@ -2595,7 +2603,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
         <div className={`sheet${cls}`}>
           <h2>Payment logged</h2>
           <div style={{fontSize:'0.85rem', color:'var(--muted)', marginBottom:18, lineHeight:1.5}}>
-            £{savedCash.amount.toFixed(2)} from {N(student.name, student.id)} on{' '}
+            {moneyText(savedCash.amount)} from {N(student.name, student.id)} on{' '}
             {new Date(savedCash.date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' })}.
             Send a WhatsApp receipt to the parent?
           </div>
@@ -3243,10 +3251,10 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const greeting = parentFirstName ? `Hi ${parentFirstName}!` : 'Hi!';
   const phone = normaliseUKPhone(student.parent_phone);
   const waMessage = balance > 0
-    ? `${greeting} Just a friendly reminder we have an outstanding balance of £${balance.toFixed(2)} for ${studentFirstName}'s maths lessons. Let me know when's good to sort payment. Thanks!`
+    ? `${greeting} Just a friendly reminder we have an outstanding balance of ${moneyText(balance)} for ${studentFirstName}'s maths lessons. Please could you settle this when you get the chance? Thanks!`
     : `${greeting} Just checking in about ${studentFirstName}'s next maths lesson.`;
   const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}` : null;
-  const paymentMsg = `${greeting} Just a note that we have ${unpaidCount} outstanding session${unpaidCount !== 1 ? 's' : ''} totalling £${balance.toFixed(2)}. Could you let me know when's convenient to settle up? Thanks!`;
+  const paymentMsg = `${greeting} Just a note that we have ${unpaidCount} outstanding session${unpaidCount !== 1 ? 's' : ''} totalling ${moneyText(balance)}. Please could you settle this when you get the chance? Thanks!`;
   const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
   const bundleWaLink = null;
 
@@ -4048,7 +4056,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v5.4</div>}
+        {!loading && <div className="version-tag">v5.5</div>}
       </div>
 
       {showAddModal && (
