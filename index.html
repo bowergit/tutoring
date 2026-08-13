@@ -3355,16 +3355,30 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                     {l.start_time && <span style={{color:'var(--muted)'}}> · {l.start_time}</span>}
                   </span>
                   <span style={{display:'flex',alignItems:'center'}}>
-                    {!l.is_complimentary && (() => {
-                      const st = lessonPayState(l);
-                      if (l.pre_settled) return <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>✓ settled</span>;
-                      if (st.settled)    return <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>✓ paid</span>;
-                      if (st.partial)    return <span style={{fontSize:'0.7rem',color:'var(--gold)',marginRight:7}}>part paid</span>;
-                      return null;
+                    {(() => {
+                      const st = l.is_complimentary ? null : lessonPayState(l);
+                      const settled = l.is_complimentary || l.pre_settled || (st && st.settled);
+                      return (
+                        <>
+                          {!l.is_complimentary && (
+                            l.pre_settled ? <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>✓ settled</span>
+                            : st.settled  ? <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>✓ paid</span>
+                            : st.partial  ? <span style={{fontSize:'0.7rem',color:'var(--gold)',marginRight:7}}>part paid</span>
+                            : null
+                          )}
+                          <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={
+                            l.is_complimentary ? {color:'var(--accent)'}
+                            // Green only once the money is actually in. A lesson
+                            // that has happened but hasn't been paid for is money
+                            // owed, not a job done, so it reads as a warning.
+                            : l.status === 'completed' ? {color: settled ? 'var(--accent)' : 'var(--warn)'}
+                            : {}
+                          }>
+                            {l.is_complimentary ? 'free' : `${l.status} · ${M(rateForLesson(l, rateHistory), l.id + ':rate')}`}
+                          </span>
+                        </>
+                      );
                     })()}
-                    <span className={`lesson-status ${l.is_complimentary ? '' : l.status}`} style={l.is_complimentary ? {color:'var(--accent)'} : {}}>
-                      {l.is_complimentary ? 'free' : `${l.status} · ${M(rateForLesson(l, rateHistory), l.id + ':rate')}`}
-                    </span>
                     <span className="chev">›</span>
                   </span>
                 </div>
@@ -3763,7 +3777,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v4.8</div>}
+        {!loading && <div className="version-tag">v4.9</div>}
       </div>
 
       {showAddModal && (
