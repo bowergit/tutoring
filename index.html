@@ -1878,10 +1878,12 @@ function SlideToConfirm({ onConfirm }) {
 }
 
 // ---------- Global Tools Sheet ----------
-function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, session, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onDataChanged }) {
+function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, session, initialTool = null, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onReplayWalkthrough, onDataChanged }) {
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
-  const [tool, setTool] = useState(null);
+  // Opens straight onto a panel when the walkthrough sent them here, so the
+  // step that says "open calendar settings" actually lands on it.
+  const [tool, setTool] = useState(initialTool);
   const [buysOpen, setBuysOpen] = useState(false);
   const privacyOn = moneyMode !== 'normal' || nameMode !== 'normal';
   const archived = students.filter(s => !s.active);
@@ -1943,6 +1945,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
               </button>
               <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
               <button onClick={() => setTool('yourname')}>✏️ Your name &amp; contact details</button>
+              <button onClick={onReplayWalkthrough}>🧭 Replay walkthrough</button>
               <button onClick={() => setTool('password')}>🔑 Change password</button>
               <button onClick={() => supabase.auth.signOut()} style={{color:'var(--muted)'}}>
                 ⏻ Sign out{userEmail ? ` — ${userEmail}` : ''}
@@ -2131,7 +2134,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
 }
 
 // ---------- Add/Edit Student Modal ----------
-function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHistory = [] }) {
+function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHistory = [], defaultRate = null }) {
   const [cls, close] = useAnimatedClose(onClose);
   const { moneyMode, nameMode } = usePrivacy();
   const N = useNameDisplay();
@@ -2177,7 +2180,12 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
     active: student?.active !== undefined ? student.active : true,
   });
   const todayStr = new Date().toISOString().slice(0, 10);
-  const [ratePerSession, setRatePerSession] = useState('');
+  // A new student starts on the tutor's usual fee (set during setup) so the
+  // common case needs no typing; an existing one keeps whatever they're on,
+  // which is loaded from rate history below.
+  const [ratePerSession, setRatePerSession] = useState(
+    !student && defaultRate != null ? String(defaultRate) : ''
+  );
   const [originalRate, setOriginalRate] = useState(null);
   const [rateFrom, setRateFrom] = useState(todayStr);
   const [saving, setSaving] = useState(false);
@@ -2417,8 +2425,13 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
           </div>
         </div>
         <div className="field">
-          <label>Google Sheet link (optional)</label>
-          <input type="text" value={form.spreadsheet_url} onChange={e => setForm({...form, spreadsheet_url: e.target.value})} placeholder="Paste the sheet URL here" />
+          <label>Progress tracker link (optional)</label>
+          <input type="text" value={form.spreadsheet_url} onChange={e => setForm({...form, spreadsheet_url: e.target.value})} placeholder="Google Sheet, Drive or Dropbox link" />
+          <div style={{fontSize: '0.78rem', color: 'var(--muted)', marginTop: 4, lineHeight: 1.45}}>
+            Wherever you keep their work. Shows as a button on their card, and on
+            the lesson page you share with their parent. Leave blank if you don't
+            use one.
+          </div>
         </div>
         <div className="field">
           <label>Referred by</label>
@@ -3513,6 +3526,226 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   );
 }
 
+// ---------- Onboarding walkthrough ----------
+// A plain bottom card rather than tooltips pinned to individual buttons: a
+// brand-new account has an empty screen, so there is often nothing to point
+// at, and anything anchored to an element breaks the moment a list is empty
+// or a layout shifts. Every step that asks the tutor to go somewhere opens
+// that screen for them instead of describing where to find it.
+const WT_STEPS = [
+  {
+    key: 'welcome',
+    title: "Let's get you running",
+    body: "About three minutes and your whole timetable will be in here. Stop whenever you like — it picks up where you left off, and nothing you do here can break anything.",
+  },
+  {
+    key: 'you',
+    title: 'A few details about you',
+    body: "Your name shows at the top of the app. The email and phone are what parents use to reach you from their child's lesson page.",
+    form: true,
+  },
+  {
+    key: 'calendar',
+    title: 'Connect your Google Calendar',
+    body: "This is the one that matters. Your lessons come straight out of your calendar, so you never type a timetable in by hand. Tap below, then Connect, and pick whichever calendar has your lessons on it.",
+    action: { label: '📅 Open calendar settings', tool: 'gcal' },
+  },
+  {
+    key: 'students',
+    title: 'Turn the names into students',
+    body: "Tap Sync now. Any name in your calendar that isn't a student yet gets listed with an Add button — tap Add for each real one and their lessons appear straight away. It guesses the name from the event title; correct it there if the guess is off.",
+    action: { label: '📅 Open calendar settings', tool: 'gcal' },
+  },
+  {
+    key: 'details',
+    title: 'Fill in the gaps',
+    body: "Tap a student, then Edit, to add their school, year, exam board, the parent's number and any notes. There's a progress tracker link too — paste a Google Drive or Dropbox folder if that's how you keep their work, or leave it blank.",
+  },
+  {
+    key: 'money',
+    title: 'Getting paid',
+    body: "Student → More tools → Log a payment. Payments always settle the oldest unpaid lesson first, so the figure on each card is simply what they still owe you. Cash payments offer to send a WhatsApp receipt.",
+  },
+  {
+    key: 'links',
+    title: 'Give parents their own page',
+    body: "Every student has a private page showing their upcoming lessons and what's been paid. Student → More tools → Copy link. Parents don't need a login, and they only ever see that one child.",
+  },
+  {
+    key: 'newstudent',
+    title: 'New students later on',
+    body: "Tap + Add at the top. If they're already in your calendar the sync will match them by name automatically, so most of the time you won't have to do even that.",
+    action: { label: '+ Add a student', addStudent: true },
+  },
+  {
+    key: 'done',
+    title: "That's everything",
+    body: "Replay this any time from Tools → Replay walkthrough. Your calendar re-syncs itself every couple of hours, so from here it mostly runs itself.",
+  },
+];
+
+function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone }) {
+  const meta = session?.user?.user_metadata || {};
+  const startAt = typeof meta.wt_step === 'number' && meta.wt_step > 0 ? meta.wt_step : 0;
+  const [step, setStep] = useState(startAt);
+  const [paused, setPaused] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [calStatus, setCalStatus] = useState(null);
+
+  const [name, setName]   = useState(meta.display_name || '');
+  const [email, setEmail] = useState(meta.contact_email || '');
+  const [phone, setPhone] = useState(meta.contact_phone || '');
+  const [rate, setRate]   = useState(meta.default_rate != null ? String(meta.default_rate) : '');
+
+  const s = WT_STEPS[step];
+  const isLast = step === WT_STEPS.length - 1;
+
+  // Live connection state, so the calendar step tells them where they actually
+  // are rather than assuming the tap worked.
+  useEffect(() => {
+    if (s.key !== 'calendar' && s.key !== 'students') { setCalStatus(null); return; }
+    let cancelled = false;
+    fetch(`${FN_BASE}/google-calendar-status`, {
+      headers: { Authorization: `Bearer ${session?.access_token}` },
+    }).then(r => r.json()).then(d => { if (!cancelled) setCalStatus(d); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [step]);
+
+  async function persist(nextStep) {
+    const data = { wt_step: nextStep };
+    if (s.form) {
+      data.display_name  = name.trim();
+      data.contact_email = email.trim();
+      data.contact_phone = normaliseUKPhone(phone);
+      const r = parseFloat(rate);
+      data.default_rate = isNaN(r) ? null : r;
+    }
+    await supabase.auth.updateUser({ data });
+  }
+
+  async function next() {
+    setSaving(true);
+    if (isLast) { await persist(-1); setSaving(false); onDone(); return; }
+    await persist(step + 1);
+    setSaving(false);
+    setStep(step + 1);
+  }
+
+  async function skip() {
+    setSaving(true);
+    await persist(-1);
+    setSaving(false);
+    onDone();
+  }
+
+  if (paused) {
+    return ReactDOM.createPortal(
+      <button onClick={() => setPaused(false)} style={{
+        position:'fixed', right:14, bottom:14, zIndex:150,
+        padding:'11px 16px', borderRadius:100, border:'1px solid var(--accent)',
+        background:'var(--card)', color:'var(--accent)', fontFamily:'inherit',
+        fontSize:'0.82rem', fontWeight:650, boxShadow:'var(--sh-3)', cursor:'pointer',
+      }}>
+        ▶ Back to setup · {step + 1}/{WT_STEPS.length}
+      </button>, document.body
+    );
+  }
+
+  return ReactDOM.createPortal(
+    <div style={{
+      position:'fixed', left:0, right:0, bottom:0, zIndex:150,
+      background:'var(--card)', borderTop:'1px solid var(--line)',
+      boxShadow:'var(--sh-3)', padding:'16px 16px calc(16px + env(safe-area-inset-bottom))',
+      maxHeight:'72vh', overflowY:'auto', overflowX:'hidden',
+    }}>
+      <div style={{maxWidth:680, margin:'0 auto'}}>
+        <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:7}}>
+          <span style={{
+            fontSize:'0.66rem', fontWeight:700, letterSpacing:'0.07em',
+            textTransform:'uppercase', color:'var(--muted)',
+          }}>Setup · {step + 1} of {WT_STEPS.length}</span>
+          <div style={{flex:1, height:3, background:'var(--card-3)', borderRadius:2}}>
+            <div style={{
+              width:`${((step + 1) / WT_STEPS.length) * 100}%`, height:'100%',
+              background:'var(--accent)', borderRadius:2, transition:'width .25s',
+            }} />
+          </div>
+        </div>
+
+        <div style={{fontSize:'1.02rem', fontWeight:700, marginBottom:5}}>{s.title}</div>
+        <div style={{fontSize:'0.86rem', color:'var(--ink-dim)', lineHeight:1.5, marginBottom:12}}>
+          {s.body}
+        </div>
+
+        {s.form && (
+          <div style={{marginBottom:12}}>
+            <div className="field">
+              <label>Your first name</label>
+              <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Djavhan" />
+            </div>
+            <div className="field">
+              <label>Contact email for parents</label>
+              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
+                     placeholder={session?.user?.email || 'you@example.com'} />
+            </div>
+            <div className="field">
+              <label>Your phone (for the parents' WhatsApp button)</label>
+              <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 07999 896555" />
+            </div>
+            <div className="field">
+              <label>Your usual fee per lesson</label>
+              <input type="number" min="0" step="1" value={rate} onChange={e => setRate(e.target.value)} placeholder="e.g. 50" />
+              <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
+                Just the starting figure for new students — you can charge each one
+                differently, and change it whenever you like.
+              </div>
+            </div>
+          </div>
+        )}
+
+        {calStatus && (
+          <div style={{
+            fontSize:'0.8rem', fontWeight:600, marginBottom:11, padding:'9px 12px',
+            borderRadius:'var(--r-md)',
+            background: calStatus.connected ? 'var(--accent-light)' : 'var(--card-2)',
+            color: calStatus.connected ? 'var(--accent)' : 'var(--muted)',
+            border:'1px solid var(--line)',
+          }}>
+            {calStatus.connected && calStatus.calendar_chosen
+              ? `✓ Connected to “${calStatus.calendar_summary}” — ${students.length} student${students.length === 1 ? '' : 's'} so far`
+              : calStatus.connected
+                ? 'Connected — now pick which calendar has your lessons'
+                : 'Not connected yet'}
+          </div>
+        )}
+
+        {s.action && (
+          <button className="btn save" style={{width:'100%', marginBottom:10}}
+            onClick={() => { s.action.addStudent ? onAddStudent() : onOpenTool(s.action.tool); }}>
+            {s.action.label}
+          </button>
+        )}
+
+        <div style={{display:'flex', gap:8, alignItems:'center'}}>
+          <button onClick={skip} disabled={saving} style={{
+            background:'none', border:'none', color:'var(--muted)', cursor:'pointer',
+            fontFamily:'inherit', fontSize:'0.78rem', padding:'8px 2px', flexShrink:0,
+          }}>Skip</button>
+          <button onClick={() => setPaused(true)} disabled={saving} style={{
+            flex:1, padding:'11px 10px', borderRadius:'var(--r-md)',
+            border:'1px solid var(--line)', background:'var(--card-2)', color:'var(--ink)',
+            fontFamily:'inherit', fontSize:'0.8rem', fontWeight:600, cursor:'pointer',
+          }}>Let me look around</button>
+          <button className="btn save" onClick={next} disabled={saving}
+            style={{flex:1, minWidth:0}}>
+            {saving ? '…' : isLast ? 'Finish' : 'Next'}
+          </button>
+        </div>
+      </div>
+    </div>, document.body
+  );
+}
+
 function App() {
   const [students, setStudents] = useState([]);
   const [lessons, setLessons] = useState([]);
@@ -3527,6 +3760,8 @@ function App() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [showGlobalTools, setShowGlobalTools] = useState(false);
+  const [toolsInitial, setToolsInitial] = useState(null);
+  const [walkthroughOpen, setWalkthroughOpen] = useState(false);
   const [monzoStatus, setMonzoStatus] = useState(null);
   const [googleStatus, setGoogleStatus] = useState(null);
   const [moneyMode, setMoneyMode] = useState('normal');
@@ -3541,6 +3776,23 @@ function App() {
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => setSession(s ?? null));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // -1 means finished or skipped. Anything else — including never having had
+  // the field at all, which is every account that predates this — means show
+  // it. Saving a step writes to user metadata and so bounces back through the
+  // auth listener above; the walkthrough keeps its own step in local state so
+  // that round trip can't reset it mid-flow.
+  useEffect(() => {
+    if (!session) return;
+    setWalkthroughOpen(session.user?.user_metadata?.wt_step !== -1);
+  }, [session?.user?.id]);
+
+  async function replayWalkthrough() {
+    await supabase.auth.updateUser({ data: { wt_step: 0 } });
+    setShowGlobalTools(false);
+    setToolsInitial(null);
+    setWalkthroughOpen(true);
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -3777,19 +4029,24 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v4.9</div>}
+        {!loading && <div className="version-tag">v5.0</div>}
       </div>
 
       {showAddModal && (
         <StudentFormModal
           allStudents={students}
           rateHistory={rateHistory}
+          defaultRate={session?.user?.user_metadata?.default_rate ?? null}
           onClose={() => setShowAddModal(false)}
           onSaved={() => { setShowAddModal(false); loadAll(); }}
         />
       )}
 
-      <button className="global-tools-btn" onClick={() => setShowGlobalTools(true)}>⚙ Tools</button>
+      {/* Hidden while the walkthrough card is up, since they occupy the same
+          corner of the screen and the card offers its own way in. */}
+      {!walkthroughOpen && (
+        <button className="global-tools-btn" onClick={() => setShowGlobalTools(true)}>⚙ Tools</button>
+      )}
 
       {showGlobalTools && (
         <GlobalToolsSheet
@@ -3798,10 +4055,22 @@ function App() {
           payments={payments}
           userEmail={session?.user?.email}
           session={session}
+          initialTool={toolsInitial}
           moneyMode={moneyMode} setMoneyMode={setMoneyMode}
           nameMode={nameMode} setNameMode={setNameMode}
-          onClose={() => setShowGlobalTools(false)}
+          onClose={() => { setShowGlobalTools(false); setToolsInitial(null); }}
+          onReplayWalkthrough={replayWalkthrough}
           onDataChanged={loadAll}
+        />
+      )}
+
+      {walkthroughOpen && (
+        <Walkthrough
+          session={session}
+          students={students}
+          onOpenTool={t => { setToolsInitial(t); setShowGlobalTools(true); }}
+          onAddStudent={() => setShowAddModal(true)}
+          onDone={() => setWalkthroughOpen(false)}
         />
       )}
 
