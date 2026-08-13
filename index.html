@@ -3603,6 +3603,9 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
 
   const s = WT_STEPS[step];
   const isLast = step === WT_STEPS.length - 1;
+  // Archived students would otherwise be counted, which reads as wrong to
+  // someone checking the number against what's on their screen.
+  const activeCount = students.filter(x => x.active).length;
 
   // Live connection state, so the calendar step tells them where they actually
   // are rather than assuming the tap worked.
@@ -3716,7 +3719,7 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
             border:'1px solid var(--line)',
           }}>
             {calStatus.connected && calStatus.calendar_chosen
-              ? `✓ Connected to “${calStatus.calendar_summary}” — ${students.length} student${students.length === 1 ? '' : 's'} so far`
+              ? `✓ Connected to “${calStatus.calendar_summary}” — ${activeCount} student${activeCount === 1 ? '' : 's'} so far`
               : calStatus.connected
                 ? 'Connected — now pick which calendar has your lessons'
                 : 'Not connected yet'}
@@ -4034,7 +4037,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v5.1</div>}
+        {!loading && <div className="version-tag">v5.2</div>}
       </div>
 
       {showAddModal && (
