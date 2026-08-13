@@ -1069,7 +1069,10 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
 
   async function connect() {
     setBusy(true);
-    const r = await authedFetch('google-calendar-connect').catch(e => ({ ok: false, problem: String(e) }));
+    // Tell the callback which domain to come back to. It's checked against an
+    // allowlist server-side, so this can't be used to bounce anyone elsewhere.
+    const back = encodeURIComponent(window.location.origin + window.location.pathname);
+    const r = await authedFetch(`google-calendar-connect?return_to=${back}`).catch(e => ({ ok: false, problem: String(e) }));
     setBusy(false);
     if (r.ok && r.authorize_url) window.location.href = r.authorize_url;
     else setMsg('Could not start the connection — try again.');
@@ -2964,7 +2967,10 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
   const [cls, close] = useAnimatedClose(onClose);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const studentLink = `https://bowergit.github.io/tutoring/student.html?t=${student.public_token}`;
+  // Built from wherever the app is actually being served, so moving domain
+  // needs no code change and links always point at the site the tutor is
+  // looking at rather than a hardcoded one.
+  const studentLink = new URL(`student.html?t=${student.public_token}`, window.location.href).toString();
 
   function copyStudentLink() {
     navigator.clipboard.writeText(studentLink).then(() => {
@@ -4037,7 +4043,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v5.2</div>}
+        {!loading && <div className="version-tag">v5.3</div>}
       </div>
 
       {showAddModal && (
