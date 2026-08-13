@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lessons</title>
+<meta name="robots" content="noindex">
+<style>
+  body {
+    margin: 0; min-height: 100dvh; display: grid; place-items: center;
+    background: #131210; color: #f2eee6; text-align: center; padding: 24px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  a { color: #4fb877; }
+</style>
+<script>
+  // location.search carries the ?t=<token> that identifies the student, so it
+  // MUST be passed through — without it the new page has no idea whose
+  // lessons to show. Every link already sent to a parent keeps working.
+  location.replace('https://tutoring.bowermaths.co.uk/student.html' + location.search + location.hash);
+</script>
+</head>
+<body>
+  <div>
+    <p>Taking you to the lessons page…</p>
+    <p style="opacity:.6;font-size:.9rem">
+      If nothing happens, ask your tutor for an updated link.
+    </p>
+  </div>
+</body>
+</html>
