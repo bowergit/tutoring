@@ -1471,8 +1471,13 @@ function LoginGate() {
       return;
     }
     setState('busy');
+    // Origin + path only. Supabase checks this against its allowed-redirect
+    // list and, if it doesn't match, silently falls back to the project's
+    // Site URL — which on this project is the other app entirely. A stray
+    // ?v=… left in the address bar was enough to cause that, so anything
+    // beyond the path is stripped before asking.
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: window.location.href.split('#')[0],
+      redirectTo: window.location.origin + window.location.pathname,
     });
     if (error) { setState('error'); setDetail(error.message); }
     else { setState('reset-sent'); }
@@ -4043,7 +4048,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v5.3</div>}
+        {!loading && <div className="version-tag">v5.4</div>}
       </div>
 
       {showAddModal && (
