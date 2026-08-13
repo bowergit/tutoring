@@ -12,7 +12,7 @@ Hey — here's how to get set up.
 
 **1. Log in.**
 Use the password I send you separately (via password.link). Go to
-**bowergit.github.io/tutoring**, sign in. You'll see an empty app — that's
+**tutoring.bowermaths.co.uk**, sign in. You'll see an empty app — that's
 correct, it's yours alone, I can't see anything you add and you can't see mine.
 
 **2. Add your students.**
