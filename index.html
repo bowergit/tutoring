@@ -3584,11 +3584,15 @@ const WT_STEPS = [
   },
 ];
 
-function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone }) {
+function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPausedChange }) {
   const meta = session?.user?.user_metadata || {};
   const startAt = typeof meta.wt_step === 'number' && meta.wt_step > 0 ? meta.wt_step : 0;
   const [step, setStep] = useState(startAt);
-  const [paused, setPaused] = useState(false);
+  const [paused, setPausedState] = useState(false);
+  // Told to the app as well, so the Tools button can come back while they
+  // wander — looking around is the whole point of pausing, and Tools is where
+  // half the app lives.
+  const setPaused = v => { setPausedState(v); onPausedChange?.(v); };
   const [saving, setSaving] = useState(false);
   const [calStatus, setCalStatus] = useState(null);
 
@@ -3762,6 +3766,7 @@ function App() {
   const [showGlobalTools, setShowGlobalTools] = useState(false);
   const [toolsInitial, setToolsInitial] = useState(null);
   const [walkthroughOpen, setWalkthroughOpen] = useState(false);
+  const [walkthroughPaused, setWalkthroughPaused] = useState(false);
   const [monzoStatus, setMonzoStatus] = useState(null);
   const [googleStatus, setGoogleStatus] = useState(null);
   const [moneyMode, setMoneyMode] = useState('normal');
@@ -4029,7 +4034,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v5.0</div>}
+        {!loading && <div className="version-tag">v5.1</div>}
       </div>
 
       {showAddModal && (
@@ -4042,9 +4047,10 @@ function App() {
         />
       )}
 
-      {/* Hidden while the walkthrough card is up, since they occupy the same
-          corner of the screen and the card offers its own way in. */}
-      {!walkthroughOpen && (
+      {/* Hidden only while the walkthrough card is actually on screen, since
+          they occupy the same space and the card offers its own way in. It
+          comes straight back when they pause to look around. */}
+      {(!walkthroughOpen || walkthroughPaused) && (
         <button className="global-tools-btn" onClick={() => setShowGlobalTools(true)}>⚙ Tools</button>
       )}
 
@@ -4070,7 +4076,8 @@ function App() {
           students={students}
           onOpenTool={t => { setToolsInitial(t); setShowGlobalTools(true); }}
           onAddStudent={() => setShowAddModal(true)}
-          onDone={() => setWalkthroughOpen(false)}
+          onPausedChange={setWalkthroughPaused}
+          onDone={() => { setWalkthroughOpen(false); setWalkthroughPaused(false); }}
         />
       )}
 
