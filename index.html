@@ -1954,6 +1954,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
               <button onClick={() => setTool('gcal')}>📅 Google Calendar</button>
               <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>
               <button onClick={() => setTool('archived')}>🗂 Archived students{archived.length > 0 ? ` (${archived.length})` : ''}</button>
+              <button onClick={() => setTool('deletedpay')}>🗃 Deleted payments</button>
               <button onClick={() => setTool('revenue')}>💹 Revenue trend — what's actually come in</button>
               <button onClick={() => setTool('growth')}>📈 Growth calculator — what if I had more students?</button>
               <button onClick={() => setTool('privacy')}>
@@ -2115,6 +2116,15 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
                 </div>
               ))
             )}
+          </>
+        )}
+        {tool === 'deletedpay' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Deleted payments</h2>
+            </div>
+            <DeletedPayments students={students} onDataChanged={onDataChanged} />
           </>
         )}
         {tool === 'info' && (
@@ -2729,9 +2739,14 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
 
   async function handleDelete() {
     setBusy(true);
-    // Allocations are removed automatically by the foreign key cascade, which
-    // frees those lessons to be settled by a later payment.
-    await supabase.from('tutoring_payments').delete().eq('id', payment.id);
+    // Archived, not destroyed. A hard delete took the date, method and Monzo
+    // link with it, so undoing meant retyping the payment from memory —
+    // which is exactly how a correct set of payments ends up wrong.
+    await supabase.from('tutoring_payments')
+      .update({ deleted_at: new Date().toISOString() }).eq('id', payment.id);
+    // Rebuilding drops this payment's allocations along with it and spreads
+    // whatever is left over the lessons again, oldest first.
+    await supabase.rpc('reallocate_student_payments', { p_student_id: payment.student_id });
     setBusy(false);
     onDeleted();
   }
@@ -2778,12 +2793,18 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
         )}
 
         {confirming ? (
-          <div className="btn-row">
-            <button className="btn cancel" onClick={() => setConfirming(false)}>Keep</button>
-            <button className="btn save" style={{background:'var(--warn)'}} onClick={handleDelete} disabled={busy}>
-              {busy ? '…' : 'Delete for good'}
-            </button>
-          </div>
+          <>
+            <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:10, lineHeight:1.45}}>
+              This is kept in Tools → Deleted payments and can be put back
+              exactly as it is, so nothing is lost if you change your mind.
+            </div>
+            <div className="btn-row">
+              <button className="btn cancel" onClick={() => setConfirming(false)}>Keep</button>
+              <button className="btn save" style={{background:'var(--warn)'}} onClick={handleDelete} disabled={busy}>
+                {busy ? '…' : 'Delete payment'}
+              </button>
+            </div>
+          </>
         ) : (
           <div className="btn-row">
             <button className="btn cancel" onClick={close}>Close</button>
@@ -2793,6 +2814,75 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
         )}
       </div>
     </div>
+  );
+}
+
+// ---------- Deleted payments ----------
+// Fetched on open rather than held in app state: these are excluded from every
+// normal query on purpose, and a list nobody looks at most days isn't worth
+// carrying around in memory.
+function DeletedPayments({ students, onDataChanged }) {
+  const M = useMoney();
+  const N = useNameDisplay();
+  const [rows, setRows] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    const { data } = await supabase.from('tutoring_payments')
+      .select('*').not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
+    setRows(data || []);
+  }
+
+  async function restore(p) {
+    setBusyId(p.id);
+    await supabase.from('tutoring_payments').update({ deleted_at: null }).eq('id', p.id);
+    // Put the money back where it belongs rather than on the end: rebuilding
+    // settles the oldest unpaid lesson first, exactly as if it had never gone.
+    await supabase.rpc('reallocate_student_payments', { p_student_id: p.student_id });
+    setBusyId(null);
+    await load();
+    onDataChanged();
+  }
+
+  const nameOf = id => students.find(s => s.id === id)?.name || 'Unknown student';
+
+  if (rows === null) return <div style={{color:'var(--muted)', fontSize:'0.88rem', padding:'10px 0'}}>Loading…</div>;
+  if (rows.length === 0) {
+    return (
+      <div style={{color:'var(--muted)', fontSize:'0.88rem', padding:'10px 0', lineHeight:1.5}}>
+        Nothing deleted. Any payment you remove lands here rather than
+        disappearing, so it can be put back with its date and method intact.
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:12, lineHeight:1.45}}>
+        Restoring puts the payment back and re-settles the oldest unpaid lesson
+        first, so balances correct themselves.
+      </div>
+      {rows.map(p => (
+        <div key={p.id} style={{display:'flex', alignItems:'center', gap:10, padding:'11px 0', borderBottom:'1px solid var(--line)'}}>
+          <div style={{flex:1, minWidth:0}}>
+            <div style={{fontSize:'0.92rem', fontWeight:600}}>
+              {M(parseFloat(p.amount), p.id)} · {N(nameOf(p.student_id), p.student_id)}
+            </div>
+            <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:2}}>
+              Paid {new Date(p.date_paid + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}
+              {' · '}{({cash:'Cash', bank_transfer:'Bank transfer', monzo_auto:'Monzo (auto)', other:'Other'})[p.method] || p.method}
+              {' · deleted '}{new Date(p.deleted_at).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}
+            </div>
+          </div>
+          <button className="btn save" style={{flex:'0 0 auto', minWidth:'auto', padding:'7px 14px', fontSize:'0.82rem'}}
+            disabled={busyId === p.id} onClick={() => restore(p)}>
+            {busyId === p.id ? '…' : 'Restore'}
+          </button>
+        </div>
+      ))}
+    </>
   );
 }
 
@@ -3040,10 +3130,11 @@ function groupByMonth(lessons) {
   return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
 }
 
-function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree, toggling }) {
+function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree, onDelete, toggling }) {
   const M = useMoney();
   const { nameMode } = usePrivacy();
   const [cls, close] = useAnimatedClose(onClose);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const d = new Date(lesson.lesson_date + 'T12:00:00');
   const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   const statusClass = lesson.is_complimentary ? 'ok' : lesson.status === 'completed' ? 'ok' : lesson.status === 'missed' ? 'warn' : 'neutral';
@@ -3103,19 +3194,38 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
             {lesson.lesson_notes}
           </div>
         )}
-        <div className="btn-row">
-          <button className="btn cancel" onClick={close}>Close</button>
-          {lesson.status === 'completed' && (
-            <button
-              className="btn save"
-              style={lesson.is_complimentary ? {background:'var(--warn)'} : {}}
-              onClick={onToggleFree}
-              disabled={toggling}
-            >
-              {toggling ? '…' : lesson.is_complimentary ? 'Remove free mark' : 'Mark as free'}
-            </button>
-          )}
-        </div>
+        {confirmingDelete ? (
+          <>
+            <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:10, lineHeight:1.45}}>
+              {lesson.google_event_id
+                ? 'This one came from your calendar, so remove it there too — otherwise the next sync puts it straight back.'
+                : 'This was added by hand, so it won’t come back.'}
+              {' '}Any money covering it moves to the next unpaid lesson.
+            </div>
+            <div className="btn-row">
+              <button className="btn cancel" onClick={() => setConfirmingDelete(false)}>Keep</button>
+              <button className="btn save" style={{background:'var(--warn)'}} onClick={onDelete} disabled={toggling}>
+                {toggling ? '…' : 'Delete lesson'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="btn-row">
+            <button className="btn cancel" onClick={close}>Close</button>
+            <button className="btn" style={{background:'var(--warn)', color:'#fff', flex:'0 0 auto', minWidth:'auto', padding:'11px 14px'}}
+              onClick={() => setConfirmingDelete(true)}>Delete</button>
+            {lesson.status === 'completed' && (
+              <button
+                className="btn save"
+                style={lesson.is_complimentary ? {background:'var(--warn)'} : {}}
+                onClick={onToggleFree}
+                disabled={toggling}
+              >
+                {toggling ? '…' : lesson.is_complimentary ? 'Remove free mark' : 'Mark as free'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -3208,6 +3318,22 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
     // already allocated to this lesson has to be redistributed — otherwise
     // making a lesson free strands its payment there instead of letting it
     // settle the next one.
+    await supabase.rpc('reallocate_student_payments', { p_student_id: student.id });
+    setToggling(false);
+    setDetailLesson(null);
+    onDataChanged();
+  }
+
+  // The escape hatch for a lesson that shouldn't exist — a calendar event
+  // created by mistake, or one the sync picked up before it was cancelled.
+  // Without this the only option was marking it free, which leaves a lesson
+  // in the history that never happened and quietly distorts the record.
+  async function deleteLesson(lesson) {
+    setToggling(true);
+    await supabase.from('tutoring_lessons').delete().eq('id', lesson.id);
+    // Its allocations cascade away with it, so rebuilding moves that money
+    // onto the next unpaid lesson instead of leaving the student looking
+    // behind on payments they've actually made.
     await supabase.rpc('reallocate_student_payments', { p_student_id: student.id });
     setToggling(false);
     setDetailLesson(null);
@@ -3538,6 +3664,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           lessonRate={rateForLesson(detailLesson, rateHistory)}
           onClose={() => setDetailLesson(null)}
           onToggleFree={() => toggleComplimentary(detailLesson)}
+          onDelete={() => deleteLesson(detailLesson)}
           toggling={toggling}
         />, document.body
       )}
@@ -3858,7 +3985,9 @@ function App() {
       const [s, l, p, b, r, a] = await Promise.all([
         supabase.from('tutoring_students').select('*').order('active', { ascending: false }).order('name'),
         supabase.from('tutoring_lessons').select('*'),
-        supabase.from('tutoring_payments').select('*'),
+        // Archived payments are excluded everywhere money is counted; they
+        // only surface in Tools → Deleted payments, where they can be restored.
+        supabase.from('tutoring_payments').select('*').is('deleted_at', null),
         supabase.from('tutoring_bundles').select('*'),
         supabase.from('tutoring_rate_history').select('*'),
         supabase.from('tutoring_payment_allocations').select('*')
@@ -4056,7 +4185,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v5.5</div>}
+        {!loading && <div className="version-tag">v5.6</div>}
       </div>
 
       {showAddModal && (
