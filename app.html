@@ -12,6 +12,7 @@
 <meta property="og:description" content="Your lessons come out of your calendar automatically. Know exactly who owes what. £5 a month, first three months free.">
 <meta property="og:type" content="website">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<script>document.documentElement.classList.add('js')</script>
 <style>
   :root {
     --bg: #f5f4f1; --bg-tint: #ecebe6; --card: #ffffff; --card-2: #f7f6f3; --card-3: #f1efea;
@@ -84,11 +85,16 @@
   .cta-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 26px; }
   .cta-note { font-size: 0.84rem; color: var(--muted); margin-top: 13px; }
 
-  /* ── Reveal on scroll ── */
-  .rv { opacity: 0; transform: translateY(22px); transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1); }
-  .rv.in { opacity: 1; transform: none; }
+  /* ── Reveal on scroll ──
+     Hidden only once the head script has confirmed JavaScript is running. If
+     it never does, every block stays visible rather than the page rendering as
+     an empty column, which is what a sales page must never do. The hero is
+     deliberately not animated at all: it has to paint instantly. */
+  .rv { transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1); }
+  .js .rv { opacity: 0; transform: translateY(22px); }
+  .js .rv.in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) {
-    .rv { opacity: 1; transform: none; transition: none; }
+    .js .rv, .js .rv.in { opacity: 1; transform: none; transition: none; }
     html { scroll-behavior: auto; }
   }
 
@@ -254,7 +260,7 @@
 <!-- ══ HERO ══ -->
 <header class="hero">
   <div class="wrap hero-grid">
-    <div class="rv">
+    <div>
       <div class="eyebrow">For private tutors</div>
       <h1>Stop guessing who&nbsp;<span class="hl">still owes you</span>&nbsp;money.</h1>
       <p class="lede">
@@ -275,7 +281,7 @@
       </div>
     </div>
 
-    <div class="rv">
+    <div>
       <div class="mock">
         <div class="mock-bar">
           <div>
