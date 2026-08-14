@@ -553,7 +553,7 @@
 
   // Reveal on scroll. Falls back to everything visible if unsupported, so the
   // page can never end up blank because an observer didn't fire.
-  const items = document.querySelectorAll('.rv');
+  const items = Array.from(document.querySelectorAll('.rv'));
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver((entries) => {
       entries.forEach((e, i) => {
@@ -563,6 +563,25 @@
       });
     }, { rootMargin: '0px 0px -60px 0px', threshold: 0.08 });
     items.forEach(el => io.observe(el));
+
+    // Observer callbacks get throttled when a tab is backgrounded, and can be
+    // outrun by a fast scroll on a slow phone. Either way the reader would be
+    // looking at an empty screen, so a cheap scroll check sweeps up anything
+    // the observer hasn't got to yet.
+    const sweep = () => {
+      for (const el of items) {
+        if (el.classList.contains('in')) continue;
+        const r = el.getBoundingClientRect();
+        if (r.top < innerHeight && r.bottom > 0) el.classList.add('in');
+      }
+    };
+    let queued = false;
+    addEventListener('scroll', () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => { queued = false; sweep(); });
+    }, { passive: true });
+    addEventListener('resize', sweep, { passive: true });
   } else {
     items.forEach(el => el.classList.add('in'));
   }
