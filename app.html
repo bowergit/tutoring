@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Never chase a tutoring payment again</title>
+<meta name="description" content="Your lessons come out of your Google Calendar automatically. See who owes what, chase it in one tap, and give every parent their own page. £5 a month. First three months free.">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0d1b3e">
+<meta property="og:title" content="Never chase a tutoring payment again">
+<meta property="og:description" content="Your lessons come out of your calendar automatically. Know exactly who owes what. £5 a month, first three months free.">
+<meta property="og:type" content="website">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f4f1; --bg-tint: #ecebe6; --card: #ffffff; --card-2: #f7f6f3; --card-3: #f1efea;
+    --line: #e7e3db; --ink: #16150f; --ink-dim: #605c53; --muted: #9a958c;
+    --accent: #1f7a45; --accent-2: #2b9757; --accent-light: #e9f4ed;
+    --warn: #b8481c; --warn-light: #fdf0ea; --gold: #8f701f; --gold-light: #faf2df;
+    --r-md: 13px; --r-lg: 17px; --r-xl: 24px;
+    --sh-1: 0 1px 2px rgba(22,21,15,.06);
+    --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
+    --sh-3: 0 2px 6px rgba(22,21,15,.06), 0 16px 40px -12px rgba(22,21,15,.22);
+    --maxw: 1080px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #131210; --bg-tint: #191714; --card: #1d1b18; --card-2: #24211d; --card-3: #2b2823;
+      --line: #34302a; --ink: #f2eee6; --ink-dim: #a8a297; --muted: #78736a;
+      --accent: #4fb877; --accent-2: #63c98a; --accent-light: #13251a;
+      --warn: #e07d46; --warn-light: #2a1408; --gold: #d9bf94; --gold-light: #2a2317;
+      --sh-1: 0 1px 2px rgba(0,0,0,.4);
+      --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
+      --sh-3: 0 2px 8px rgba(0,0,0,.5), 0 20px 48px -14px rgba(0,0,0,.75);
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+    line-height: 1.55; overflow-x: hidden;
+  }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
+  section { padding: 76px 0; }
+  h1, h2, h3 { line-height: 1.15; letter-spacing: -0.03em; margin: 0 0 14px; }
+  h1 { font-size: clamp(2.1rem, 6vw, 3.9rem); font-weight: 750; }
+  h2 { font-size: clamp(1.6rem, 4vw, 2.6rem); font-weight: 720; }
+  h3 { font-size: 1.12rem; font-weight: 680; letter-spacing: -0.02em; }
+  p  { margin: 0 0 15px; }
+  .lede { font-size: clamp(1.02rem, 2.1vw, 1.24rem); color: var(--ink-dim); max-width: 620px; }
+  .eyebrow {
+    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 13px;
+  }
+  .muted { color: var(--muted); }
+
+  /* ── Nav ── */
+  nav {
+    position: sticky; top: 0; z-index: 60; background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(14px); border-bottom: 1px solid var(--line);
+  }
+  .nav-in { display: flex; align-items: center; gap: 14px; height: 62px; }
+  .logo { font-weight: 750; letter-spacing: -0.03em; font-size: 1.05rem; margin-right: auto; }
+  .logo span { color: var(--accent); }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 13px 22px; border-radius: 100px; font-weight: 650; font-size: 0.95rem;
+    text-decoration: none; cursor: pointer; border: 1px solid transparent;
+    font-family: inherit; transition: transform .16s cubic-bezier(.2,.8,.2,1), filter .16s, box-shadow .16s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--accent) 70%, transparent); }
+  .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.07); }
+  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btn-ghost:hover { border-color: var(--accent); }
+  .btn-sm { padding: 9px 16px; font-size: 0.86rem; }
+  .btn-lg { padding: 16px 30px; font-size: 1.04rem; }
+  .cta-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 26px; }
+  .cta-note { font-size: 0.84rem; color: var(--muted); margin-top: 13px; }
+
+  /* ── Reveal on scroll ── */
+  .rv { opacity: 0; transform: translateY(22px); transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1); }
+  .rv.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .rv { opacity: 1; transform: none; transition: none; }
+    html { scroll-behavior: auto; }
+  }
+
+  /* ── Hero ── */
+  .hero { padding: 58px 0 30px; position: relative; }
+  .hero::before {
+    content: ''; position: absolute; inset: -20% -30% auto -30%; height: 620px; z-index: -1;
+    background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 70%);
+    pointer-events: none;
+  }
+  .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 46px; align-items: center; }
+  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 34px; } }
+  .hl { color: var(--accent); }
+
+  .trust { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
+  .trust div { font-size: 0.83rem; color: var(--muted); }
+  .trust b { display: block; color: var(--ink); font-size: 1.02rem; font-weight: 700; }
+
+  /* ── App mockup ── */
+  .mock {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-xl);
+    box-shadow: var(--sh-3); padding: 15px; position: relative; overflow: hidden;
+  }
+  .mock-bar { display: flex; align-items: center; gap: 9px; margin-bottom: 13px; }
+  .mock-title { font-weight: 720; letter-spacing: -0.02em; font-size: 1rem; }
+  .mock-sub { font-size: 0.72rem; color: var(--muted); }
+  .pill-btn { margin-left: auto; background: var(--accent); color: #fff; border-radius: 100px; padding: 6px 13px; font-size: 0.76rem; font-weight: 650; }
+
+  .srow {
+    display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: var(--r-md);
+    background: var(--card-2); border: 1px solid var(--line); margin-bottom: 8px;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .dot.ok { background: var(--accent); } .dot.warn { background: var(--warn); }
+  .sname { font-weight: 640; font-size: 0.92rem; }
+  .chip {
+    font-size: 0.68rem; font-weight: 650; padding: 3px 9px; border-radius: 100px;
+    background: var(--accent-light); color: var(--accent); white-space: nowrap;
+  }
+  .chip.warn { background: var(--warn-light); color: var(--warn); }
+  .chip.neutral { background: var(--card-3); color: var(--ink-dim); }
+  .spacer { margin-left: auto; }
+
+  /* ── Sync animation ── */
+  .flow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin-top: 8px; }
+  @media (max-width: 620px) { .flow { grid-template-columns: 1fr; } .flow .arrow { transform: rotate(90deg); margin: 2px auto; } }
+  .flow-card { background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: 13px; }
+  .cal-ev {
+    font-size: 0.78rem; padding: 7px 9px; border-radius: 7px; margin-bottom: 6px;
+    background: #e8703a; color: #fff; font-weight: 600;
+  }
+  .cal-ev:nth-child(2) { background: #d9603a; } .cal-ev:nth-child(3) { background: #c9542f; }
+  .arrow { font-size: 1.5rem; color: var(--accent); animation: nudge 1.9s ease-in-out infinite; }
+  @keyframes nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(6px); } }
+
+  /* ── Cards / grid ── */
+  .grid { display: grid; gap: 18px; }
+  .g2 { grid-template-columns: repeat(2, 1fr); }
+  .g3 { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 860px) { .g2, .g3 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+    padding: 24px; box-shadow: var(--sh-1);
+  }
+  .card .ico { font-size: 1.5rem; margin-bottom: 10px; display: block; }
+
+  /* ── Pain list ── */
+  .pain { list-style: none; padding: 0; margin: 0; }
+  .pain li {
+    padding: 13px 0 13px 32px; border-bottom: 1px solid var(--line); position: relative;
+    color: var(--ink-dim); font-size: 1rem;
+  }
+  .pain li::before {
+    content: '✕'; position: absolute; left: 4px; top: 13px; color: var(--warn); font-weight: 700;
+  }
+  .pain li:last-child { border-bottom: none; }
+
+  /* ── Phone / WhatsApp ── */
+  .phone {
+    width: 100%; max-width: 320px; margin: 0 auto; background: #0b141a; border-radius: 30px;
+    padding: 12px 10px 18px; box-shadow: var(--sh-3); border: 1px solid #223;
+  }
+  .wa-top { display: flex; align-items: center; gap: 9px; padding: 6px 8px 12px; color: #e9edef; }
+  .wa-av { width: 30px; height: 30px; border-radius: 50%; background: #6b7c85; display: grid; place-items: center; font-size: 0.8rem; }
+  .wa-name { font-size: 0.86rem; font-weight: 600; }
+  .wa-body { background: #0b141a; padding: 6px 6px 0; min-height: 190px; }
+  .bub {
+    background: #005c4b; color: #e9edef; padding: 9px 11px; border-radius: 12px 12px 3px 12px;
+    font-size: 0.83rem; line-height: 1.45; margin-left: auto; max-width: 92%; box-shadow: 0 1px 1px rgba(0,0,0,.3);
+  }
+  .bub .tick { display: block; text-align: right; font-size: 0.63rem; color: #8fd6c2; margin-top: 3px; }
+  .typing { display: inline-block; }
+  .caret { display: inline-block; width: 2px; height: 1em; background: #8fd6c2; vertical-align: text-bottom; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── Screenshot slots ── */
+  .shot {
+    border: 2px dashed var(--gold); border-radius: var(--r-lg); background: var(--gold-light);
+    padding: 28px 22px; text-align: center; color: var(--gold);
+  }
+  .shot b { display: block; font-size: 0.95rem; margin-bottom: 5px; }
+  .shot span { font-size: 0.82rem; opacity: .85; }
+
+  /* ── Offer ── */
+  .offer {
+    background: linear-gradient(165deg, var(--card) 0%, var(--card-2) 100%);
+    border: 1px solid var(--line); border-radius: var(--r-xl); padding: 34px; box-shadow: var(--sh-3);
+    position: relative; overflow: hidden;
+  }
+  .offer::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, var(--gold), var(--accent-2));
+  }
+  .price { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 4px; }
+  .price .amt { font-size: 3.4rem; font-weight: 780; letter-spacing: -0.05em; }
+  .price .per { color: var(--muted); font-weight: 600; }
+  .stack { list-style: none; padding: 0; margin: 20px 0; }
+  .stack li { padding: 9px 0 9px 30px; position: relative; border-bottom: 1px dashed var(--line); font-size: 0.95rem; }
+  .stack li:last-child { border-bottom: none; }
+  .stack li::before { content: '✓'; position: absolute; left: 3px; color: var(--accent); font-weight: 800; }
+  .stack .val { float: right; color: var(--muted); font-size: 0.86rem; }
+
+  .banner {
+    background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: var(--r-lg); padding: 18px 20px; color: var(--accent); font-weight: 600;
+  }
+
+  /* ── Referral ── */
+  .ref-step {
+    display: flex; gap: 14px; align-items: flex-start; padding: 16px 0; border-bottom: 1px solid var(--line);
+  }
+  .ref-step:last-child { border-bottom: none; }
+  .ref-n {
+    flex: 0 0 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff;
+    display: grid; place-items: center; font-weight: 700; font-size: 0.9rem;
+  }
+
+  /* ── FAQ ── */
+  details {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
+    padding: 15px 18px; margin-bottom: 10px;
+  }
+  details[open] { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
+  summary { cursor: pointer; font-weight: 640; list-style: none; font-size: 0.98rem; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: '+'; float: right; color: var(--accent); font-weight: 700; }
+  details[open] summary::after { content: '–'; }
+  details p { margin: 11px 0 0; color: var(--ink-dim); font-size: 0.94rem; }
+
+  footer { border-top: 1px solid var(--line); padding: 34px 0; color: var(--muted); font-size: 0.86rem; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-in">
+    <div class="logo">Bower<span>Maths</span></div>
+    <a href="#how" class="btn btn-ghost btn-sm" style="display:none" id="navHow">How it works</a>
+    <a href="#price" class="btn btn-primary btn-sm">Start free</a>
+  </div>
+</nav>
+
+<!-- ══ HERO ══ -->
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div class="rv">
+      <div class="eyebrow">For private tutors</div>
+      <h1>Stop guessing who&nbsp;<span class="hl">still owes you</span>&nbsp;money.</h1>
+      <p class="lede">
+        Your lessons already live in your Google Calendar. This turns them into a
+        running record of who was taught, who has paid, and who hasn't, without you
+        typing a timetable ever again.
+      </p>
+      <div class="cta-row">
+        <a href="#price" class="btn btn-primary btn-lg">Start free for 3 months</a>
+        <a href="#how" class="btn btn-ghost btn-lg">See how it works</a>
+      </div>
+      <p class="cta-note">No card. Setup takes about three minutes.</p>
+
+      <div class="trust">
+        <div><b>3 min</b>to set up</div>
+        <div><b>£5</b>a month after your free months</div>
+        <div><b>0</b>lessons typed in by hand</div>
+      </div>
+    </div>
+
+    <div class="rv">
+      <div class="mock">
+        <div class="mock-bar">
+          <div>
+            <div class="mock-title">Sam's Maths Tutoring</div>
+            <div class="mock-sub">7 active · synced 2 min ago</div>
+          </div>
+          <div class="pill-btn">+ Add</div>
+        </div>
+
+        <div class="srow"><span class="dot ok"></span><span class="sname">Amira K.</span>
+          <span class="spacer"></span><span class="chip">Paid up</span><span class="chip neutral">Tue 16:00</span></div>
+        <div class="srow"><span class="dot warn"></span><span class="sname">Joe F.</span>
+          <span class="spacer"></span><span class="chip warn">Owes £180</span><span class="chip neutral">Y11</span></div>
+        <div class="srow"><span class="dot ok"></span><span class="sname">Priya S.</span>
+          <span class="spacer"></span><span class="chip">Paid up</span><span class="chip neutral">Zoom</span></div>
+        <div class="srow"><span class="dot warn"></span><span class="sname">Tom B.</span>
+          <span class="spacer"></span><span class="chip warn">Owes £90</span><span class="chip neutral">Y9</span></div>
+      </div>
+      <p class="cta-note" style="text-align:center">Two of them owe you £270. You'd have found that out in October.</p>
+    </div>
+  </div>
+</header>
+
+<!-- ══ PAIN ══ -->
+<section style="background:var(--bg-tint)">
+  <div class="wrap">
+    <div class="grid g2" style="align-items:center;gap:44px">
+      <div class="rv">
+        <div class="eyebrow">Sound familiar?</div>
+        <h2>Most tutors track money in their head. It leaks.</h2>
+        <p class="lede">
+          Not because you're disorganised. Because there are twelve students, three
+          reschedules a week, and a bank app that just says "FASTER PAYMENT".
+        </p>
+      </div>
+      <ul class="pain rv">
+        <li>You think someone's two lessons behind but you're not certain enough to ask.</li>
+        <li>A parent says "I paid you in September" and you have no way to check.</li>
+        <li>You write it in Notes, then stop updating Notes by week three.</li>
+        <li>You cancel a lesson and forget to take it off the total.</li>
+        <li>You quietly write off money every term because chasing it feels awkward.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ══ HOW ══ -->
+<section id="how">
+  <div class="wrap">
+    <div class="rv" style="max-width:640px">
+      <div class="eyebrow">How it works</div>
+      <h2>You already did the admin. It was called booking the lesson.</h2>
+      <p class="lede">Connect your calendar once. Everything after that is automatic.</p>
+    </div>
+
+    <div class="flow rv" style="margin-top:34px">
+      <div class="flow-card">
+        <div class="mock-sub" style="margin-bottom:9px">Your Google Calendar</div>
+        <div class="cal-ev">Amira maths lesson · Tue 16:00</div>
+        <div class="cal-ev">Joe maths lesson · Wed 17:30</div>
+        <div class="cal-ev">Priya maths lesson · Thu 18:00</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="flow-card">
+        <div class="mock-sub" style="margin-bottom:9px">Your dashboard, minutes later</div>
+        <div class="srow" style="margin-bottom:6px"><span class="dot ok"></span><span class="sname">Amira</span><span class="spacer"></span><span class="chip">Paid</span></div>
+        <div class="srow" style="margin-bottom:6px"><span class="dot warn"></span><span class="sname">Joe</span><span class="spacer"></span><span class="chip warn">Owes £180</span></div>
+        <div class="srow" style="margin-bottom:0"><span class="dot ok"></span><span class="sname">Priya</span><span class="spacer"></span><span class="chip">Paid</span></div>
+      </div>
+    </div>
+
+    <div class="grid g3" style="margin-top:34px">
+      <div class="card rv"><span class="ico">📅</span><h3>It reads your calendar</h3>
+        <p class="muted" style="font-size:.93rem">Finds the names in your event titles and offers to turn each one into a student. One tap each. It re-checks every couple of hours, so a lesson you book on your phone is in here before you get home.</p></div>
+      <div class="card rv"><span class="ico">⚖️</span><h3>It does the arithmetic</h3>
+        <p class="muted" style="font-size:.93rem">Every payment settles the oldest unpaid lesson first, so the number on each card is simply what that family still owes. Change someone's rate and it recalculates the history properly.</p></div>
+      <div class="card rv"><span class="ico">💬</span><h3>It writes the awkward message</h3>
+        <p class="muted" style="font-size:.93rem">One tap opens WhatsApp with the amount, the number of lessons and a polite ask already written. You just press send.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ WHATSAPP ══ -->
+<section style="background:var(--bg-tint)">
+  <div class="wrap grid g2" style="align-items:center;gap:44px">
+    <div class="rv">
+      <div class="eyebrow">The bit everyone hates</div>
+      <h2>Asking for money, without the stomach drop.</h2>
+      <p class="lede">
+        You press one button. It counts the unpaid lessons, adds them up, and opens
+        WhatsApp with it written out. Nothing sends until you tap send.
+      </p>
+      <p class="muted" style="font-size:.93rem">
+        Most tutors put this off for weeks. It takes four seconds.
+      </p>
+    </div>
+
+    <div class="rv">
+      <div class="phone">
+        <div class="wa-top">
+          <div class="wa-av">K</div>
+          <div><div class="wa-name">Karen (Joe's mum)</div><div style="font-size:.68rem;opacity:.6">online</div></div>
+        </div>
+        <div class="wa-body">
+          <div class="bub"><span id="waText" class="typing"></span><span class="caret"></span>
+            <span class="tick">17:42 ✓✓</span>
+          </div>
+        </div>
+      </div>
+      <p class="cta-note" style="text-align:center">Written for you. Sent by you.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ SCREENSHOTS ══ -->
+<section>
+  <div class="wrap">
+    <div class="rv" style="max-width:640px">
+      <div class="eyebrow">Inside</div>
+      <h2>What you actually get.</h2>
+      <p class="lede">Built on a phone, for a tutor standing in a hallway between lessons.</p>
+    </div>
+
+    <div class="grid g2" style="margin-top:30px">
+      <div class="rv shot"><b>SCREENSHOT 1 — Student card, expanded</b>
+        <span>Turn Privacy mode ON first. Show upcoming lessons, history, and the green "paid" / orange "unpaid" states.</span></div>
+      <div class="rv shot"><b>SCREENSHOT 2 — The WhatsApp payment message</b>
+        <span>Tap Request payment so WhatsApp opens pre-filled, then screenshot that.</span></div>
+      <div class="rv shot"><b>SCREENSHOT 3 — Calendar sync finding students</b>
+        <span>Tools → Google Calendar → Sync now, showing the "Add student" suggestions.</span></div>
+      <div class="rv shot"><b>SCREENSHOT 4 — A parent's lesson page</b>
+        <span>Open any student link. This one sells the professionalism.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ PARENT PAGE ══ -->
+<section style="background:var(--bg-tint)">
+  <div class="wrap grid g2" style="align-items:center;gap:44px">
+    <div class="rv">
+      <div class="eyebrow">Looks expensive. Isn't.</div>
+      <h2>Every parent gets their own page.</h2>
+      <p class="lede">
+        A private link showing their child's upcoming lessons and exactly what's been
+        paid. No login, no app to install. They stop asking you, and you look like an
+        operation rather than a bloke with a notebook.
+      </p>
+      <p class="muted" style="font-size:.93rem">Tapping any lesson tells them the date it was paid.</p>
+    </div>
+    <div class="rv">
+      <div class="mock" style="max-width:340px;margin:0 auto">
+        <div style="font-weight:750;font-size:1.05rem;letter-spacing:-.02em">Amira</div>
+        <div class="mock-sub" style="margin-bottom:14px">Your lessons and payment status</div>
+        <div class="srow"><span class="sname" style="font-weight:560">Tue 19 Aug · 16:00</span><span class="spacer"></span><span class="chip neutral">Scheduled</span></div>
+        <div class="srow"><span class="sname" style="font-weight:560">Tue 26 Aug · 16:00</span><span class="spacer"></span><span class="chip neutral">Scheduled</span></div>
+        <div class="mock-sub" style="margin:14px 0 8px">RECENT</div>
+        <div class="srow"><span class="sname" style="font-weight:560">Tue 12 Aug · 16:00</span><span class="spacer"></span><span class="chip">Paid</span></div>
+        <div class="srow" style="margin-bottom:0"><span class="sname" style="font-weight:560">Tue 5 Aug · 16:00</span><span class="spacer"></span><span class="chip">Paid</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ OFFER ══ -->
+<section id="price">
+  <div class="wrap">
+    <div class="rv" style="max-width:640px">
+      <div class="eyebrow">The offer</div>
+      <h2>One lesson pays for your first eighteen months.</h2>
+      <p class="lede">
+        If you teach at £40 an hour, this costs you about seven minutes of teaching a
+        month. It only has to catch one forgotten lesson a year to have paid for itself
+        several times over.
+      </p>
+    </div>
+
+    <div class="grid g2" style="margin-top:30px;align-items:start">
+      <div class="offer rv">
+        <div class="eyebrow" style="margin-bottom:6px">Everything, one price</div>
+        <div class="price"><span class="amt">£5</span><span class="per">/ month</span></div>
+        <p class="muted" style="font-size:.9rem">First 3 months free. Cancel any time, in one tap.</p>
+
+        <ul class="stack">
+          <li>Automatic calendar sync, every 2 hours <span class="val">no typing</span></li>
+          <li>Who owes what, worked out for you <span class="val">oldest lesson first</span></li>
+          <li>One-tap payment requests <span class="val">pre-written</span></li>
+          <li>A private lesson page for every parent <span class="val">unlimited</span></li>
+          <li>Cash receipts sent over WhatsApp <span class="val">included</span></li>
+          <li>Rate changes that fix your history <span class="val">retrospective</span></li>
+          <li>Unlimited students <span class="val">no tiers</span></li>
+        </ul>
+
+        <a href="#start" class="btn btn-primary btn-lg" style="width:100%">Start my 3 free months</a>
+        <p class="cta-note" style="text-align:center">No card needed to start.</p>
+      </div>
+
+      <div class="rv">
+        <div class="banner" style="margin-bottom:18px">
+          If it doesn't find you money you'd forgotten about in the first three months,
+          don't pay for the fourth. Just tell me.
+        </div>
+
+        <div class="card">
+          <div class="eyebrow">Refer a tutor, both win</div>
+          <h3 style="margin-bottom:12px">Free months, stacked.</h3>
+          <div class="ref-step"><div class="ref-n">1</div><div>
+            <b>You start free for 3 months.</b>
+            <div class="muted" style="font-size:.9rem">No card, nothing to cancel if you hate it.</div></div></div>
+          <div class="ref-step"><div class="ref-n">2</div><div>
+            <b>Send it to a tutor you know.</b>
+            <div class="muted" style="font-size:.9rem">They get their own 3 free months.</div></div></div>
+          <div class="ref-step"><div class="ref-n">3</div><div>
+            <b>When they stay past the free period, you both get 3 more months free.</b>
+            <div class="muted" style="font-size:.9rem">Every single time. Refer four tutors who stick and you're free for a year.</div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FAQ ══ -->
+<section style="background:var(--bg-tint)">
+  <div class="wrap" style="max-width:760px">
+    <div class="rv"><div class="eyebrow">Questions</div><h2>The things people ask.</h2></div>
+    <div class="rv" style="margin-top:24px">
+      <details open><summary>Do I have to change how I book lessons?</summary>
+        <p>No. Keep putting them in Google Calendar exactly as you do now. It reads the student's name out of the event title. If your titles are odd, you can tell it what to look for.</p></details>
+      <details><summary>What if I teach something other than maths?</summary>
+        <p>It doesn't care what you teach. Lessons, students, money owed. Tutors of any subject use it the same way.</p></details>
+      <details><summary>Does it connect to my bank?</summary>
+        <p>No. You log payments yourself, which takes a couple of seconds, and it does the arithmetic from there. Bank connections are regulated and would push the price well past £5.</p></details>
+      <details><summary>Can parents see each other's information?</summary>
+        <p>No. Each parent's link only ever shows their own child's lessons and payments. They can't see your other students, your rates, or anything else.</p></details>
+      <details><summary>What happens to my data if I stop paying?</summary>
+        <p>Nothing is deleted. You keep read access to your records and can export them. Losing your payment history because you cancelled would be a rotten way to treat someone.</p></details>
+      <details><summary>Is it actually £5, or £5 and then more later?</summary>
+        <p>£5 a month, everything included, unlimited students. If the price ever rises, it won't rise for anyone who already signed up.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ══ FINAL CTA ══ -->
+<section id="start">
+  <div class="wrap" style="text-align:center;max-width:680px">
+    <div class="rv">
+      <h2>Find out what you're owed.</h2>
+      <p class="lede" style="margin:0 auto 6px">
+        Three minutes to set up. Three months free. Most tutors find at least one lesson
+        they'd have never billed for.
+      </p>
+      <div class="cta-row" style="justify-content:center">
+        <a class="btn btn-primary btn-lg" href="https://wa.me/447407437292?text=Hi%20Daniel%2C%20I%27d%20like%20to%20try%20the%20tutoring%20tracker.">Message me on WhatsApp</a>
+        <a class="btn btn-ghost btn-lg" href="mailto:daniel@bowermaths.co.uk?subject=Tutoring%20tracker%20-%203%20free%20months">Email me</a>
+      </div>
+      <p class="cta-note">I'll set your account up myself and walk you through it.</p>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+    <div>© <span id="yr"></span> Bower Maths</div>
+    <div style="margin-left:auto"><a href="/" style="color:var(--accent);text-decoration:none">Already have an account? Sign in →</a></div>
+  </div>
+</footer>
+
+<script>
+  document.getElementById('yr').textContent = new Date().getFullYear();
+
+  // Reveal on scroll. Falls back to everything visible if unsupported, so the
+  // page can never end up blank because an observer didn't fire.
+  const items = document.querySelectorAll('.rv');
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((e, i) => {
+        if (!e.isIntersecting) return;
+        setTimeout(() => e.target.classList.add('in'), i * 70);
+        io.unobserve(e.target);
+      });
+    }, { rootMargin: '0px 0px -60px 0px', threshold: 0.08 });
+    items.forEach(el => io.observe(el));
+  } else {
+    items.forEach(el => el.classList.add('in'));
+  }
+
+  // The real message the app generates, typed out once the phone scrolls into
+  // view. Word by word rather than character by character so it reads like a
+  // message arriving instead of a gimmick.
+  const MSG = "Hi Karen! Just a note that we have 2 outstanding sessions totalling £160. Please could you settle this when you get the chance? Thanks!";
+  const target = document.getElementById('waText');
+  let typed = false;
+  function typeIt() {
+    if (typed) return; typed = true;
+    const words = MSG.split(' ');
+    let i = 0;
+    (function next() {
+      if (i >= words.length) return;
+      target.textContent += (i ? ' ' : '') + words[i++];
+      setTimeout(next, 55 + Math.random() * 45);
+    })();
+  }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    target.textContent = MSG;
+  } else if ('IntersectionObserver' in window) {
+    const io2 = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) typeIt(); }), { threshold: 0.4 });
+    io2.observe(target.closest('.phone'));
+  } else {
+    target.textContent = MSG;
+  }
+</script>
+</body>
+</html>
