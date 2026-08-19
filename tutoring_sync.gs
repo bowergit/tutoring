@@ -4,8 +4,7 @@
  * Calendar syncing used to live here too. It doesn't any more: every tutor's
  * calendar is now synced server-side via their own Google OAuth connection
  * (Tools → Google Calendar in the app), on a schedule, for everyone at once.
- * Two systems both writing and DELETING lessons was a genuine hazard — each
- * could independently decide a lesson was gone and remove it.
+ * Two systems both writing and DELETING lessons was a genuine hazard.
  *
  * What's left is past papers, which still needs Apps Script: reading a
  * spreadsheet needs a Sheets scope the calendar connection doesn't ask for.
@@ -20,9 +19,7 @@
  *                             students. The service key bypasses row-level
  *                             security, so without this filter the script reads
  *                             and writes every tutor's students, not just yours.
- * 2. ONE daily time-driven trigger on syncPastPapers. Daily is right — paper
- *    scores change a few times a week at most, and each run opens every
- *    student's spreadsheet.
+ * 2. ONE daily time-driven trigger on syncPastPapers.
  */
 
 const PAPER_HEADER_PATTERN = /date\s*taken/i;
@@ -35,34 +32,35 @@ function syncPastPapers() {
   }
   if (!config.ownerId) {
     throw new Error('Missing TUTOR_OWNER_ID script property — refusing to run ' +
-      'unscoped, since the service key would otherwise read every tutor\'s students.');
+      'unscoped, since the service key would otherwise read every tutor of ' +
+      'every account, not just yours.');
   }
 
   const students = fetchStudentsWithSheets_(config);
-  let updated = 0;
-  let failed = 0;
+  let updated = 0, failed = 0, papers = 0;
 
   students.forEach(s => {
     try {
-      const latest = latestPaperFromSheet_(s.spreadsheet_url);
+      const found = papersFromSheet_(s.spreadsheet_url);
+      replacePapers_(config, s.id, found);
+      papers += found.length;
+      // Newest first, so the chip on the student card stays as it was.
+      const latest = found.length
+        ? found.slice().sort((a, b) => b.date.localeCompare(a.date))[0]
+        : null;
       if (patchStudentPaper_(config, s.id, latest)) updated++; else failed++;
     } catch (err) {
       failed++;
-      Logger.log('Could not read ' + s.name + "'s sheet: " + err);
+      Logger.log('Could not read ' + s.name + ' sheet: ' + err);
     }
   });
 
-  Logger.log('Papers — updated: ' + updated + ' | failed: ' + failed);
+  Logger.log('Papers — students updated: ' + updated + ' | failed: ' + failed +
+             ' | papers recorded: ' + papers);
 }
 
-/**
- * Kept so a trigger still pointing at the old name keeps working. Without it
- * an un-updated trigger fails silently every run and paper scores just quietly
- * stop updating.
- */
-function syncTutoring() {
-  syncPastPapers();
-}
+/** Kept so a trigger still pointing at an older name keeps working. */
+function syncTutoring() { syncPastPapers(); }
 
 // ─── Supabase ────────────────────────────────────────────────────────────
 
@@ -76,10 +74,7 @@ function getSupabaseConfig_() {
 }
 
 function supabaseHeaders_(config) {
-  return {
-    'apikey': config.key,
-    'Authorization': 'Bearer ' + config.key
-  };
+  return { 'apikey': config.key, 'Authorization': 'Bearer ' + config.key };
 }
 
 function fetchStudentsWithSheets_(config) {
@@ -89,14 +84,52 @@ function fetchStudentsWithSheets_(config) {
     '&spreadsheet_url=not.is.null' +
     '&owner_id=eq.' + config.ownerId;
   const response = UrlFetchApp.fetch(url, {
-    method: 'get',
-    headers: supabaseHeaders_(config),
-    muteHttpExceptions: true
+    method: 'get', headers: supabaseHeaders_(config), muteHttpExceptions: true
   });
   if (response.getResponseCode() !== 200) {
     throw new Error('Failed to fetch students: ' + response.getContentText());
   }
   return JSON.parse(response.getContentText());
+}
+
+/**
+ * The sheet is the source of truth, so the stored set is replaced wholesale
+ * rather than merged. Clearing a score in the sheet then removes the paper
+ * here too, which a merge would silently fail to do.
+ */
+function replacePapers_(config, studentId, papers) {
+  const del = UrlFetchApp.fetch(
+    config.url + '/rest/v1/tutoring_past_papers?student_id=eq.' + studentId,
+    { method: 'delete', headers: supabaseHeaders_(config), muteHttpExceptions: true }
+  );
+  if (del.getResponseCode() >= 300) {
+    Logger.log('Could not clear old papers for ' + studentId + ': ' + del.getContentText());
+    return;
+  }
+  if (papers.length === 0) return;
+
+  const rows = papers.map(p => ({
+    student_id: studentId,
+    owner_id: config.ownerId,
+    sheet_tab: p.tab,
+    paper_set: p.set,
+    paper_code: p.code,
+    score_raw: p.raw,
+    max_score: p.max,
+    percentage: p.pct,
+    date_taken: p.date
+  }));
+
+  const res = UrlFetchApp.fetch(config.url + '/rest/v1/tutoring_past_papers', {
+    method: 'post',
+    contentType: 'application/json',
+    headers: supabaseHeaders_(config),
+    payload: JSON.stringify(rows),
+    muteHttpExceptions: true
+  });
+  if (res.getResponseCode() >= 300) {
+    Logger.log('Failed to insert papers for ' + studentId + ': ' + res.getContentText());
+  }
 }
 
 function patchStudentPaper_(config, studentId, latest) {
@@ -108,15 +141,16 @@ function patchStudentPaper_(config, studentId, latest) {
       contentType: 'application/json',
       headers: supabaseHeaders_(config),
       payload: JSON.stringify({
-        last_paper_date:  latest ? latest.date  : null,
-        last_paper_score: latest ? latest.score : null,
-        last_paper_name:  latest ? latest.name  : null,
+        last_paper_date:  latest ? latest.date : null,
+        // The percentage, never the raw mark. A "Mark /80" column holding 20
+        // was being shown as "20%" when it is 25%.
+        last_paper_score: latest ? latest.pct : null,
+        last_paper_name:  latest ? (latest.set + ' ' + latest.code).trim() : null,
         papers_synced_at: new Date().toISOString()
       }),
       muteHttpExceptions: true
     }
   );
-
   const code = response.getResponseCode();
   if (code >= 200 && code < 300) return true;
   Logger.log('Failed to update student ' + studentId + ': ' + response.getContentText());
@@ -159,52 +193,86 @@ function resolvePaperDate_(value, today) {
   return candidate;
 }
 
-/** Most recent completed paper across every tab, or null. */
-function latestPaperFromSheet_(spreadsheetUrl) {
+/**
+ * How to read the score column, worked out from its own heading.
+ *
+ * "Percentage" is already 0-100. "Mark /80" and "mark out of 80" hold raw
+ * marks that have to be scaled. Guessing from the values alone is not safe:
+ * 46 is a plausible percentage and a plausible mark out of 80.
+ */
+function scoreScaleFromHeader_(header) {
+  const h = String(header || '').trim();
+  if (/percent|%/i.test(h)) return { max: null };
+  const outOf = h.match(/(?:\/|out\s*of)\s*(\d{1,3})/i);
+  if (outOf) return { max: parseInt(outOf[1], 10) };
+  // Nothing in the heading to go on. Treated as a percentage, which is what
+  // the tracker templates default to; anything over 100 is rejected below.
+  return { max: null };
+}
+
+function headerIndex_(row, re) {
+  for (let i = 0; i < row.length; i++) {
+    if (re.test(String(row[i] || '').trim())) return i;
+  }
+  return -1;
+}
+
+/** Every completed paper across every tab. */
+function papersFromSheet_(spreadsheetUrl) {
   const ss = SpreadsheetApp.openById(sheetIdFromUrl_(spreadsheetUrl));
   const today = new Date();
   today.setHours(23, 59, 59, 999);
-
-  let best = null;
+  const tz = Session.getScriptTimeZone();
+  const out = [];
 
   ss.getSheets().forEach(sheet => {
+    const tab = sheet.getName();
     const values = sheet.getDataRange().getValues();
 
     for (let r = 0; r < values.length; r++) {
-      for (let c = 0; c < values[r].length; c++) {
-        if (!PAPER_HEADER_PATTERN.test(String(values[r][c] || ''))) continue;
+      const cDate = headerIndex_(values[r], PAPER_HEADER_PATTERN);
+      if (cDate < 1) continue;
 
-        // Column to the left of "Date taken" holds the score.
-        for (let rr = r + 1; rr < values.length; rr++) {
-          const when = resolvePaperDate_(values[rr][c], today);
-          if (!when || when > today) continue;
-          if (best && when <= best.when) continue;
+      const cSet   = headerIndex_(values[r], /^paper\s*set$/i);
+      const cPaper = headerIndex_(values[r], /^paper$/i);
+      const cScore = cDate - 1;
+      const scale  = scoreScaleFromHeader_(values[r][cScore]);
 
-          const score = parseFloat(String(c > 0 ? values[rr][c - 1] : '').replace('%', ''));
+      // Paper set is a merged cell spanning its two or three papers, so only
+      // the first row of each group carries the text. Everything below it
+      // inherits that value until the next one appears.
+      let lastSet = '';
 
-          const nameParts = [];
-          for (let cc = 0; cc < Math.min(c - 1, 4); cc++) {
-            const raw = values[rr][cc];
-            // A date in these columns is the exam series ("June 2018"), not a
-            // timestamp. Left as-is it stringifies to the full JS date —
-            // "Fri Jun 01 2018 00:00:00 GMT+0100 (British Summer Time)" —
-            // which then shows up verbatim on the student's card.
-            const cell = (raw instanceof Date && !isNaN(raw))
-              ? Utilities.formatDate(raw, Session.getScriptTimeZone(), 'MMM yyyy')
-              : String(raw || '').trim();
-            if (cell) nameParts.push(cell);
-          }
+      for (let rr = r + 1; rr < values.length; rr++) {
+        const setCell = cSet >= 0 ? String(values[rr][cSet] || '').trim() : '';
+        if (setCell) lastSet = setCell;
 
-          best = {
-            when: when,
-            date: Utilities.formatDate(when, Session.getScriptTimeZone(), 'yyyy-MM-dd'),
-            score: isNaN(score) ? null : score,
-            name: nameParts.join(' ').slice(0, 80) || 'Past paper'
-          };
-        }
+        const when = resolvePaperDate_(values[rr][cDate], today);
+        if (!when || when > today) continue;
+
+        const cell = values[rr][cScore];
+        const raw = parseFloat(String(cell == null ? '' : cell).replace('%', ''));
+        if (isNaN(raw)) continue;
+
+        const pct = scale.max ? (raw / scale.max) * 100 : raw;
+        if (pct < 0 || pct > 100) continue;
+
+        out.push({
+          tab: tab,
+          set: lastSet,
+          code: cPaper >= 0 ? String(values[rr][cPaper] || '').trim() : '',
+          raw: raw,
+          max: scale.max,
+          pct: Math.round(pct * 10) / 10,
+          date: Utilities.formatDate(when, tz, 'yyyy-MM-dd')
+        });
       }
     }
   });
 
-  return best;
+  // The same paper listed twice on one tab would break the unique key, so the
+  // later reading wins.
+  const seen = {};
+  out.forEach(p => { seen[p.tab + '|' + p.set + '|' + p.code] = p; });
+  return Object.keys(seen).map(k => seen[k]);
 }

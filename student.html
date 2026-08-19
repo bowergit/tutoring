@@ -80,6 +80,43 @@
     background: var(--card); color: var(--ink); font-size: 0.88rem; font-weight: 600;
     text-decoration: none; font-family: inherit; box-shadow: var(--sh-2);
   }
+
+  /* ── Progress ── */
+  .prog { padding: 16px 15px 12px; }
+  .prog-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
+  .prog-exam { font-size: 0.74rem; color: var(--muted); margin-left: auto; text-align: right; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 6px; }
+  .kpi { text-align: center; padding: 9px 4px; background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r-md); }
+  .kpi b { display: block; font-size: 1.18rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1.15; }
+  .kpi span { display: block; font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px; }
+  .kpi.hero b { color: var(--accent); }
+  .trend {
+    display: inline-flex; align-items: center; gap: 5px; margin: 12px 0 2px;
+    font-size: 0.78rem; font-weight: 600; padding: 5px 10px; border-radius: 100px;
+  }
+  .trend.up   { background: var(--accent-light); color: var(--accent); }
+  .trend.down { background: var(--warn-light); color: var(--warn); }
+  .trend.flat { background: var(--card-2); color: var(--ink-dim); }
+  .trend small { font-weight: 500; opacity: .8; }
+  .chart-wrap { margin-top: 10px; }
+  .chart-wrap svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
+  .chart-cap {
+    font-size: 0.78rem; color: var(--ink-dim); text-align: center;
+    margin-top: 6px; min-height: 1.2em;
+  }
+  .papers-toggle {
+    display: block; width: 100%; text-align: center; padding: 10px 0 2px;
+    background: none; border: none; color: var(--muted); font-size: 0.8rem;
+    font-family: inherit; cursor: pointer;
+  }
+  .ptable { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 0.82rem; }
+  .ptable th {
+    text-align: left; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); font-weight: 700; padding: 6px 4px; border-bottom: 1px solid var(--line);
+  }
+  .ptable td { padding: 7px 4px; border-bottom: 1px solid var(--line); }
+  .ptable tr:last-child td { border-bottom: none; }
+  .ptable .num { text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
 </style>
 </head>
 <body>
@@ -149,6 +186,164 @@
     if (toggle) toggle.addEventListener('click', () => { upcomingExpanded = !upcomingExpanded; renderUpcoming(); });
   }
 
+  // ── Progress ──────────────────────────────────────────────────────────
+  // One series over time, so: a line, one hue, no legend. The y axis is fixed
+  // at 0–100 rather than fitted to the data, because a percentage axis that
+  // starts at 35 turns an ordinary term into a vertical climb.
+  const CH = { w: 440, h: 200, l: 30, r: 10, t: 14, b: 28 };
+
+  function scoreText(p) {
+    return p.max ? `${p.raw} / ${p.max} · ${p.pct}%` : `${p.pct}%`;
+  }
+  function shortDate(d) {
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  }
+
+  function chartSVG(papers) {
+    const x0 = CH.l, x1 = CH.w - CH.r, y0 = CH.t, y1 = CH.h - CH.b;
+    const yOf = pct => y1 - (pct / 100) * (y1 - y0);
+
+    const times = papers.map(p => new Date(p.date + 'T12:00:00').getTime());
+    const tMin = Math.min(...times), tMax = Math.max(...times);
+    // A single paper has no span to spread across, so it sits centred rather
+    // than collapsing onto the axis.
+    const xOf = t => (tMax === tMin) ? (x0 + x1) / 2 : x0 + ((t - tMin) / (tMax - tMin)) * (x1 - x0);
+
+    const pts = papers.map((p, i) => ({ ...p, x: xOf(times[i]), y: yOf(p.pct) }));
+
+    const grid = [0, 25, 50, 75, 100].map(v => `
+      <line x1="${x0}" y1="${yOf(v)}" x2="${x1}" y2="${yOf(v)}"
+            stroke="var(--line)" stroke-width="1" />
+      <text x="${x0 - 6}" y="${yOf(v) + 3.5}" text-anchor="end"
+            font-size="9" fill="var(--muted)">${v}</text>`).join('');
+
+    const line = pts.length > 1
+      ? `<polyline fill="none" stroke="var(--accent)" stroke-width="2"
+           stroke-linejoin="round" stroke-linecap="round"
+           points="${pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" />`
+      : '';
+    const area = pts.length > 1
+      ? `<path d="M${pts[0].x.toFixed(1)},${y1} ${pts.map(p => `L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} L${pts[pts.length-1].x.toFixed(1)},${y1} Z"
+           fill="var(--accent)" opacity="0.10" />`
+      : '';
+
+    // A 2px ring in the surface colour keeps points that land close together
+    // from merging into one blob.
+    const dots = pts.map((p, i) => `
+      <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${i === pts.length - 1 ? 5 : 3.5}"
+              fill="var(--accent)" stroke="var(--card)" stroke-width="2" data-i="${i}" />`).join('');
+
+    const last = pts[pts.length - 1];
+    // Labelled selectively: the most recent score only. A number on every
+    // point turns the line into a table nobody reads.
+    const lastLabel = `<text x="${Math.min(last.x, x1 - 14).toFixed(1)}" y="${(last.y - 11).toFixed(1)}"
+        text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent)">${last.pct}%</text>`;
+
+    const xLabels = (pts.length > 1 ? [pts[0], pts[pts.length - 1]] : [pts[0]])
+      .map((p, i) => `<text x="${p.x.toFixed(1)}" y="${CH.h - 8}"
+            text-anchor="${pts.length > 1 ? (i === 0 ? 'start' : 'end') : 'middle'}"
+            font-size="9" fill="var(--muted)">${shortDate(p.date)}</text>`).join('');
+
+    return {
+      svg: `<svg viewBox="0 0 ${CH.w} ${CH.h}" role="img"
+              aria-label="Past paper scores over time, ${pts.length} papers, most recent ${last.pct} percent">
+        ${grid}${area}${line}
+        <line id="chair" x1="0" y1="${y0}" x2="0" y2="${y1}" stroke="var(--accent)"
+              stroke-width="1" opacity="0" />
+        ${dots}${lastLabel}${xLabels}
+        <rect id="hit" x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="transparent" />
+      </svg>`,
+      pts
+    };
+  }
+
+  function renderProgress(pr) {
+    if (!pr) return '';
+    const { svg } = chartSVG(pr.papers);
+    const t = pr.trend;
+    const trendCls = t == null ? 'flat' : t > 0.5 ? 'up' : t < -0.5 ? 'down' : 'flat';
+    const trendTxt = t == null
+      ? 'First paper recorded'
+      : `${t > 0 ? '▲' : t < 0 ? '▼' : '■'} ${t > 0 ? '+' : ''}${t} points <small>${esc(pr.trend_basis)}</small>`;
+    const tier = pr.exam_label
+      ? esc(pr.exam_label.replace(/\b\w/g, c => c.toUpperCase()))
+      : '';
+
+    return `
+      <div class="section-label">Progress</div>
+      <div class="card prog">
+        <div class="prog-head">
+          <div style="font-weight:700;font-size:.95rem">Past papers</div>
+          <div class="prog-exam">${tier}</div>
+        </div>
+        <div class="kpis">
+          <div class="kpi hero"><b>${pr.latest.pct}%</b><span>Latest</span></div>
+          <div class="kpi"><b>${pr.average}%</b><span>Average</span></div>
+          <div class="kpi"><b>${pr.best.pct}%</b><span>Best</span></div>
+          <div class="kpi"><b>${pr.count}</b><span>Papers</span></div>
+        </div>
+        <div class="trend ${trendCls}">${trendTxt}</div>
+        <div class="chart-wrap">${svg}</div>
+        <div class="chart-cap" id="chartCap">${esc(pr.latest.label)} · ${shortDate(pr.latest.date)} · ${pr.latest.pct}%</div>
+        <button class="papers-toggle" id="papersToggle">Show every paper</button>
+        <div id="papersTable" hidden>
+          <table class="ptable">
+            <thead><tr><th>Paper</th><th>Date</th><th style="text-align:right">Score</th></tr></thead>
+            <tbody>
+              ${pr.papers.slice().reverse().map(p => `
+                <tr><td>${esc(p.label)}</td><td>${shortDate(p.date)}</td>
+                <td class="num">${esc(scoreText(p))}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  // Crosshair + caption. A tooltip that follows the finger is unreadable under
+  // it on a phone, so the reading appears in a fixed line beneath the chart.
+  function wireChart(pr) {
+    if (!pr) return;
+    const svg = app.querySelector('.chart-wrap svg');
+    const hit = svg && svg.querySelector('#hit');
+    const chair = svg && svg.querySelector('#chair');
+    const cap = app.querySelector('#chartCap');
+    if (!hit || !cap) return;
+
+    const { pts } = chartSVG(pr.papers);
+    const show = i => {
+      const p = pts[i];
+      chair.setAttribute('x1', p.x); chair.setAttribute('x2', p.x);
+      chair.setAttribute('opacity', '0.45');
+      svg.querySelectorAll('circle[data-i]').forEach(c => {
+        c.setAttribute('r', +c.dataset.i === i ? 6 : (+c.dataset.i === pts.length - 1 ? 5 : 3.5));
+      });
+      cap.textContent = `${p.label} · ${shortDate(p.date)} · ${scoreText(p)}`;
+    };
+    const locate = ev => {
+      const r = svg.getBoundingClientRect();
+      const x = ((ev.clientX - r.left) / r.width) * CH.w;
+      let best = 0, bd = Infinity;
+      pts.forEach((p, i) => { const d = Math.abs(p.x - x); if (d < bd) { bd = d; best = i; } });
+      show(best);
+    };
+    svg.addEventListener('pointermove', locate);
+    svg.addEventListener('pointerdown', locate);
+    svg.addEventListener('pointerleave', () => {
+      chair.setAttribute('opacity', '0');
+      svg.querySelectorAll('circle[data-i]').forEach(c => {
+        c.setAttribute('r', +c.dataset.i === pts.length - 1 ? 5 : 3.5);
+      });
+      cap.textContent = `${pr.latest.label} · ${shortDate(pr.latest.date)} · ${pr.latest.pct}%`;
+    });
+
+    const toggle = app.querySelector('#papersToggle');
+    const table = app.querySelector('#papersTable');
+    if (toggle && table) toggle.addEventListener('click', () => {
+      table.hidden = !table.hidden;
+      toggle.textContent = table.hidden ? 'Show every paper' : 'Hide papers';
+    });
+  }
+
   // One delegated listener handles every row, including ones added later by
   // "Show more" — no need to re-bind click handlers on every re-render.
   app.addEventListener('click', e => {
@@ -196,14 +391,16 @@
   portalData = data;
   app.innerHTML = `
     <h1>${esc(data.name)}</h1>
-    <div class="sub">Your lessons and payment status</div>
-    ${actions ? `<div class="actions">${actions}</div>` : ''}
+    <div class="sub">Progress, lessons and payment status</div>
+    ${renderProgress(data.progress)}
+    ${actions ? `<div class="actions" style="margin-top:18px">${actions}</div>` : ''}
     <div class="section-label">Upcoming</div>
     <div id="upcoming-section"></div>
     <div class="section-label">Recent</div>
     ${renderList(data.recent, 'rec-', false)}
   `;
   renderUpcoming();
+  wireChart(data.progress);
 })();
 </script>
 </body>
