@@ -68,11 +68,9 @@
   .logo { display:flex; align-items:center; gap:9px; font-weight: 780; letter-spacing: -0.03em; font-size: 1.08rem; margin-right: auto; }
   .logo span { color: var(--accent); }
   .brandmark {
-    width: 31px; height: 31px; border-radius: 10px; background: var(--ink);
-    display: grid; place-items: center; color: var(--card); box-shadow: var(--sh-1);
-    font-weight: 780; font-size: 0.92rem; letter-spacing: -0.08em;
+    width: 31px; height: 31px; border-radius: 10px; box-shadow: var(--sh-1);
+    display: block;
   }
-  .brandmark::before { content: '||||'; transform: rotate(-8deg); }
 
   /* ── Buttons ── */
   .btn {
@@ -257,7 +255,7 @@
 
 <nav>
   <div class="wrap nav-in">
-    <div class="logo"><span class="brandmark" aria-hidden="true"></span>Tutor<span>tally</span></div>
+    <div class="logo"><img class="brandmark" src="brand/tutortally-mark.svg" alt="" aria-hidden="true">Tutor<span>tally</span></div>
     <a href="#how" class="btn btn-ghost btn-sm" style="display:none" id="navHow">How it works</a>
     <a href="#price" class="btn btn-primary btn-sm">Start free</a>
   </div>

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tutortally logo preview</title>
+<style>
+  :root {
+    --ink: #15211f;
+    --paper: #f7f8f4;
+    --mint: #ecf4f1;
+    --teal: #0f766e;
+    --blue: #2563eb;
+    --coral: #d05b39;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "General Sans", Inter, "Segoe UI", Arial, sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    padding: 40px;
+  }
+  main { max-width: 980px; margin: 0 auto; display: grid; gap: 24px; }
+  section {
+    background: #fff;
+    border: 1px solid #dfe7e3;
+    border-radius: 18px;
+    padding: 28px;
+  }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -0.04em; }
+  p { margin: 0 0 22px; color: #596965; }
+  .logo { width: min(100%, 760px); height: auto; display: block; }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .tile {
+    min-height: 180px;
+    display: grid;
+    place-items: center;
+    border: 1px solid #dfe7e3;
+    border-radius: 16px;
+    background: var(--mint);
+  }
+  .tile.dark { background: #101716; }
+  .mark { width: 108px; height: 108px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+  .swatch { width: 116px; height: 76px; border-radius: 14px; padding: 10px; color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: end; }
+  @media (max-width: 720px) {
+    body { padding: 18px; }
+    .grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <section>
+    <h1>Tutortally logo</h1>
+    <p>A tally mark for counted lessons, crossed by the fifth stroke as a check against what is owed.</p>
+    <img class="logo" src="tutortally-logo.svg" alt="Tutortally logo">
+  </section>
+  <section>
+    <h1>Responsive marks</h1>
+    <div class="grid">
+      <div class="tile"><img class="mark" src="tutortally-mark.svg" alt="Tutortally mark"></div>
+      <div class="tile dark"><img class="mark" src="tutortally-mark.svg" alt="Tutortally mark on dark"></div>
+      <div class="tile"><img class="logo" src="tutortally-logo-reversed.svg" alt="Tutortally reversed logo"></div>
+    </div>
+  </section>
+  <section>
+    <h1>Colours</h1>
+    <div class="swatches">
+      <div class="swatch" style="background:#15211f">Ink<br>#15211f</div>
+      <div class="swatch" style="background:#0f766e">Teal<br>#0f766e</div>
+      <div class="swatch" style="background:#2563eb">Sync blue<br>#2563eb</div>
+      <div class="swatch" style="background:#d05b39">Chase coral<br>#d05b39</div>
+      <div class="swatch" style="background:#b7791f">Receipt gold<br>#b7791f</div>
+    </div>
+  </section>
+</main>
+</body>
+</html>
