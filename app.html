@@ -3,22 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Never chase a tutoring payment again</title>
-<meta name="description" content="Your lessons come out of your Google Calendar automatically. See who owes what, chase it in one tap, and give every parent their own page. £5 a month. First three months free.">
+<title>Tutortally - the tiny finance desk for solo tutors</title>
+<meta name="description" content="Tutortally turns a solo tutor's calendar into clear lesson records, payment totals, parent links, and polite chase messages. £5 a month. First three months free.">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<meta name="theme-color" content="#0d1b3e">
-<meta property="og:title" content="Never chase a tutoring payment again">
+<meta name="theme-color" content="#0f766e">
+<meta property="og:title" content="Tutortally - the tiny finance desk for solo tutors">
 <meta property="og:description" content="Your lessons come out of your calendar automatically. Know exactly who owes what. £5 a month, first three months free.">
 <meta property="og:type" content="website">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script>document.documentElement.classList.add('js')</script>
 <style>
   :root {
-    --bg: #f5f4f1; --bg-tint: #ecebe6; --card: #ffffff; --card-2: #f7f6f3; --card-3: #f1efea;
-    --line: #e7e3db; --ink: #16150f; --ink-dim: #605c53; --muted: #9a958c;
-    --accent: #1f7a45; --accent-2: #2b9757; --accent-light: #e9f4ed;
-    --warn: #b8481c; --warn-light: #fdf0ea; --gold: #8f701f; --gold-light: #faf2df;
+    --bg: #f7f8f4; --bg-tint: #ecf4f1; --card: #ffffff; --card-2: #f5f7f6; --card-3: #edf1ef;
+    --line: #dfe7e3; --ink: #15211f; --ink-dim: #596965; --muted: #87938f;
+    --accent: #0f766e; --accent-2: #2563eb; --accent-light: #e0f3ef;
+    --warn: #d05b39; --warn-light: #fff0e9; --gold: #b7791f; --gold-light: #fff4d8;
     --r-md: 13px; --r-lg: 17px; --r-xl: 24px;
     --sh-1: 0 1px 2px rgba(22,21,15,.06);
     --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
@@ -27,10 +27,10 @@
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #131210; --bg-tint: #191714; --card: #1d1b18; --card-2: #24211d; --card-3: #2b2823;
-      --line: #34302a; --ink: #f2eee6; --ink-dim: #a8a297; --muted: #78736a;
-      --accent: #4fb877; --accent-2: #63c98a; --accent-light: #13251a;
-      --warn: #e07d46; --warn-light: #2a1408; --gold: #d9bf94; --gold-light: #2a2317;
+      --bg: #101716; --bg-tint: #14211f; --card: #182321; --card-2: #1e2a27; --card-3: #26332f;
+      --line: #30413d; --ink: #eef8f5; --ink-dim: #a5b7b1; --muted: #7f918c;
+      --accent: #35c2b0; --accent-2: #7ba7ff; --accent-light: #12332f;
+      --warn: #ff8a63; --warn-light: #351d15; --gold: #e6bd62; --gold-light: #302612;
       --sh-1: 0 1px 2px rgba(0,0,0,.4);
       --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
       --sh-3: 0 2px 8px rgba(0,0,0,.5), 0 20px 48px -14px rgba(0,0,0,.75);
@@ -65,8 +65,14 @@
     backdrop-filter: blur(14px); border-bottom: 1px solid var(--line);
   }
   .nav-in { display: flex; align-items: center; gap: 14px; height: 62px; }
-  .logo { font-weight: 750; letter-spacing: -0.03em; font-size: 1.05rem; margin-right: auto; }
+  .logo { display:flex; align-items:center; gap:9px; font-weight: 780; letter-spacing: -0.03em; font-size: 1.08rem; margin-right: auto; }
   .logo span { color: var(--accent); }
+  .brandmark {
+    width: 31px; height: 31px; border-radius: 10px; background: var(--ink);
+    display: grid; place-items: center; color: var(--card); box-shadow: var(--sh-1);
+    font-weight: 780; font-size: 0.92rem; letter-spacing: -0.08em;
+  }
+  .brandmark::before { content: '||||'; transform: rotate(-8deg); }
 
   /* ── Buttons ── */
   .btn {
@@ -99,7 +105,7 @@
   }
 
   /* ── Hero ── */
-  .hero { padding: 58px 0 30px; position: relative; }
+  .hero { padding: 58px 0 30px; position: relative; overflow: hidden; }
   .hero::before {
     content: ''; position: absolute; inset: -20% -30% auto -30%; height: 620px; z-index: -1;
     background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 70%);
@@ -251,7 +257,7 @@
 
 <nav>
   <div class="wrap nav-in">
-    <div class="logo">Bower<span>Maths</span></div>
+    <div class="logo"><span class="brandmark" aria-hidden="true"></span>Tutor<span>tally</span></div>
     <a href="#how" class="btn btn-ghost btn-sm" style="display:none" id="navHow">How it works</a>
     <a href="#price" class="btn btn-primary btn-sm">Start free</a>
   </div>
@@ -261,12 +267,12 @@
 <header class="hero">
   <div class="wrap hero-grid">
     <div>
-      <div class="eyebrow">For private tutors</div>
-      <h1>Stop guessing who&nbsp;<span class="hl">still owes you</span>&nbsp;money.</h1>
+      <div class="eyebrow">For solo tutors</div>
+      <h1>Tutoring admin, <span class="hl">finally totalled</span>.</h1>
       <p class="lede">
-        Your lessons already live in your Google Calendar. This turns them into a
-        running record of who was taught, who has paid, and who hasn't, without you
-        typing a timetable ever again.
+        Tutortally turns your calendar into a clean record of lessons, payments,
+        parent links, and polite chase messages, without turning you into an
+        accounts department.
       </p>
       <div class="cta-row">
         <a href="#price" class="btn btn-primary btn-lg">Start free for 3 months</a>
@@ -285,7 +291,7 @@
       <div class="mock">
         <div class="mock-bar">
           <div>
-            <div class="mock-title">Sam's Maths Tutoring</div>
+            <div class="mock-title">Sam's Tutortally</div>
             <div class="mock-sub">7 active · synced 2 min ago</div>
           </div>
           <div class="pill-btn">+ Add</div>
@@ -300,7 +306,7 @@
         <div class="srow"><span class="dot warn"></span><span class="sname">Tom B.</span>
           <span class="spacer"></span><span class="chip warn">Owes £90</span><span class="chip neutral">Y9</span></div>
       </div>
-      <p class="cta-note" style="text-align:center">Two of them owe you £270. You'd have found that out in October.</p>
+      <p class="cta-note" style="text-align:center">Two of them owe you £270. Tutortally spotted it before the month got away.</p>
     </div>
   </div>
 </header>
@@ -310,7 +316,7 @@
   <div class="wrap">
     <div class="grid g2" style="align-items:center;gap:44px">
       <div class="rv">
-        <div class="eyebrow">Sound familiar?</div>
+        <div class="eyebrow">Built for one-person tutor businesses</div>
         <h2>Most tutors track money in their head. It leaks.</h2>
         <p class="lede">
           Not because you're disorganised. Because there are twelve students, three
@@ -346,7 +352,7 @@
       </div>
       <div class="arrow">→</div>
       <div class="flow-card">
-        <div class="mock-sub" style="margin-bottom:9px">Your dashboard, minutes later</div>
+        <div class="mock-sub" style="margin-bottom:9px">Tutortally, minutes later</div>
         <div class="srow" style="margin-bottom:6px"><span class="dot ok"></span><span class="sname">Amira</span><span class="spacer"></span><span class="chip">Paid</span></div>
         <div class="srow" style="margin-bottom:6px"><span class="dot warn"></span><span class="sname">Joe</span><span class="spacer"></span><span class="chip warn">Owes £180</span></div>
         <div class="srow" style="margin-bottom:0"><span class="dot ok"></span><span class="sname">Priya</span><span class="spacer"></span><span class="chip">Paid</span></div>
@@ -396,24 +402,24 @@
   </div>
 </section>
 
-<!-- ══ SCREENSHOTS ══ -->
+<!-- ══ WORKFLOW ══ -->
 <section>
   <div class="wrap">
     <div class="rv" style="max-width:640px">
       <div class="eyebrow">Inside</div>
-      <h2>What you actually get.</h2>
+      <h2>A calm little command centre.</h2>
       <p class="lede">Built on a phone, for a tutor standing in a hallway between lessons.</p>
     </div>
 
     <div class="grid g2" style="margin-top:30px">
-      <div class="rv shot"><b>SCREENSHOT 1 — Student card, expanded</b>
-        <span>Turn Privacy mode ON first. Show upcoming lessons, history, and the green "paid" / orange "unpaid" states.</span></div>
-      <div class="rv shot"><b>SCREENSHOT 2 — The WhatsApp payment message</b>
-        <span>Tap Request payment so WhatsApp opens pre-filled, then screenshot that.</span></div>
-      <div class="rv shot"><b>SCREENSHOT 3 — Calendar sync finding students</b>
-        <span>Tools → Google Calendar → Sync now, showing the "Add student" suggestions.</span></div>
-      <div class="rv shot"><b>SCREENSHOT 4 — A parent's lesson page</b>
-        <span>Open any student link. This one sells the professionalism.</span></div>
+      <div class="rv shot"><b>Student cards</b>
+        <span>Each family has a tidy card showing next lesson, recent history, paid status, and the balance that actually needs chasing.</span></div>
+      <div class="rv shot"><b>Payment requests</b>
+        <span>Tap once and WhatsApp opens with the amount, lesson count, and dates already written in human language.</span></div>
+      <div class="rv shot"><b>Calendar sync</b>
+        <span>New students and rescheduled lessons come from Google Calendar, so your teaching diary stays the source of truth.</span></div>
+      <div class="rv shot"><b>Parent pages</b>
+        <span>Every family gets a private lesson page, which makes your tiny tutoring business feel organised without extra admin.</span></div>
     </div>
   </div>
 </section>
@@ -422,12 +428,12 @@
 <section style="background:var(--bg-tint)">
   <div class="wrap grid g2" style="align-items:center;gap:44px">
     <div class="rv">
-      <div class="eyebrow">Looks expensive. Isn't.</div>
+      <div class="eyebrow">Small business energy</div>
       <h2>Every parent gets their own page.</h2>
       <p class="lede">
         A private link showing their child's upcoming lessons and exactly what's been
-        paid. No login, no app to install. They stop asking you, and you look like an
-        operation rather than a bloke with a notebook.
+        paid. No login, no app to install. They stop asking you, and you look like a
+        proper setup rather than a notebook with good intentions.
       </p>
       <p class="muted" style="font-size:.93rem">Tapping any lesson tells them the date it was paid.</p>
     </div>
@@ -460,7 +466,7 @@
 
     <div class="grid g2" style="margin-top:30px;align-items:start">
       <div class="offer rv">
-        <div class="eyebrow" style="margin-bottom:6px">Everything, one price</div>
+        <div class="eyebrow" style="margin-bottom:6px">Tutortally, one price</div>
         <div class="price"><span class="amt">£5</span><span class="per">/ month</span></div>
         <p class="muted" style="font-size:.9rem">First 3 months free. Cancel any time, in one tap.</p>
 
@@ -533,8 +539,8 @@
         they'd have never billed for.
       </p>
       <div class="cta-row" style="justify-content:center">
-        <a class="btn btn-primary btn-lg" href="https://wa.me/447407437292?text=Hi%20Daniel%2C%20I%27d%20like%20to%20try%20the%20tutoring%20tracker.">Message me on WhatsApp</a>
-        <a class="btn btn-ghost btn-lg" href="mailto:daniel@bowermaths.co.uk?subject=Tutoring%20tracker%20-%203%20free%20months">Email me</a>
+        <a class="btn btn-primary btn-lg" href="https://wa.me/447407437292?text=Hi%20Daniel%2C%20I%27d%20like%20to%20try%20Tutortally.">Message me on WhatsApp</a>
+        <a class="btn btn-ghost btn-lg" href="mailto:daniel@bowermaths.co.uk?subject=Tutortally%20-%203%20free%20months">Email me</a>
       </div>
       <p class="cta-note">I'll set your account up myself and walk you through it.</p>
     </div>
@@ -543,7 +549,7 @@
 
 <footer>
   <div class="wrap" style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
-    <div>© <span id="yr"></span> Bower Maths</div>
+    <div>© <span id="yr"></span> Tutortally</div>
     <div style="margin-left:auto"><a href="/" style="color:var(--accent);text-decoration:none">Already have an account? Sign in →</a></div>
   </div>
 </footer>

@@ -3,13 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Tutoring — Bower OS</title>
+<title>Tutortally</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json"> 
-<meta name="theme-color" content="#0d1b3e">
+<meta name="theme-color" content="#0f766e">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -18,56 +18,56 @@
 <style>
   /* ── Light mode (default) ── */
   :root {
-    --bg: #f5f4f1;
-    --bg-tint: #ecebe6;
+    --bg: #f7f8f4;
+    --bg-tint: #ecf4f1;
     --card: #ffffff;
-    --card-2: #f7f6f3;
-    --card-3: #f1efea;
-    --line: #e7e3db;
-    --line-soft: #f0ede6;
-    --ink: #16150f;
-    --ink-dim: #605c53;
-    --accent: #1f7a45;
-    --accent-2: #2b9757;
-    --accent-light: #e9f4ed;
-    --warn: #b8481c;
-    --warn-light: #fdf0ea;
-    --muted: #9a958c;
-    --gold: #8f701f;
-    --gold-light: #faf2df;
+    --card-2: #f5f7f6;
+    --card-3: #edf1ef;
+    --line: #dfe7e3;
+    --line-soft: #edf1ef;
+    --ink: #15211f;
+    --ink-dim: #596965;
+    --accent: #0f766e;
+    --accent-2: #2563eb;
+    --accent-light: #e0f3ef;
+    --warn: #d05b39;
+    --warn-light: #fff0e9;
+    --muted: #87938f;
+    --gold: #b7791f;
+    --gold-light: #fff4d8;
     --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
     /* Layered shadows read as real depth; a single blurred box never does. */
     --sh-1: 0 1px 2px rgba(22,21,15,.06);
     --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
     --sh-3: 0 2px 6px rgba(22,21,15,.06), 0 16px 40px -12px rgba(22,21,15,.22);
-    --ring: 0 0 0 3px rgba(31,122,69,.16);
+    --ring: 0 0 0 3px rgba(15,118,110,.16);
   }
 
   /* ── Dark mode ── */
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #131210;
-      --bg-tint: #191714;
-      --card: #1d1b18;
-      --card-2: #24211d;
-      --card-3: #2b2823;
-      --line: #34302a;
-      --line-soft: #262320;
-      --ink: #f2eee6;
-      --ink-dim: #a8a297;
-      --accent: #4fb877;
-      --accent-2: #63c98a;
-      --accent-light: #13251a;
-      --warn: #e07d46;
-      --warn-light: #2a1408;
-      --muted: #78736a;
-      --gold: #d9bf94;
-      --gold-light: #2a2317;
+      --bg: #101716;
+      --bg-tint: #14211f;
+      --card: #182321;
+      --card-2: #1e2a27;
+      --card-3: #26332f;
+      --line: #30413d;
+      --line-soft: #26332f;
+      --ink: #eef8f5;
+      --ink-dim: #a5b7b1;
+      --accent: #35c2b0;
+      --accent-2: #7ba7ff;
+      --accent-light: #12332f;
+      --warn: #ff8a63;
+      --warn-light: #351d15;
+      --muted: #7f918c;
+      --gold: #e6bd62;
+      --gold-light: #302612;
       --shadow: 0 1px 3px rgba(0,0,0,0.3);
       --sh-1: 0 1px 2px rgba(0,0,0,.4);
       --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
       --sh-3: 0 2px 8px rgba(0,0,0,.5), 0 20px 48px -14px rgba(0,0,0,.75);
-      --ring: 0 0 0 3px rgba(79,184,119,.22);
+      --ring: 0 0 0 3px rgba(53,194,176,.22);
     }
   }
 
@@ -1504,11 +1504,18 @@ function LoginGate() {
         <div style={{position:'absolute',top:0,left:0,right:0,height:3,
           background:'linear-gradient(90deg, var(--gold), var(--accent-2))'}} />
 
-        <div style={{fontSize:'1.35rem', fontWeight:750, letterSpacing:'-0.03em', marginBottom:5}}>
-          Maths Tutoring
+        <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:7}}>
+          <div style={{
+            width:34, height:34, borderRadius:11, background:'var(--ink)', color:'var(--card)',
+            display:'grid', placeItems:'center', fontWeight:800, fontSize:'0.95rem',
+            letterSpacing:'-0.08em', transform:'rotate(-2deg)'
+          }}>||||</div>
+          <div style={{fontSize:'1.35rem', fontWeight:780, letterSpacing:'-0.03em'}}>
+            Tutor<span style={{color:'var(--accent)'}}>tally</span>
+          </div>
         </div>
         <div style={{fontSize:'0.85rem', color:'var(--muted)', marginBottom:22, lineHeight:1.5}}>
-          Sign in to see your students.
+          Sign in to total your lessons, payments, and parent links.
         </div>
 
         {state === 'reset-sent' ? (
@@ -1616,7 +1623,7 @@ function ChangePassword() {
 }
 
 // ---------- Your name ----------
-// Sets the header from "Maths Tutoring" to "{name}'s Maths Tutoring" — useful
+// Sets the header from "Tutortally" to "{name}'s Tutortally" — useful
 // now that more than one tutor's account exists on the same app, so each
 // person's own copy is visibly theirs. Stored in Supabase Auth's own user
 // metadata (auth.updateUser({ data })), not a new table: it's private to the
@@ -1648,7 +1655,7 @@ function YourName({ session }) {
   return (
     <form onSubmit={save}>
       <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
-        Shown in the header as "{name.trim() || '…'}'s Maths Tutoring". The email
+        Shown in the header as "{name.trim() || '…'}'s Tutortally". The email
         and phone here are what the "message the tutor" buttons on each student's
         lesson link use — nobody else's copy changes.
       </div>
@@ -2134,12 +2141,12 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
               <h2 style={{margin:0}}>About &amp; data sources</h2>
             </div>
             {[
-              { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase (Bower OS project). Name, school, exam board, rate, WhatsApp number, Zoom link, spreadsheet link, and the bank name to expect payments from — all edited via the Edit button on each card.' },
+              { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase for Tutortally. Name, school, exam board, rate, WhatsApp number, Zoom link, spreadsheet link, and the bank name to expect payments from — all edited via the Edit button on each card.' },
               { icon: '📅', title: 'Lessons', body: 'Each lesson row has a date, start time, status (scheduled / completed / missed) and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load. History is grouped by month — tap a month to expand it, then tap a lesson for its detail, where you can also mark it free.' },
               { icon: '🔄', title: 'Fresh start — 27 July 2026', body: 'Everything taught before 27 July 2026 is marked as already paid for. Those lessons still show in history (tagged "settled") but never count towards a balance, and all payments predating that date were cleared out. The old records were archived inside the database rather than destroyed, so they can be recovered if ever needed.' },
               { icon: '💷', title: 'Payments', body: 'Open a student and expand Payments to see every payment, or log a new one (cash or bank transfer). Tap a payment to see which lessons it covers, edit it, or delete it. Balance = completed lessons since the reset − total paid.' },
               { icon: '🏦', title: 'Monzo', body: 'Tools → Monzo payments pulls incoming bank transfers and logs them against the right student automatically. Set "Expect bank transfers from" on a student to teach it a parent\'s name; after the first match it remembers their account, so it keeps working even when the bank formats the name differently. Only money coming IN from real people is ever looked at — card spending, pot transfers and declines are filtered out, and unrecognised transfers are read live and never stored. Nothing before 27 July 2026 is considered.' },
-              { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script (tutoring_calendar_sync_v3.gs) runs nightly. It reads your Tutoring calendar, matches events to students by their "calendar name" field, and writes lesson rows into Supabase with their start times — marking sessions complete once the date passes. Delete an event from the calendar and the lesson is removed too, unless a payment is attached to it, in which case it is kept and flagged in the log. Lessons you add by hand in the app are never touched by the sync.' },
+              { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script runs nightly. It reads your tutoring calendar, matches events to students by their "calendar name" field, and writes lesson rows into Supabase with their start times — marking sessions complete once the date passes. Delete an event from the calendar and the lesson is removed too, unless a payment is attached to it, in which case it is kept and flagged in the log. Lessons you add by hand in the app are never touched by the sync.' },
               { icon: '📈', title: 'Spreadsheet links', body: 'Each student can have a Google Sheets link (set via Edit). Tap the 📈 button on a card to open it. Links are stored in Supabase and can also be set directly in the database.' },
               { icon: '💰', title: 'Rate history', body: 'Every rate change is recorded with a date. The app always uses the rate that was in effect on a given day — so historical balances stay accurate when you put prices up.' },
               { icon: '🔐', title: 'Security', body: 'Monzo credentials live only in Supabase\'s secret store, and the Monzo tables are locked so the key embedded in this page cannot read any bank data. Student details are not yet behind a login, so treat the site URL as private until that is added.' },
@@ -4085,8 +4092,8 @@ function App() {
           <div>
             <div className="header-title">
               {session?.user?.user_metadata?.display_name
-                ? `${session.user.user_metadata.display_name}'s Maths Tutoring`
-                : 'Maths Tutoring'}
+                ? `${session.user.user_metadata.display_name}'s Tutortally`
+                : 'Tutortally'}
             </div>
             <div className="header-sub">
               {activeStudents.length} active{archivedCount > 0 ? ` · ${archivedCount} archived` : ''}{syncLabel ? ` · ${syncLabel}` : ''}
