@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Privacy — Tutortally</title>
+<meta name="description" content="What Tutortally stores, where it lives, and who can see it.">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0f766e">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f8f4; --card: #ffffff; --card-2: #f5f7f6;
+    --line: #dfe7e3; --ink: #15211f; --ink-dim: #4a5a56; --muted: #87938f;
+    --accent: #0f766e; --gold: #b7791f; --gold-light: #fff4d8;
+    --r-md: 13px; --r-lg: 17px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101716; --card: #182321; --card-2: #1e2a27;
+      --line: #30413d; --ink: #eef8f5; --ink-dim: #b6c7c1; --muted: #7f918c;
+      --accent: #35c2b0; --gold: #e6bd62; --gold-light: #302612;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased; line-height: 1.62;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 0 22px; }
+  nav { border-bottom: 1px solid var(--line); background: var(--card); }
+  .nav-in { display: flex; align-items: center; gap: 14px; height: 60px; }
+  .logo { display: flex; align-items: center; gap: 9px; font-weight: 780; letter-spacing: -0.03em; font-size: 1.05rem; text-decoration: none; color: var(--ink); }
+  .logo span { color: var(--accent); }
+  .brandmark { width: 29px; height: 29px; border-radius: 9px; display: block; }
+  .nav-in a.back { margin-left: auto; color: var(--accent); text-decoration: none; font-size: 0.88rem; font-weight: 620; }
+  main { padding: 46px 0 70px; }
+  h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); font-weight: 750; letter-spacing: -0.03em; margin: 0 0 8px; line-height: 1.14; }
+  .updated { color: var(--muted); font-size: 0.86rem; margin: 0 0 34px; }
+  h2 { font-size: 1.12rem; font-weight: 700; letter-spacing: -0.02em; margin: 34px 0 10px; }
+  p, li, td, th { color: var(--ink-dim); font-size: 0.97rem; }
+  p { margin: 0 0 13px; }
+  ul { padding-left: 20px; margin: 0 0 13px; }
+  li { margin-bottom: 7px; }
+  a { color: var(--accent); }
+  strong { color: var(--ink); font-weight: 650; }
+  .tablewrap { overflow-x: auto; margin: 0 0 15px; }
+  table { border-collapse: collapse; width: 100%; min-width: 460px; }
+  th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 0.91rem; }
+  th { color: var(--ink); font-weight: 650; }
+  .note {
+    background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    border-radius: var(--r-md); padding: 15px 18px; margin: 0 0 13px;
+  }
+  .note p:last-child { margin-bottom: 0; }
+  footer { border-top: 1px solid var(--line); padding: 26px 0; color: var(--muted); font-size: 0.85rem; }
+  footer .wrap { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  footer a { color: var(--muted); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-in">
+    <a class="logo" href="/app"><img class="brandmark" src="brand/tutortally-mark.svg" alt="" aria-hidden="true">Tutor<span>tally</span></a>
+    <a class="back" href="/app">Back to Tutortally</a>
+  </div>
+</nav>
+
+<main>
+<div class="wrap">
+
+<h1>Privacy</h1>
+<p class="updated">Last updated 20 August 2026.</p>
+
+<p>
+  Tutortally holds information about children, because that is what a tutor's records
+  are. This page says exactly what is stored, where it sits, and who can reach it.
+</p>
+
+<h2>Two different sets of data</h2>
+<p>
+  There is a split here that matters, so it is worth being clear about it up front.
+</p>
+<ul>
+  <li><strong>Your account.</strong> Your email, your settings, your subscription. I decide what happens to this, so in legal terms I am the controller of it.</li>
+  <li><strong>Your students and their families.</strong> You decide what goes in and what comes out. You are the controller, and I am processing it on your instructions. I do not use it for anything of my own.</li>
+</ul>
+
+<h2>What is actually stored</h2>
+<div class="tablewrap">
+<table>
+  <tr><th>About you</th><td>Email address, a hashed password, your display name and contact details if you enter them, your default lesson rate and app settings, and your plan or subscription status.</td></tr>
+  <tr><th>About your students</th><td>Name, school, school year, exam board and tier, whether they get extra time, free text notes you write, and a link to a progress spreadsheet if you add one.</td></tr>
+  <tr><th>About parents</th><td>Name, phone number, and address if you enter one.</td></tr>
+  <tr><th>Lessons</th><td>Date, time, whether it happened, the rate charged, and any notes you add.</td></tr>
+  <tr><th>Payments</th><td>Amount, date, and method. No card numbers or bank details are ever stored, because payments from parents do not go through Tutortally.</td></tr>
+  <tr><th>Calendar</th><td>If you connect Google Calendar, an access token for the one calendar you pick, plus the event IDs of lessons it has matched. Events from Apple Calendar may be read if you sync them into that Google calendar.</td></tr>
+</table>
+</div>
+<p>
+  There is no analytics, no advertising, no tracking pixel and no behavioural profiling
+  anywhere in Tutortally. I do not know which buttons you press.
+</p>
+
+<h2>Where it lives</h2>
+<p>
+  Everything is in a Postgres database hosted by Supabase in the AWS London region
+  (eu&#8209;west&#8209;2), so your data is stored in the United Kingdom. The web pages
+  themselves are served by Cloudflare.
+</p>
+
+<h2>Who else is involved</h2>
+<div class="tablewrap">
+<table>
+  <tr><th>Supabase</th><td>Database, sign in, and the server functions. Holds all of the above.</td></tr>
+  <tr><th>Cloudflare</th><td>Serves the site. Sees the IP addresses of people who load it.</td></tr>
+  <tr><th>Stripe</th><td>Only if you upgrade to Pro. Takes your £5 a month. Stripe holds your card details; I never see them. Stripe is told your email and your account ID, nothing about your students.</td></tr>
+  <tr><th>Google</th><td>Only if you connect a calendar, and only the calendar you choose. Read access. Disconnect any time from inside the app. Apple Calendar can work if its events are synced into the connected Google calendar.</td></tr>
+  <tr><th>Fontshare, jsDelivr, unpkg</th><td>Serve the typeface and code libraries the pages use. They see the IP address of whoever loads a page, including parents opening a lesson link.</td></tr>
+</table>
+</div>
+<p>
+  Nobody buys your data from me, because it is not for sale, and it never will be.
+</p>
+
+<h2>Can I see your students?</h2>
+<p>
+  This deserves a straight answer rather than a reassuring one.
+</p>
+<p>
+  The database enforces separation per account: signed in as you, the app can only ever
+  read rows belonging to you, and there is no query a tutor can run that reaches another
+  tutor's records. That is enforced by the database itself, not by the app being careful.
+</p>
+<p>
+  But I run the database, and I hold the administrative credentials for it. So
+  technically I can look at what is in there, in the same way that anybody who runs a
+  service can. I will only do that to fix a fault or because you have asked me to help
+  with something, and I would rather say so plainly than imply a wall that is not there.
+</p>
+
+<h2>Parent links</h2>
+<p>
+  Each student has a private link that shows their own lessons and payment status with
+  no sign in. It shows nothing about your other students, your rates, or your totals.
+  Anyone holding the link can open it, so it is as private as the link is. Ask me and I
+  will issue a fresh one, which stops the old link working.
+</p>
+
+<h2>Cookies</h2>
+<p>
+  No tracking or advertising cookies, so there is no consent banner to click away. Your
+  browser keeps your sign in token in local storage so you are not asked to sign in
+  every visit. That is all.
+</p>
+
+<h2>How long it is kept</h2>
+<p>
+  For as long as your account is open. If you close it, I delete your data on request.
+  If an account sits inactive and unopened for twelve months, I will email you at least
+  thirty days before deleting it.
+</p>
+
+<h2>Your rights</h2>
+<p>
+  For the information I hold about you as a customer, you can ask me to show you a copy,
+  correct it, delete it, or hand it over in a portable format. Email
+  <a href="mailto:daniel@bowermaths.co.uk">daniel@bowermaths.co.uk</a> and I will sort
+  it within a month.
+</p>
+<p>
+  For information about a student or a parent, the tutor is the controller, so a family
+  should ask their tutor rather than me. Tutors can correct or delete any of it directly
+  in the app, and I will help if something will not budge.
+</p>
+<p>
+  If you think I have handled something badly, tell me first, but you are entitled to
+  complain to the Information Commissioner's Office at
+  <a href="https://ico.org.uk/make-a-complaint/" rel="noopener">ico.org.uk</a>.
+</p>
+
+<h2>Children</h2>
+<p>
+  Most students in Tutortally are under 18. They do not have accounts and they are not
+  asked for anything: their tutor enters the records, and their parent can view a lesson
+  page through a link the tutor sends. As the controller of that information, the tutor
+  is responsible for having a lawful basis to hold it and for telling families that they
+  do.
+</p>
+
+<h2>If something goes wrong</h2>
+<p>
+  If there is a breach that puts anyone at real risk, I will tell affected tutors
+  without delay and report it to the ICO within 72 hours, as required.
+</p>
+
+<div class="note">
+  <p>
+    <strong>Questions.</strong> Email <a href="mailto:daniel@bowermaths.co.uk">daniel@bowermaths.co.uk</a>.
+    A real person reads it.
+  </p>
+</div>
+
+</div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>© <span id="yr"></span> Tutortally</div>
+    <a href="/app">Home</a>
+    <a href="/terms">Terms</a>
+    <a href="/privacy">Privacy</a>
+    <a href="mailto:daniel@bowermaths.co.uk">Contact</a>
+  </div>
+</footer>
+
+<script>document.getElementById('yr').textContent = new Date().getFullYear();</script>
+</body>
+</html>
