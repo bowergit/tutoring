@@ -63,11 +63,14 @@ Logo idea: a compact tally-mark icon beside the Tutortally wordmark. The mark sh
 
 Logo files:
 - `brand/tutortally-mark.svg`
+- `brand/tutortally-mark-transparent.svg`
 - `brand/tutortally-logo.svg`
 - `brand/tutortally-logo-reversed.svg`
+- `brand/tutortally-logo-icon.png`
+- `brand/tutortally-logo-mark-transparent.png`
 - `brand/tutortally-logo-preview.html`
 
-The mark uses four lesson tally strokes plus a fifth diagonal stroke that reads as a check against the account. It should work as an app icon, favicon, social avatar, and compact nav mark.
+The mark uses two upright ink tally strokes crossed by one rising teal tally stroke. It should read first as a tally mark, and second as a quiet "TT" monogram. It should work as an app icon, favicon, social avatar, and compact nav mark.
 
 Wordmark:
 - "Tutor" in ink.

@@ -1,22 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 190" role="img" aria-labelledby="title desc">
   <title id="title">Tutortally logo</title>
-  <desc id="desc">Tutortally wordmark with a tally mark icon.</desc>
+  <desc id="desc">Tutortally wordmark with a smart tally mark icon.</desc>
   <defs>
-    <linearGradient id="tutortally-bg" x1="20" y1="12" x2="148" y2="152" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#11988d"/>
-      <stop offset="0.62" stop-color="#0f766e"/>
-      <stop offset="1" stop-color="#15211f"/>
-    </linearGradient>
     <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#15211f" flood-opacity="0.16"/>
     </filter>
   </defs>
   <g transform="translate(16 18)">
-    <rect x="0" y="0" width="136" height="136" rx="32" fill="url(#tutortally-bg)" filter="url(#soft-shadow)"/>
-    <path d="M31 39v58M51 39v58M71 39v58M91 39v58" fill="none" stroke="#f7f8f4" stroke-width="12" stroke-linecap="round"/>
-    <path d="M26 95L105 44" fill="none" stroke="#d05b39" stroke-width="17" stroke-linecap="round"/>
-    <path d="M26 95L105 44" fill="none" stroke="#f7f8f4" stroke-width="8" stroke-linecap="round"/>
-    <path d="M114 34l-7 18 19-6" fill="#2563eb"/>
+    <rect x="0" y="0" width="136" height="136" rx="31" fill="#ffffff" filter="url(#soft-shadow)"/>
+    <rect x="3" y="3" width="130" height="130" rx="28" fill="#f7f8f4"/>
+    <rect x="8" y="8" width="120" height="120" rx="25" fill="none" stroke="#dfe7e3" stroke-width="1.5"/>
+    <path d="M31 82L105 60" fill="none" stroke="#0f766e" stroke-width="11" stroke-linecap="round"/>
+    <rect x="49" y="37" width="12" height="69" rx="2" fill="#0c1214"/>
+    <rect x="75" y="37" width="12" height="69" rx="2" fill="#0c1214"/>
   </g>
   <g font-family="General Sans, Inter, Avenir Next, Segoe UI, Arial, sans-serif">
     <text x="184" y="102" fill="#15211f" font-size="72" font-weight="760" letter-spacing="-3.6">Tutor</text>
