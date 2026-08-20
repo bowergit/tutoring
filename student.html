@@ -117,6 +117,59 @@
   .ptable td { padding: 7px 4px; border-bottom: 1px solid var(--line); }
   .ptable tr:last-child td { border-bottom: none; }
   .ptable .num { text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  /* ── Grade estimate ── */
+  .grade { padding: 16px 15px 12px; }
+  .grade-top { display: flex; align-items: center; gap: 12px; }
+  .grade-badge {
+    flex-shrink: 0; width: 54px; height: 54px; border-radius: var(--r-md);
+    background: var(--accent-light); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.65rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1;
+  }
+  .grade-badge.none { background: var(--card-2); color: var(--muted); font-size: 1.35rem; }
+  .grade-say { flex: 1; min-width: 0; }
+  .grade-say b { display: block; font-size: 0.92rem; font-weight: 700; line-height: 1.3; }
+  .grade-say span { display: block; font-size: 0.78rem; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+  .info-btn {
+    flex-shrink: 0; align-self: flex-start; width: 26px; height: 26px; border-radius: 50%;
+    border: 1px solid var(--line); background: var(--card-2); color: var(--muted);
+    font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; padding: 0;
+  }
+  .info-btn[aria-expanded="true"] { background: var(--accent-light); color: var(--accent); border-color: transparent; }
+  .grade-note {
+    margin-top: 12px; padding: 11px 12px; border-radius: var(--r-md);
+    background: var(--card-2); color: var(--ink-dim); font-size: 0.78rem; line-height: 1.55;
+  }
+  .grade-note p { margin: 0 0 8px; }
+  .grade-note p:last-child { margin-bottom: 0; }
+  .gb-head { display: flex; align-items: center; gap: 8px; margin: 18px 0 4px; }
+  .gb-head h3 {
+    margin: 0; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); font-weight: 700;
+  }
+  .gb-switch { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 100px; overflow: hidden; }
+  .gb-switch button {
+    border: none; background: none; font-family: inherit; font-size: 0.68rem; font-weight: 650;
+    color: var(--muted); padding: 4px 11px; cursor: pointer;
+  }
+  .gb-switch button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+  /* The boundary grid is wider than a phone. It scrolls inside its own box so
+     the page itself never gets a sideways scrollbar. */
+  .gb-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .gbtable { border-collapse: collapse; font-size: 0.76rem; min-width: 100%; }
+  .gbtable th, .gbtable td {
+    padding: 6px 7px; border-bottom: 1px solid var(--line);
+    white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .gbtable th:first-child, .gbtable td:first-child { text-align: left; }
+  .gbtable thead th {
+    font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); font-weight: 700;
+  }
+  .gbtable tbody tr.used td { background: var(--accent-light); color: var(--accent); font-weight: 650; }
+  .gbtable tbody tr:last-child td { border-bottom: none; }
+  .gb-foot { font-size: 0.7rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -344,6 +397,141 @@
     });
   }
 
+  // ── Grade estimate ──────────────────────────────────────────────────────
+  // A grade only appears once a whole series has been sat, because a single
+  // paper out of two or three says nothing about the grade: boundaries are
+  // published for the set, not per paper.
+
+  const GRADE_ORDER = ['9', '8', '7', '6', '5', '4', '3', '2', '1'];
+  const gradesIn = g => GRADE_ORDER.filter(k => g.boundaries.length && g.boundaries[0].grades[k] != null);
+
+  function boundaryBody(g, mode) {
+    const cols = gradesIn(g);
+    // Only the series this student has actually been marked against get the
+    // highlight, so the table reads as theirs rather than as a data dump.
+    const used = new Set(g.sets.filter(s => s.complete && s.exact_series).map(s => s.series_used));
+    return g.boundaries.map(b => `
+      <tr class="${used.has(b.label) ? 'used' : ''}">
+        <td>${esc(b.label)}</td>
+        ${cols.map(k => `<td>${mode === 'pct' ? b.pcts[k] + '%' : b.grades[k]}</td>`).join('')}
+      </tr>`).join('');
+  }
+
+  function renderGrade(g) {
+    if (!g || !g.boundaries.length) return '';
+
+    const cols = gradesIn(g);
+    const done = g.sets.filter(s => s.complete);
+    const latest = g.latest;
+    const partial = g.sets.filter(s => !s.complete).slice(-1)[0];
+
+    let badge, head, sub;
+    if (latest) {
+      badge = `<div class="grade-badge">${esc(latest.grade)}</div>`;
+      head = `Grade ${esc(latest.grade)} on the ${esc(latest.set)} papers`;
+      const bits = [`${latest.total_marks} out of ${latest.max_mark}`, `${latest.mean_pct}%`];
+      if (latest.next_grade) {
+        bits.push(`${latest.marks_to_next} mark${latest.marks_to_next === 1 ? '' : 's'} off a grade ${latest.next_grade}`);
+      }
+      sub = bits.join(' · ') + (latest.exact_series
+        ? ''
+        : `. No boundaries were published for ${esc(latest.set)}, so this uses the average of every other series.`);
+    } else {
+      badge = `<div class="grade-badge none">?</div>`;
+      head = 'No full set finished yet';
+      sub = partial
+        ? `${esc(partial.set)} is ${partial.papers_done} of ${partial.papers_needed} papers in. A grade appears as soon as a whole series is done.`
+        : `A grade appears once all ${g.papers_per_set} papers from one series are done.`;
+    }
+
+    const setsTable = done.length ? `
+      <div class="gb-head"><h3>Every completed set</h3></div>
+      <table class="ptable">
+        <thead><tr><th>Series</th><th style="text-align:right">Marks</th><th style="text-align:right">Grade</th></tr></thead>
+        <tbody>
+          ${done.slice().reverse().map(s => `
+            <tr>
+              <td>${esc(s.set)}${s.exact_series ? '' : ' <span style="color:var(--muted)">(typical)</span>'}</td>
+              <td class="num">${s.total_marks}/${s.max_mark}</td>
+              <td class="num">${esc(s.grade)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>` : '';
+
+    return `
+      <div class="section-label">Grade estimate</div>
+      <div class="card grade">
+        <div class="grade-top">
+          ${badge}
+          <div class="grade-say"><b>${head}</b><span>${sub}</span></div>
+          <button class="info-btn" id="gradeInfo" aria-expanded="false"
+                  aria-label="How grade boundaries work">i</button>
+        </div>
+
+        <div class="grade-note" id="gradeNote" hidden>
+          <p>Grade boundaries move every year. They are set after everyone has
+          sat the paper, so that a grade means the same thing whether that
+          year's paper turned out hard or easy. A harder paper gets lower
+          boundaries.</p>
+          <p>Each set below is marked against the boundaries published for that
+          exact paper, so the grade is the one those marks really would have
+          earned that summer. Treat it as a good guide rather than a promise:
+          next year's boundaries are not out yet.</p>
+        </div>
+
+        ${setsTable}
+
+        <button class="papers-toggle" id="gradeToggle">Show the boundaries</button>
+        <div id="gradeDetail" hidden>
+          <div class="gb-head">
+            <h3>${esc(g.board)} ${esc(g.qualification)} ${esc(g.spec_code)} · ${esc(g.tier)}</h3>
+            <div class="gb-switch">
+              <button data-mode="marks" aria-pressed="true">Marks</button>
+              <button data-mode="pct" aria-pressed="false">%</button>
+            </div>
+          </div>
+          <div class="gb-scroll">
+            <table class="gbtable">
+              <thead><tr><th>Series</th>${cols.map(k => `<th>${k}</th>`).join('')}</tr></thead>
+              <tbody id="gbBody">${boundaryBody(g, 'marks')}</tbody>
+            </table>
+          </div>
+          <div class="gb-foot">
+            Marks are out of ${g.max_mark} for the whole set of ${g.papers_per_set} papers.
+            Published by the exam board after each series.
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function wireGrade(g) {
+    if (!g || !g.boundaries.length) return;
+
+    const info = app.querySelector('#gradeInfo');
+    const note = app.querySelector('#gradeNote');
+    if (info && note) info.addEventListener('click', () => {
+      note.hidden = !note.hidden;
+      info.setAttribute('aria-expanded', String(!note.hidden));
+    });
+
+    const toggle = app.querySelector('#gradeToggle');
+    const detail = app.querySelector('#gradeDetail');
+    if (toggle && detail) toggle.addEventListener('click', () => {
+      detail.hidden = !detail.hidden;
+      toggle.textContent = detail.hidden ? 'Show the boundaries' : 'Hide the boundaries';
+    });
+
+    const body = app.querySelector('#gbBody');
+    app.querySelectorAll('.gb-switch button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        app.querySelectorAll('.gb-switch button').forEach(b => {
+          b.setAttribute('aria-pressed', String(b === btn));
+        });
+        body.innerHTML = boundaryBody(g, btn.dataset.mode);
+      });
+    });
+  }
+
   // One delegated listener handles every row, including ones added later by
   // "Show more" — no need to re-bind click handlers on every re-render.
   app.addEventListener('click', e => {
@@ -353,18 +541,67 @@
     if (detail) detail.hidden = !detail.hidden;
   });
 
+
+  // ---------- Demo parent page ----------
+  // Reached from the app demo at /?demo=1, whose students carry demo- tokens.
+  // Built here rather than server-side so the demo never touches the database.
+  function demoPortalData(tok) {
+    const spec = {
+      'demo-amira':  { name: 'Amira Khan',   weekday: 2, time: '16:00', owed: 0 },
+      'demo-joe':    { name: 'Joe Fletcher', weekday: 3, time: '17:30', owed: 3 },
+      'demo-priya':  { name: 'Priya Shah',   weekday: 4, time: '18:00', owed: 0 },
+      'demo-tom':    { name: 'Tom Bennett',  weekday: 1, time: '17:00', owed: 2 },
+      'demo-layla':  { name: 'Layla Ahmed',  weekday: 5, time: '16:30', owed: 0 },
+      'demo-ben':    { name: 'Ben Carter',   weekday: 6, time: '10:00', owed: 1 },
+      'demo-sofia':  { name: 'Sofia Rossi',  weekday: 2, time: '18:15', owed: 0 },
+    };
+    const s = spec[tok] || spec['demo-amira'];
+    const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const todayStr = iso(new Date());
+    const offset = (s.weekday - new Date().getDay() + 7) % 7;
+
+    const all = [];
+    for (let w = 0; w < 12; w++) {
+      const d = new Date();
+      d.setDate(d.getDate() + offset - 63 + w * 7);
+      all.push({ date: iso(d), time: s.time });
+    }
+    const past = all.filter(l => l.date < todayStr);
+    const upcoming = all.filter(l => l.date >= todayStr);
+    const unpaidFrom = past.length - s.owed;
+
+    const recent = past.map((l, i) => i < unpaidFrom
+      ? { ...l, pay_status: 'paid', paid_dates: [{ date: l.date }] }
+      : { ...l, pay_status: 'unpaid', paid_dates: [] }
+    ).reverse();
+
+    return {
+      ok: true,
+      name: s.name,
+      tutor: { name: 'Sam', phone: '447700900100', email: 'sam@example.com' },
+      spreadsheet_url: null,
+      progress: null,
+      upcoming: upcoming.map(l => ({ ...l, pay_status: 'unpaid', paid_dates: [] })),
+      recent,
+    };
+  }
+
   if (!token) {
     app.innerHTML = '<div class="state">This link is missing something — ask your tutor for the correct one.</div>';
     return;
   }
 
   let data;
-  try {
-    const res = await fetch(`${FN_BASE}/student-portal?t=${encodeURIComponent(token)}`);
-    data = await res.json();
-  } catch (e) {
-    app.innerHTML = '<div class="state">Couldn\'t load your lessons right now — try again shortly.</div>';
-    return;
+  if (token.startsWith('demo-')) {
+    data = demoPortalData(token);
+  } else {
+    try {
+      const res = await fetch(`${FN_BASE}/student-portal?t=${encodeURIComponent(token)}`);
+      data = await res.json();
+    } catch (e) {
+      app.innerHTML = '<div class="state">Couldn\'t load your lessons right now — try again shortly.</div>';
+      return;
+    }
   }
 
   if (!data.ok) {
@@ -393,6 +630,7 @@
     <h1>${esc(data.name)}</h1>
     <div class="sub">Progress, lessons and payment status</div>
     ${renderProgress(data.progress)}
+    ${renderGrade(data.grade)}
     ${actions ? `<div class="actions" style="margin-top:18px">${actions}</div>` : ''}
     <div class="section-label">Upcoming</div>
     <div id="upcoming-section"></div>
@@ -401,6 +639,7 @@
   `;
   renderUpcoming();
   wireChart(data.progress);
+  wireGrade(data.grade);
 })();
 </script>
 </body>

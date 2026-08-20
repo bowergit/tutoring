@@ -19,7 +19,14 @@
  *                             students. The service key bypasses row-level
  *                             security, so without this filter the script reads
  *                             and writes every tutor's students, not just yours.
- * 2. ONE daily time-driven trigger on syncPastPapers.
+ * 2. ONE daily time-driven trigger on syncPastPapers. This is the backstop:
+ *    it catches anything the change triggers missed, and it is the only thing
+ *    running if you never install them.
+ * 3. Optional, for near-instant updates: run installSheetTriggers() once by
+ *    hand. It puts a change trigger on each student's tracker so a score typed
+ *    into a sheet reaches the parent page within seconds instead of by the
+ *    next morning. Run it again whenever you add a student or change whose
+ *    sheet is whose, since it works off the current list.
  */
 
 const PAPER_HEADER_PATTERN = /date\s*taken/i;
@@ -40,19 +47,9 @@ function syncPastPapers() {
   let updated = 0, failed = 0, papers = 0;
 
   students.forEach(s => {
-    try {
-      const found = papersFromSheet_(s.spreadsheet_url);
-      replacePapers_(config, s.id, found);
-      papers += found.length;
-      // Newest first, so the chip on the student card stays as it was.
-      const latest = found.length
-        ? found.slice().sort((a, b) => b.date.localeCompare(a.date))[0]
-        : null;
-      if (patchStudentPaper_(config, s.id, latest)) updated++; else failed++;
-    } catch (err) {
-      failed++;
-      Logger.log('Could not read ' + s.name + ' sheet: ' + err);
-    }
+    const result = syncOneStudent_(config, s);
+    papers += result.papers;
+    if (result.ok) updated++; else failed++;
   });
 
   Logger.log('Papers — students updated: ' + updated + ' | failed: ' + failed +
@@ -61,6 +58,97 @@ function syncPastPapers() {
 
 /** Kept so a trigger still pointing at an older name keeps working. */
 function syncTutoring() { syncPastPapers(); }
+
+/** One student's tracker, read and written wholesale. */
+function syncOneStudent_(config, student) {
+  try {
+    const found = papersFromSheet_(student.spreadsheet_url);
+    replacePapers_(config, student.id, found);
+    // Newest first, so the chip on the student card stays as it was.
+    const latest = found.length
+      ? found.slice().sort(function (a, b) { return b.date.localeCompare(a.date); })[0]
+      : null;
+    return { ok: patchStudentPaper_(config, student.id, latest), papers: found.length };
+  } catch (err) {
+    Logger.log('Could not read ' + student.name + ' sheet: ' + err);
+    return { ok: false, papers: 0 };
+  }
+}
+
+// ─── Change triggers ──────────────────────────────────────────────
+
+/**
+ * Puts a change trigger on every tracker currently linked to a student, so
+ * typing a score updates the parent page straight away.
+ *
+ * Safe to run repeatedly: it clears its own old triggers first, so re-running
+ * after adding a student leaves exactly one trigger per sheet rather than a
+ * growing pile. Google caps a script at 20 triggers per user, which is the
+ * real limit on how many trackers this can watch; the daily sync still covers
+ * everything either way.
+ */
+function installSheetTriggers() {
+  const config = getSupabaseConfig_();
+  if (!config.url || !config.key || !config.ownerId) {
+    throw new Error('Set SUPABASE_URL, SUPABASE_SERVICE_KEY and TUTOR_OWNER_ID first.');
+  }
+
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'onSheetChanged') ScriptApp.deleteTrigger(t);
+  });
+
+  const seen = {};
+  fetchStudentsWithSheets_(config).forEach(function (s) {
+    try { seen[sheetIdFromUrl_(s.spreadsheet_url)] = true; } catch (err) { /* not a sheet URL */ }
+  });
+  const ids = Object.keys(seen);
+
+  let made = 0;
+  ids.forEach(function (id) {
+    try {
+      ScriptApp.newTrigger('onSheetChanged').forSpreadsheet(id).onChange().create();
+      made++;
+    } catch (err) {
+      Logger.log('No trigger for ' + id + ': ' + err);
+    }
+  });
+
+  Logger.log('Watching ' + made + ' of ' + ids.length + ' trackers for changes.');
+}
+
+/** Undoes installSheetTriggers, leaving only the daily sync. */
+function removeSheetTriggers() {
+  let gone = 0;
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'onSheetChanged') { ScriptApp.deleteTrigger(t); gone++; }
+  });
+  Logger.log('Removed ' + gone + ' change triggers.');
+}
+
+/**
+ * Fires when one tracker changes. Syncs only that student, so a single typed
+ * score costs one sheet read rather than a sweep of everybody's.
+ */
+function onSheetChanged(e) {
+  const id = e && e.source ? e.source.getId() : null;
+  if (!id) return;
+
+  // Google fires this more than once for what feels like one edit, and a
+  // person entering marks types several in a row. Collapsing anything inside
+  // the window turns a burst into a single round trip.
+  const cache = CacheService.getScriptCache();
+  if (cache.get('synced:' + id)) return;
+  cache.put('synced:' + id, '1', 45);
+
+  const config = getSupabaseConfig_();
+  if (!config.url || !config.key || !config.ownerId) return;
+
+  fetchStudentsWithSheets_(config).forEach(function (s) {
+    let sheetId = null;
+    try { sheetId = sheetIdFromUrl_(s.spreadsheet_url); } catch (err) { return; }
+    if (sheetId === id) syncOneStudent_(config, s);
+  });
+}
 
 // ─── Supabase ────────────────────────────────────────────────────────────
 

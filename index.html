@@ -426,6 +426,15 @@
     cursor:pointer; font-family:inherit; transition: all 0.15s;
   }
   .seg button.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
+  /* A second switch inside a panel that already has group tabs above it. Kept
+     quieter than the tabs so the two rows read as different levels rather than
+     as two equal choices stacked on top of each other. */
+  .seg.sub { gap:0; width:max-content; border:1px solid var(--line); border-radius:100px; overflow:hidden; }
+  .seg.sub button {
+    flex:0 0 auto; border:none; border-radius:0; background:none;
+    padding:5px 14px; font-size:0.76rem; font-weight:600;
+  }
+  .seg.sub button.sel { background:var(--card-3); color:var(--ink); }
 
   /* ── Three-position sliding switch (fake / real / hidden) ── */
   .tri-row {
@@ -522,6 +531,26 @@
   .toggle-label { font-size:0.88rem; color:var(--ink); }
   .rate-cash-row { display:flex; align-items:center; gap:12px; }
   .rate-cash-row input { width:90px !important; flex-shrink:0; }
+
+  /* ── Billing / demo bar ── */
+  .billing-bar {
+    display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+    padding:10px 16px; font-size:0.82rem; line-height:1.45;
+    background:var(--card-2); border-bottom:1px solid var(--line); color:var(--ink);
+  }
+  .billing-bar.warn { background:var(--warn-light); border-bottom-color:var(--warn); color:var(--warn); }
+  .billing-bar.demo { background:var(--accent); border-bottom-color:var(--accent); color:#fff; }
+  .billing-bar > span { flex:1 1 240px; }
+  .billing-btn {
+    border:none; border-radius:100px; padding:7px 15px; cursor:pointer;
+    font-family:inherit; font-size:0.8rem; font-weight:650; white-space:nowrap;
+    background:var(--accent); color:#fff; text-decoration:none; display:inline-block;
+  }
+  .billing-bar.demo .billing-btn { background:#fff; color:var(--accent); }
+  .billing-bar.warn .billing-btn { background:var(--warn); color:#fff; }
+  .billing-btn.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  .billing-btn:disabled { opacity:.6; cursor:default; }
+  .billing-err { flex:1 1 100%; color:var(--warn); font-size:0.78rem; }
 </style>
 </head>
 <body>
@@ -531,7 +560,7 @@ const { useState, useEffect } = React;
 
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+const realSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     // Keep the session in localStorage and refresh it silently, so signing in
     // is a rare event rather than something to do every visit.
@@ -542,6 +571,619 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     detectSessionInUrl: true,
   },
 });
+
+// ---------- Demo mode and the billing lock ----------
+//
+// Both need the same thing: a seam between the app and Supabase that can fake
+// a write or refuse one. Rather than touching all 26 call sites, the client is
+// wrapped once, here. Every mutation in this app is called directly after
+// .from(table), so intercepting at that point catches every one of them.
+//
+// ?demo=1 runs the real app against fabricated students held in memory. It is
+// the marketing demo, so it must never reach the database: the demo client
+// below makes no network calls of any kind.
+
+const DEMO_MODE = new URLSearchParams(window.location.search).has('demo');
+
+// Set true once a subscription has lapsed. Reads stay open deliberately. The
+// promise made on the marketing page is that nothing is deleted and records
+// stay readable and exportable, so lapsing blocks writing, not looking.
+let WRITES_BLOCKED = false;
+let notifyBlockedWrite = () => {};
+const BLOCKED_MESSAGE = "Your subscription has lapsed, so Tutortally is read-only for now. Nothing has been deleted.";
+
+// Stands in for a PostgREST query builder: every method returns itself, and
+// awaiting it produces a fixed result. Used for refused writes, and for the
+// parts of the demo client that only need to report success.
+function chainableResult(result) {
+  const proxy = new Proxy({}, {
+    get(_t, prop) {
+      if (prop === 'then')    return (ok, bad) => Promise.resolve(result).then(ok, bad);
+      if (prop === 'catch')   return (f) => Promise.resolve(result).catch(f);
+      if (prop === 'finally') return (f) => Promise.resolve(result).finally(f);
+      return () => proxy;
+    }
+  });
+  return proxy;
+}
+
+const MUTATIONS = ['insert', 'update', 'delete', 'upsert'];
+
+function guardedClient(client) {
+  return {
+    auth: client.auth,
+    rpc: (...args) => WRITES_BLOCKED
+      ? chainableResult({ data: null, error: { message: BLOCKED_MESSAGE } })
+      : client.rpc(...args),
+    from: (table) => {
+      const q = client.from(table);
+      return new Proxy(q, {
+        get(target, prop) {
+          if (WRITES_BLOCKED && MUTATIONS.includes(prop)) {
+            return () => {
+              notifyBlockedWrite();
+              return chainableResult({ data: null, error: { message: BLOCKED_MESSAGE } });
+            };
+          }
+          const v = target[prop];
+          return typeof v === 'function' ? v.bind(target) : v;
+        }
+      });
+    },
+  };
+}
+
+// ---------- The demo tutor's books ----------
+// Dates are generated relative to today so the demo never looks abandoned.
+// Phone numbers are in Ofcom's 07700 900xxx range, permanently reserved for
+// fiction, so a demo visitor tapping "chase" can never reach a real person.
+function makeDemoData() {
+  const iso = (d) => {
+    const x = new Date(d);
+    return new Date(x.getTime() - x.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  };
+  const shift = (days) => { const d = new Date(); d.setDate(d.getDate() + days); return d; };
+  const todayStr = iso(new Date());
+
+  const spec = [
+    { name: 'Amira Khan',   parent: 'Yasmin Khan',    phone: '07700900101', school: 'Hasmonean High',    year: 11, board: 'Edexcel', tier: 'Higher',     rate: 60, weekday: 2, time: '16:00', owed: 0, cash: false, zoom: false },
+    { name: 'Joe Fletcher', parent: 'Karen Fletcher', phone: '07700900102', school: 'Queen Elizabeths',  year: 11, board: 'AQA',     tier: 'Higher',     rate: 60, weekday: 3, time: '17:30', owed: 3, cash: false, zoom: false },
+    { name: 'Priya Shah',   parent: 'Anita Shah',     phone: '07700900103', school: 'St Michaels',       year: 13, board: 'Edexcel', tier: null,         rate: 70, weekday: 4, time: '18:00', owed: 0, cash: false, zoom: true  },
+    { name: 'Tom Bennett',  parent: 'Rachel Bennett', phone: '07700900104', school: 'Woodhouse',         year: 9,  board: null,      tier: null,         rate: 55, weekday: 1, time: '17:00', owed: 2, cash: false, zoom: false },
+    { name: 'Layla Ahmed',  parent: 'Sana Ahmed',     phone: '07700900105', school: 'Copthall',          year: 10, board: 'Edexcel', tier: 'Foundation', rate: 60, weekday: 5, time: '16:30', owed: 0, cash: true,  zoom: false },
+    { name: 'Ben Carter',   parent: 'Mark Carter',    phone: '07700900106', school: 'Mill Hill County',  year: 12, board: 'OCR',     tier: null,         rate: 70, weekday: 6, time: '10:00', owed: 1, cash: false, zoom: false },
+    { name: 'Sofia Rossi',  parent: 'Elena Rossi',    phone: '07700900107', school: 'Finchley Catholic', year: 8,  board: null,      tier: null,         rate: 50, weekday: 2, time: '18:15', owed: 0, cash: true,  zoom: false },
+  ];
+
+  const students = [], lessons = [], payments = [], rateHistory = [];
+  let seq = 0;
+  const nextId = (p) => p + '-' + (++seq);
+
+  spec.forEach((s, idx) => {
+    const sid = 'demo-student-' + (idx + 1);
+    const firstName = s.name.split(' ')[0].toLowerCase();
+
+    students.push({
+      id: sid,
+      name: s.name,
+      parent_name: s.parent,
+      parent_phone: s.phone,
+      address: null,
+      school: s.school,
+      school_year: s.year,
+      school_year_as_of_date: todayStr,
+      exam_board: s.board,
+      exam_tier: s.tier,
+      has_extra_time: false,
+      pays_in_cash: s.cash,
+      is_zoom: s.zoom,
+      zoom_link: s.zoom ? 'https://zoom.us/j/0000000000' : null,
+      monzo_payer_name: null,
+      general_notes: '',
+      calendar_title_pattern: s.name.split(' ')[0] + ' maths',
+      spreadsheet_url: null,
+      referred_by_student_id: null,
+      public_token: 'demo-' + firstName,
+      active: true,
+      last_paper_date: null,
+      last_paper_score: null,
+      last_paper_name: null,
+      owner_id: 'demo-tutor',
+      created_at: new Date().toISOString(),
+    });
+
+    rateHistory.push({
+      id: nextId('demo-rate'),
+      student_id: sid,
+      rate: s.rate,
+      effective_from_date: iso(shift(-400)),
+      owner_id: 'demo-tutor',
+      created_at: new Date().toISOString(),
+    });
+
+    // Nine weeks behind, three ahead, on the student's usual day.
+    const offsetToWeekday = (s.weekday - new Date().getDay() + 7) % 7;
+    const anchor = shift(offsetToWeekday - 63);
+    const mine = [];
+    for (let w = 0; w < 12; w++) {
+      const d = new Date(anchor);
+      d.setDate(d.getDate() + w * 7);
+      const dstr = iso(d);
+      mine.push({
+        id: nextId('demo-lesson'),
+        student_id: sid,
+        lesson_date: dstr,
+        start_time: s.time,
+        status: dstr < todayStr ? 'completed' : 'scheduled',
+        is_complimentary: false,
+        pre_settled: false,
+        rate_charged: null,
+        lesson_notes: null,
+        google_event_id: 'demo-event-' + sid + '-' + w,
+        owner_id: 'demo-tutor',
+      });
+    }
+    lessons.push(...mine);
+
+    // Pay for every completed lesson except the ones this student is meant to
+    // be behind on, in chunks of three, which is how most parents actually pay.
+    const completed = mine.filter(l => l.status === 'completed');
+    const toCover = Math.max(0, completed.length - s.owed);
+    let covered = 0;
+    while (covered < toCover) {
+      const chunk = Math.min(3, toCover - covered);
+      payments.push({
+        id: nextId('demo-payment'),
+        student_id: sid,
+        amount: chunk * s.rate,
+        date_paid: completed[Math.min(covered + chunk - 1, completed.length - 1)].lesson_date,
+        method: s.cash ? 'cash' : 'bank_transfer',
+        deleted_at: null,
+        monzo_transaction_id: null,
+        owner_id: 'demo-tutor',
+        created_at: new Date().toISOString(),
+      });
+      covered += chunk;
+    }
+  });
+
+  return {
+    tutoring_students: students,
+    tutoring_lessons: lessons,
+    tutoring_payments: payments,
+    tutoring_bundles: [],
+    tutoring_rate_history: rateHistory,
+    tutoring_payment_allocations: [],
+    tutoring_monzo_transactions: [],
+  };
+}
+
+// ---------- In-memory stand-in for Supabase ----------
+// Supports exactly the query shapes this app uses: the filters, the two-key
+// ordering on the student list, insert/update/delete/upsert, and the one RPC.
+// Anything it does not recognise resolves to an empty success rather than
+// throwing, because a demo that white-screens is worse than a demo that is
+// slightly incomplete.
+function makeDemoClient() {
+  const db = makeDemoData();
+  let seq = 10000;
+  const newId = () => 'demo-' + (++seq);
+
+  const user = {
+    id: 'demo-tutor',
+    email: 'you@example.com',
+    user_metadata: { display_name: 'Sam', default_rate: 60, wt_step: -1 },
+  };
+  const session = { user, access_token: 'demo-token' };
+  const listeners = [];
+
+  function matches(row, filters) {
+    return filters.every(f => {
+      const v = row[f.col];
+      switch (f.op) {
+        case 'eq':  return String(v) === String(f.val);
+        case 'neq': return String(v) !== String(f.val);
+        case 'is':  return f.val === null ? (v === null || v === undefined) : v === f.val;
+        case 'lt':  return v != null && v <  f.val;
+        case 'lte': return v != null && v <= f.val;
+        case 'gt':  return v != null && v >  f.val;
+        case 'gte': return v != null && v >= f.val;
+        case 'in':  return Array.isArray(f.val) && f.val.includes(v);
+        default:    return true;
+      }
+    });
+  }
+
+  // Mirrors allocate_payment() in the database: oldest unpaid lesson first,
+  // skipping anything cancelled, complimentary or already settled. Kept here
+  // so a demo visitor logging a payment sees a balance move exactly the way it
+  // would on a real account.
+  function rateFor(lesson) {
+    if (lesson.rate_charged != null && lesson.rate_charged !== '') return parseFloat(lesson.rate_charged);
+    const rows = db.tutoring_rate_history
+      .filter(r => r.student_id === lesson.student_id && r.effective_from_date <= lesson.lesson_date)
+      .sort((a, b) => {
+        const byDate = b.effective_from_date.localeCompare(a.effective_from_date);
+        return byDate !== 0 ? byDate : String(b.created_at || '').localeCompare(String(a.created_at || ''));
+      });
+    return rows.length ? parseFloat(rows[0].rate) : 60;
+  }
+
+  function reallocate(studentId) {
+    const mine = new Set(db.tutoring_payments.filter(p => p.student_id === studentId).map(p => p.id));
+    db.tutoring_payment_allocations = db.tutoring_payment_allocations.filter(a => !mine.has(a.payment_id));
+
+    const queue = db.tutoring_lessons
+      .filter(l => l.student_id === studentId && l.status !== 'cancelled' && !l.is_complimentary && !l.pre_settled)
+      .sort((a, b) => (a.lesson_date + (a.start_time || '00:00')).localeCompare(b.lesson_date + (b.start_time || '00:00')));
+
+    const due = {};
+    queue.forEach(l => { due[l.id] = rateFor(l); });
+
+    db.tutoring_payments
+      .filter(p => p.student_id === studentId && !p.deleted_at)
+      .sort((a, b) => String(a.date_paid).localeCompare(String(b.date_paid)))
+      .forEach(p => {
+        let remaining = parseFloat(p.amount) || 0;
+        for (const l of queue) {
+          if (remaining <= 0.005) break;
+          if (due[l.id] <= 0.005) continue;
+          const take = Math.min(due[l.id], remaining);
+          db.tutoring_payment_allocations.push({
+            id: newId(), payment_id: p.id, lesson_id: l.id,
+            student_id: studentId, amount: take, created_at: new Date().toISOString(),
+          });
+          due[l.id] -= take;
+          remaining -= take;
+        }
+      });
+  }
+
+  function reallocateAll() {
+    db.tutoring_students.forEach(s => reallocate(s.id));
+  }
+  reallocateAll();
+
+  function table(name) {
+    if (!db[name]) db[name] = [];
+    const st = { op: 'select', filters: [], orders: [], payload: null, single: false, onConflict: null };
+
+    function affectedStudents(rows) {
+      return [...new Set(rows.map(r => r.student_id).filter(Boolean))];
+    }
+
+    function run() {
+      const rows = db[name];
+      try {
+        if (st.op === 'select') {
+          let out = rows.filter(r => matches(r, st.filters));
+          // Applied back to front so the first .order() wins, which is how
+          // PostgREST treats a chain of them.
+          for (let i = st.orders.length - 1; i >= 0; i--) {
+            const o = st.orders[i];
+            out = out.slice().sort((a, b) => {
+              const av = a[o.col], bv = b[o.col];
+              if (av === bv) return 0;
+              const cmp = av == null ? -1 : bv == null ? 1 : (av > bv ? 1 : -1);
+              return o.asc ? cmp : -cmp;
+            });
+          }
+          return { data: st.single ? (out[0] ?? null) : out, error: null };
+        }
+
+        if (st.op === 'insert') {
+          const items = (Array.isArray(st.payload) ? st.payload : [st.payload]).map(x => ({
+            id: newId(), created_at: new Date().toISOString(), ...x,
+          }));
+          rows.push(...items);
+          affectedStudents(items).forEach(reallocate);
+          return { data: st.single ? (items[0] ?? null) : items, error: null };
+        }
+
+        if (st.op === 'update') {
+          const hit = rows.filter(r => matches(r, st.filters));
+          hit.forEach(r => Object.assign(r, st.payload));
+          affectedStudents(hit).forEach(reallocate);
+          return { data: st.single ? (hit[0] ?? null) : hit, error: null };
+        }
+
+        if (st.op === 'delete') {
+          const hit = rows.filter(r => matches(r, st.filters));
+          db[name] = rows.filter(r => !matches(r, st.filters));
+          affectedStudents(hit).forEach(reallocate);
+          return { data: hit, error: null };
+        }
+
+        if (st.op === 'upsert') {
+          const items = Array.isArray(st.payload) ? st.payload : [st.payload];
+          const keys = st.onConflict ? st.onConflict.split(',').map(k => k.trim()) : ['id'];
+          const saved = items.map(x => {
+            const existing = rows.find(r => keys.every(k => String(r[k]) === String(x[k])));
+            if (existing) { Object.assign(existing, x); return existing; }
+            const fresh = { id: newId(), created_at: new Date().toISOString(), ...x };
+            rows.push(fresh);
+            return fresh;
+          });
+          affectedStudents(saved).forEach(reallocate);
+          return { data: st.single ? (saved[0] ?? null) : saved, error: null };
+        }
+
+        return { data: null, error: null };
+      } catch (e) {
+        return { data: null, error: { message: String(e && e.message ? e.message : e) } };
+      }
+    }
+
+    const api = {
+      select() { return api; },
+      insert(p) { st.op = 'insert'; st.payload = p; return api; },
+      update(p) { st.op = 'update'; st.payload = p; return api; },
+      upsert(p, opts) { st.op = 'upsert'; st.payload = p; st.onConflict = opts && opts.onConflict; return api; },
+      delete() { st.op = 'delete'; return api; },
+      eq(c, v)  { st.filters.push({ op: 'eq',  col: c, val: v }); return api; },
+      neq(c, v) { st.filters.push({ op: 'neq', col: c, val: v }); return api; },
+      is(c, v)  { st.filters.push({ op: 'is',  col: c, val: v }); return api; },
+      lt(c, v)  { st.filters.push({ op: 'lt',  col: c, val: v }); return api; },
+      lte(c, v) { st.filters.push({ op: 'lte', col: c, val: v }); return api; },
+      gt(c, v)  { st.filters.push({ op: 'gt',  col: c, val: v }); return api; },
+      gte(c, v) { st.filters.push({ op: 'gte', col: c, val: v }); return api; },
+      in(c, v)  { st.filters.push({ op: 'in',  col: c, val: v }); return api; },
+      order(col, opts) { st.orders.push({ col, asc: !(opts && opts.ascending === false) }); return api; },
+      limit() { return api; },
+      single() { st.single = true; return api; },
+      maybeSingle() { st.single = true; return api; },
+      then(ok, bad) { return Promise.resolve(run()).then(ok, bad); },
+    };
+    return api;
+  }
+
+  return {
+    from: table,
+    rpc: (fn, args) => {
+      if (fn === 'reallocate_student_payments' && args && args.p_student_id) reallocate(args.p_student_id);
+      return chainableResult({ data: null, error: null });
+    },
+    auth: {
+      getSession: () => Promise.resolve({ data: { session }, error: null }),
+      getUser:    () => Promise.resolve({ data: { user }, error: null }),
+      onAuthStateChange: (cb) => {
+        listeners.push(cb);
+        return { data: { subscription: { unsubscribe() {} } } };
+      },
+      updateUser: ({ data }) => {
+        Object.assign(user.user_metadata, data || {});
+        listeners.forEach(cb => cb('USER_UPDATED', { ...session }));
+        return Promise.resolve({ data: { user }, error: null });
+      },
+      signOut: () => { window.location.href = '/app'; return Promise.resolve({ error: null }); },
+      signInWithPassword: () => Promise.resolve({ data: { session }, error: null }),
+      resetPasswordForEmail: () => Promise.resolve({ error: null }),
+    },
+  };
+}
+
+// The Monzo and Google panels talk to Edge Functions over plain fetch rather
+// than through the client, so the demo answers for them here. Without this
+// they would sit on "couldn't connect", which reads as a broken product rather
+// than a demo.
+function demoFunctionReply(url) {
+  if (url.includes('google-calendar-status')) {
+    return {
+      ok: true, connected: true, calendar_chosen: true, calendar_summary: 'Tutoring',
+      connected_at: new Date(Date.now() - 86400000 * 40).toISOString(),
+      last_synced_at: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+      last_sync_error: null,
+    };
+  }
+  if (url.includes('google-calendar-list')) {
+    return { ok: true, calendars: [{ id: 'demo', summary: 'Tutoring', primary: true }] };
+  }
+  if (url.includes('google-calendar-sync')) return { ok: true, created: 0, updated: 0, skipped: 0 };
+  if (url.includes('google-calendar-diagnose')) return { ok: true, findings: [] };
+  if (url.includes('monzo-status')) return { connected: false };
+  if (url.includes('monzo-review')) return { pending: [], blocked: [] };
+  return { ok: true };
+}
+
+if (DEMO_MODE) {
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = typeof input === 'string' ? input : (input && input.url) || '';
+    if (url.includes('/functions/v1/')) {
+      return Promise.resolve(new Response(JSON.stringify(demoFunctionReply(url)), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      }));
+    }
+    return realFetch(input, init);
+  };
+}
+
+// Everything below this line talks to `supabase` without knowing or caring
+// which of the two it got.
+const supabase = DEMO_MODE ? makeDemoClient() : guardedClient(realSupabase);
+
+// ---------- Billing ----------
+// The rule: access if the free period is still running, or Stripe says they
+// are paying. past_due counts, because Stripe retries a failed card for days
+// and locking a tutor out of their own lesson records over an expired card is
+// a worse outcome than a few free days.
+const FN_BILLING = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
+const STRIPE_OK = ['active', 'trialing', 'past_due'];
+
+function todayISO() { return new Date().toISOString().slice(0, 10); }
+
+// Fails open on purpose. If the entitlement row cannot be read — a network
+// blip, a policy change, a row that never got created — the tutor keeps full
+// access. Locking a paying customer out because of a billing bug is far worse
+// than giving away a few free days.
+function readEntitlement(ent) {
+  if (!ent) return { access: true, reason: 'unknown', paying: false, daysLeft: null };
+  if (ent.plan === 'comp') return { access: true, reason: 'comp', paying: false, daysLeft: null };
+  const free = !!(ent.free_until && ent.free_until >= todayISO());
+  const paying = STRIPE_OK.includes(ent.stripe_status);
+  const daysLeft = ent.free_until
+    ? Math.round((new Date(ent.free_until + 'T00:00:00') - new Date(todayISO() + 'T00:00:00')) / 86400000)
+    : null;
+  return { access: free || paying, reason: paying ? 'paying' : free ? 'free' : 'lapsed', paying, daysLeft };
+}
+
+async function billingRedirect(fn, setBusy, setError) {
+  setBusy(true);
+  setError(null);
+  try {
+    const { data } = await supabase.auth.getSession();
+    const res = await fetch(`${FN_BILLING}/${fn}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${data?.session?.access_token ?? ''}`,
+      },
+    });
+    const body = await res.json();
+    if (body.ok && body.url) { window.location.href = body.url; return; }
+    setError(body.message || 'Could not open the payment page. Try again in a moment.');
+  } catch (e) {
+    setError('Could not reach the payment page. Check your connection and try again.');
+  }
+  setBusy(false);
+}
+
+function BillingBar({ entitlement, blockedOnce }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+
+  if (DEMO_MODE) {
+    return (
+      <div className="billing-bar demo">
+        <span><b>Demo.</b> Invented students, invented money. Change whatever you like, nothing is saved.</span>
+        <a className="billing-btn" href="/app">Get your own</a>
+      </div>
+    );
+  }
+
+  if (!entitlement) return null;
+  const st = readEntitlement(entitlement);
+
+  if (!st.access) {
+    return (
+      <div className="billing-bar warn">
+        <span>
+          <b>Read-only.</b>{blockedOnce ? ' That change was not saved.' : ''} Your free
+          months have run out. Everything you have entered is still here.
+        </span>
+        <button className="billing-btn" disabled={busy}
+          onClick={() => billingRedirect('stripe-checkout', setBusy, setError)}>
+          {busy ? 'Opening…' : 'Add a card — £5 a month'}
+        </button>
+        {error && <span className="billing-err">{error}</span>}
+      </div>
+    );
+  }
+
+  if (st.reason === 'free' && st.daysLeft != null && st.daysLeft <= 21) {
+    return (
+      <div className="billing-bar">
+        <span>
+          {st.daysLeft <= 0
+            ? 'Your free months end today.'
+            : `${st.daysLeft} day${st.daysLeft === 1 ? '' : 's'} left of your free months.`}
+          {' '}£5 a month after that, cancel any time.
+        </span>
+        <button className="billing-btn ghost" disabled={busy}
+          onClick={() => billingRedirect('stripe-checkout', setBusy, setError)}>
+          {busy ? 'Opening…' : 'Add a card'}
+        </button>
+        {error && <span className="billing-err">{error}</span>}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function BillingPanel({ entitlement }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const st = readEntitlement(entitlement);
+  const fmt = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+
+  if (DEMO_MODE) {
+    return <div style={{fontSize:'0.88rem', color:'var(--ink-dim)', lineHeight:1.6}}>
+      <p>This is the demo, so there is nothing to bill.</p>
+      <p>On a real account: three months free, then £5 a month, cancel in one tap.
+      The first fifty accounts keep £5 for as long as they stay.</p>
+      <a className="billing-btn" href="/app" style={{marginTop:6}}>Set up your own</a>
+    </div>;
+  }
+
+  if (!entitlement) {
+    return <div style={{fontSize:'0.86rem', color:'var(--muted)', lineHeight:1.5}}>
+      Couldn't read your subscription just now. Your access is unaffected, this panel
+      is only reporting. Try again shortly.
+    </div>;
+  }
+
+  return (
+    <div style={{fontSize:'0.88rem', lineHeight:1.6}}>
+      {st.reason === 'comp' && (
+        <p style={{color:'var(--accent)', fontWeight:600}}>
+          This account is free, permanently. Nothing to pay and nothing to cancel.
+        </p>
+      )}
+      {st.reason === 'free' && (
+        <p>
+          Free until <b>{fmt(entitlement.free_until)}</b>
+          {st.daysLeft != null ? ` (${st.daysLeft} day${st.daysLeft === 1 ? '' : 's'})` : ''}.
+          {' '}After that it is £5 a month.
+          {entitlement.stripe_customer_id
+            ? ' Your card is saved, so it will carry on without you doing anything.'
+            : ' Add a card whenever you like — you will not be charged until the free period ends.'}
+        </p>
+      )}
+      {st.reason === 'paying' && (
+        <p>
+          Subscribed at £5 a month.
+          {entitlement.cancel_at_period_end
+            ? ` Cancelling on ${fmt(entitlement.current_period_end)}.`
+            : ` Next payment ${fmt(entitlement.current_period_end)}.`}
+          {entitlement.stripe_status === 'past_due' && (
+            <><br /><span style={{color:'var(--warn)'}}>Your last payment did not go through. Update your card to avoid losing access.</span></>
+          )}
+        </p>
+      )}
+      {st.reason === 'lapsed' && (
+        <p style={{color:'var(--warn)'}}>
+          Your free period ended on {fmt(entitlement.free_until)}. Tutortally is read-only
+          until you subscribe. Nothing has been deleted and your export still works.
+        </p>
+      )}
+
+      {entitlement.plan === 'founder' && st.reason !== 'comp' && (
+        <p style={{color:'var(--gold)', fontSize:'0.82rem'}}>
+          Founder price: £5 a month stays £5 for as long as you keep this account.
+        </p>
+      )}
+
+      {st.reason !== 'comp' && (
+        <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:14}}>
+          {entitlement.stripe_customer_id ? (
+            <button className="billing-btn" disabled={busy}
+              onClick={() => billingRedirect('stripe-portal', setBusy, setError)}>
+              {busy ? 'Opening…' : 'Manage card, invoices and cancelling'}
+            </button>
+          ) : (
+            <button className="billing-btn" disabled={busy}
+              onClick={() => billingRedirect('stripe-checkout', setBusy, setError)}>
+              {busy ? 'Opening…' : 'Add a card'}
+            </button>
+          )}
+        </div>
+      )}
+      {error && <div style={{color:'var(--warn)', fontSize:'0.8rem', marginTop:8}}>{error}</div>}
+    </div>
+  );
+}
+
 
 function daysBetween(dateStr) {
   const d = new Date(dateStr);
@@ -1691,29 +2333,48 @@ function YourName({ session }) {
 }
 
 // ---------- Revenue trend ----------
-// Money actually received, by month. Built from payment dates rather than
-// lessons taught, so it reflects cash in hand rather than what's owed.
-function RevenueTrend({ payments, students, rateHistory }) {
+// Two different questions, one chart. "Earned" is what the lessons taught in
+// a month were worth; "received" is what actually landed in the bank that
+// month. They diverge whenever someone pays late, in advance, or in a lump.
+//
+// Earned is the default because it is the one with history behind it: lesson
+// records go back as far as the calendar does, whereas payment tracking only
+// starts when the tutor starts logging payments, so a received-only chart
+// shows a couple of bars and looks broken.
+function RevenueTrend({ payments, lessons, students, rateHistory }) {
   const M = useMoney();
-  const MONTHS_SHOWN = 6;
+  const [basis, setBasis] = React.useState('earned');
+  const [months, setMonths] = React.useState(12);
 
   const scaleByStudent = {};
   students.forEach(s => { scaleByStudent[s.id] = moneyScaleFor(s.id, rateHistory); });
 
   const buckets = {};
   const now = new Date();
-  for (let i = MONTHS_SHOWN - 1; i >= 0; i--) {
+  for (let i = months - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     // Built from local parts, not toISOString: midnight on the 1st in BST is
     // still the previous month in UTC, which silently merged July into June.
     buckets[`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`] = 0;
   }
 
-  payments.forEach(p => {
-    const key = String(p.date_paid || '').slice(0, 7);
-    if (!(key in buckets)) return;
-    buckets[key] += parseFloat(p.amount) * (scaleByStudent[p.student_id] ?? 1);
-  });
+  if (basis === 'received') {
+    payments.forEach(p => {
+      const key = String(p.date_paid || '').slice(0, 7);
+      if (!(key in buckets)) return;
+      buckets[key] += parseFloat(p.amount) * (scaleByStudent[p.student_id] ?? 1);
+    });
+  } else {
+    // A free lesson earned nothing, and a cancelled one never happened. Both
+    // would otherwise inflate a month that was quieter than it looks.
+    (lessons || [])
+      .filter(l => l.status === 'completed' && !l.is_complimentary)
+      .forEach(l => {
+        const key = String(l.lesson_date || '').slice(0, 7);
+        if (!(key in buckets)) return;
+        buckets[key] += rateForLesson(l, rateHistory);
+      });
+  }
 
   const rows = Object.entries(buckets).map(([key, total]) => ({
     key, total,
@@ -1734,14 +2395,35 @@ function RevenueTrend({ payments, students, rateHistory }) {
     ? Math.round(((lastFull.total - prevFull.total) / prevFull.total) * 100)
     : null;
 
+  const empty = monthsWithMoney === 0;
+
   return (
     <div>
-      <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
-        Money received each month. The current month is still filling up, so the
-        change below compares the last two complete months.
+      <div className="seg sub" style={{marginBottom:10}}>
+        <button className={basis === 'earned' ? 'sel' : ''} onClick={() => setBasis('earned')}>
+          Earned
+        </button>
+        <button className={basis === 'received' ? 'sel' : ''} onClick={() => setBasis('received')}>
+          Received
+        </button>
       </div>
 
-      {rows.map(r => (
+      <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
+        {basis === 'earned'
+          ? 'What the lessons you taught each month were worth, free lessons aside. The current month is still filling up, so the change below compares the last two complete months.'
+          : 'Money that actually arrived each month, dated by when it was paid. This only goes back as far as you have been logging payments.'}
+      </div>
+
+      {empty ? (
+        <div style={{
+          padding:'22px 16px', textAlign:'center', color:'var(--muted)',
+          fontSize:'0.84rem', lineHeight:1.5, background:'var(--card-2)',
+          border:'1px solid var(--line)', borderRadius:'var(--r-md)'
+        }}>
+          Nothing recorded in the last {months} months.
+          {basis === 'received' && ' Try Earned, which is built from the lessons themselves.'}
+        </div>
+      ) : rows.map(r => (
         <div className="rev-row" key={r.key}>
           <span className="rev-month">{r.label}</span>
           <span className="rev-track">
@@ -1760,7 +2442,7 @@ function RevenueTrend({ payments, students, rateHistory }) {
         <div style={{flex:'1 1 90px'}}>
           <div style={{fontSize:'1.15rem', fontWeight:750, letterSpacing:'-0.02em'}}>{M(received)}</div>
           <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.07em', marginTop:2}}>
-            last {MONTHS_SHOWN} months
+            last {months} months
           </div>
         </div>
         <div style={{flex:'1 1 90px'}}>
@@ -1781,6 +2463,15 @@ function RevenueTrend({ payments, students, rateHistory }) {
           </div>
         )}
       </div>
+
+      <button
+        onClick={() => setMonths(months === 12 ? 24 : 12)}
+        style={{
+          display:'block', width:'100%', marginTop:14, padding:'10px 0',
+          background:'none', border:'none', color:'var(--muted)',
+          fontFamily:'inherit', fontSize:'0.8rem', cursor:'pointer'
+        }}
+      >{months === 12 ? 'Show two years' : 'Show one year'}</button>
     </div>
   );
 }
@@ -1902,7 +2593,7 @@ function SlideToConfirm({ onConfirm }) {
 }
 
 // ---------- Global Tools Sheet ----------
-function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, session, initialTool = null, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onReplayWalkthrough, onDataChanged }) {
+function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], userEmail, session, entitlement, initialTool = null, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onReplayWalkthrough, onDataChanged }) {
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
   // Opens straight onto a panel when the walkthrough sent them here, so the
@@ -1952,6 +2643,38 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
     <button style={{background:'none',border:'none',color:'var(--muted)',cursor:'pointer',fontSize:'1.1rem',padding:0}} onClick={() => setTool(null)}>←</button>
   );
 
+  // Panels that belong together share one screen with a switch across the top,
+  // rather than sitting as separate lines in the menu. Six entries collapse to
+  // three, and the pair you actually wanted is one tap away instead of a
+  // return trip through the menu.
+  const GROUPS = {
+    money:   { title: 'Money',        tabs: [['revenue', 'Revenue trend'], ['growth', 'Growth calculator']] },
+    archive: { title: 'Archive',      tabs: [['archived', 'Students'], ['deletedpay', 'Payments']] },
+    account: { title: 'Your account', tabs: [['yourname', 'Your details'], ['password', 'Password']] },
+  };
+
+  function groupHeader(leaf) {
+    const group = Object.values(GROUPS).find(g => g.tabs.some(([id]) => id === leaf));
+    if (!group) return null;
+    return (
+      <div style={{marginBottom:16}}>
+        <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:12}}>
+          {backBtn}
+          <h2 style={{margin:0}}>{group.title}</h2>
+        </div>
+        <div className="seg">
+          {group.tabs.map(([id, label]) => (
+            <button
+              key={id}
+              className={id === leaf ? 'sel' : ''}
+              onClick={() => setTool(id)}
+            >{label}</button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
       <div className={`sheet${cls}`}>
@@ -1961,21 +2684,30 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
             <div className="tools-menu">
               <button onClick={() => setTool('gcal')}>📅 Google Calendar</button>
               <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>
-              <button onClick={() => setTool('archived')}>🗂 Archived students{archived.length > 0 ? ` (${archived.length})` : ''}</button>
-              <button onClick={() => setTool('deletedpay')}>🗃 Deleted payments</button>
-              <button onClick={() => setTool('revenue')}>💹 Revenue trend — what's actually come in</button>
-              <button onClick={() => setTool('growth')}>📈 Growth calculator — what if I had more students?</button>
+              <button onClick={() => setTool('revenue')}>💹 Money — revenue trend and growth calculator</button>
+              <button onClick={() => setTool('archived')}>
+                🗄 Archive — students and payments{archived.length > 0 ? ` (${archived.length})` : ''}
+              </button>
               <button onClick={() => setTool('privacy')}>
                 🕶 Privacy mode{privacyOn ? ' — on' : ''}
               </button>
               <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
-              <button onClick={() => setTool('yourname')}>✏️ Your name &amp; contact details</button>
+              <button onClick={() => setTool('yourname')}>👤 Your account — details and password</button>
+              <button onClick={() => setTool('billing')}>💳 Billing &amp; subscription</button>
               <button onClick={onReplayWalkthrough}>🧭 Replay walkthrough</button>
-              <button onClick={() => setTool('password')}>🔑 Change password</button>
               <button onClick={() => supabase.auth.signOut()} style={{color:'var(--muted)'}}>
                 ⏻ Sign out{userEmail ? ` — ${userEmail}` : ''}
               </button>
             </div>
+          </>
+        )}
+        {tool === 'billing' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:14}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Billing</h2>
+            </div>
+            <BillingPanel entitlement={entitlement} />
           </>
         )}
         {tool === 'privacy' && (
@@ -2011,37 +2743,25 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
         )}
         {tool === 'yourname' && (
           <>
-            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
-              {backBtn}
-              <h2 style={{margin:0}}>Your name &amp; contact details</h2>
-            </div>
+            {groupHeader('yourname')}
             <YourName session={session} />
           </>
         )}
         {tool === 'password' && (
           <>
-            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
-              {backBtn}
-              <h2 style={{margin:0}}>Change password</h2>
-            </div>
+            {groupHeader('password')}
             <ChangePassword />
           </>
         )}
         {tool === 'revenue' && (
           <>
-            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
-              {backBtn}
-              <h2 style={{margin:0}}>Revenue trend</h2>
-            </div>
-            <RevenueTrend payments={payments} students={students} rateHistory={rateHistory} />
+            {groupHeader('revenue')}
+            <RevenueTrend payments={payments} lessons={lessons} students={students} rateHistory={rateHistory} />
           </>
         )}
         {tool === 'growth' && (
           <>
-            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
-              {backBtn}
-              <h2 style={{margin:0}}>Growth calculator</h2>
-            </div>
+            {groupHeader('growth')}
             <GrowthCalculator
               students={students}
               rateHistory={rateHistory}
@@ -2087,10 +2807,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
         )}
         {tool === 'archived' && (
           <>
-            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
-              {backBtn}
-              <h2 style={{margin:0}}>Archived students</h2>
-            </div>
+            {groupHeader('archived')}
             {archived.length === 0 ? (
               <div style={{color:'var(--muted)', fontSize:'0.88rem', padding:'10px 0'}}>No archived students.</div>
             ) : (
@@ -2128,10 +2845,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], userEmail, ses
         )}
         {tool === 'deletedpay' && (
           <>
-            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
-              {backBtn}
-              <h2 style={{margin:0}}>Deleted payments</h2>
-            </div>
+            {groupHeader('deletedpay')}
             <DeletedPayments students={students} onDataChanged={onDataChanged} />
           </>
         )}
@@ -3932,12 +4646,54 @@ function App() {
   const [focusStudentId, setFocusStudentId] = useState(null);
   // undefined = still checking; null = signed out; object = signed in.
   const [session, setSession] = useState(undefined);
+  // undefined = not read yet; null = could not read (treated as full access);
+  // object = the real entitlement row.
+  const [entitlement, setEntitlement] = useState(undefined);
+  const [blockedOnce, setBlockedOnce] = useState(false);
+  const [billingNotice, setBillingNotice] = useState(null);
+  const [billingTick, setBillingTick] = useState(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => setSession(s ?? null));
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Read once per sign-in, and again after a return from Stripe, since the
+  // webhook that flips the status can land a second or two after the redirect.
+  useEffect(() => {
+    if (!session || DEMO_MODE) return;
+    let cancelled = false;
+    supabase.from('tutoring_subscriptions').select('*').maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          // Fail open: see readEntitlement. Never lock someone out of their
+          // own records because a billing read failed.
+          console.warn('subscription read failed, allowing access:', error.message);
+          setEntitlement(null);
+          return;
+        }
+        setEntitlement(data);
+      });
+    return () => { cancelled = true; };
+  }, [session?.user?.id, billingTick]);
+
+  // The lock is read by the client wrapper, which lives outside React, so it
+  // is assigned here as a side effect rather than passed down as a prop.
+  useEffect(() => {
+    if (DEMO_MODE) { WRITES_BLOCKED = false; return; }
+    WRITES_BLOCKED = !readEntitlement(entitlement).access;
+    notifyBlockedWrite = () => setBlockedOnce(true);
+  }, [entitlement]);
+
+  // Stripe redirects back before its webhook necessarily has; re-read twice.
+  useEffect(() => {
+    if (billingNotice !== 'done') return;
+    const a = setTimeout(() => setBillingTick(n => n + 1), 2500);
+    const b = setTimeout(() => setBillingTick(n => n + 1), 7000);
+    return () => { clearTimeout(a); clearTimeout(b); };
+  }, [billingNotice]);
 
   // -1 means finished or skipped. Anything else — including never having had
   // the field at all, which is every account that predates this — means show
@@ -3969,6 +4725,12 @@ function App() {
       setGoogleStatus(google);
       window.history.replaceState({}, '', window.location.pathname);
       setTimeout(() => setGoogleStatus(null), 6000);
+    }
+    const billing = params.get('billing');
+    if (billing) {
+      setBillingNotice(billing);
+      window.history.replaceState({}, '', window.location.pathname);
+      setTimeout(() => setBillingNotice(null), 9000);
     }
   }, []);
 
@@ -4068,6 +4830,19 @@ function App() {
   return (
     <PrivacyContext.Provider value={{ moneyMode, nameMode }}>
     <div>
+      <BillingBar entitlement={entitlement} blockedOnce={blockedOnce} />
+      {billingNotice && (
+        <div style={{
+          position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
+          padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600, maxWidth:'92vw',
+          background: billingNotice === 'done' ? 'var(--accent)' : 'var(--warn)',
+          color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
+        }}>
+          {billingNotice === 'done'
+            ? 'Thanks — your subscription is active.'
+            : 'Payment was cancelled. Nothing has been charged.'}
+        </div>
+      )}
       {monzoStatus && (
         <div style={{
           position:'fixed', top:12, left:'50%', transform:'translateX(-50%)', zIndex:200,
@@ -4218,6 +4993,8 @@ function App() {
           students={students}
           rateHistory={rateHistory}
           payments={payments}
+          lessons={lessons}
+          entitlement={entitlement}
           userEmail={session?.user?.email}
           session={session}
           initialTool={toolsInitial}
