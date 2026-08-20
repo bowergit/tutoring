@@ -161,16 +161,31 @@ function buildGrade(papers: any[], student: any, rows: any[]) {
     pcts: toPcts(typicalGrades, maxMark),
   }
 
+  // "1H/2H" and "1HR/2HR" are two different sittings of the same series: the R
+  // papers are the international replacement set. Pooling all four averages
+  // between them and can report a grade neither sitting actually earned. Sam's
+  // June 2024 is the case in point: 160 marks on H is a grade 8, 166 on HR is
+  // a 9, and the pooled 163 reads as a 9 the H papers never reached.
   const sets = new Map<string, any>()
   for (const p of papers) {
-    const key = `${p.sheet_tab}|${p.paper_set}`
-    if (!sets.has(key)) sets.set(key, { set: p.paper_set, tab: p.sheet_tab, papers: [] })
+    const variant = /R$/i.test(String(p.paper_code || '')) ? 'R' : ''
+    const key = `${p.sheet_tab}|${p.paper_set}|${variant}`
+    if (!sets.has(key)) {
+      sets.set(key, {
+        set: variant ? `${p.paper_set} (R)` : p.paper_set,
+        series: p.paper_set,
+        tab: p.sheet_tab,
+        papers: [],
+      })
+    }
     sets.get(key).papers.push(p)
   }
 
   const out: any[] = []
   for (const s of sets.values()) {
-    const parsed = parseSeries(s.set)
+    // Parsed off the series, not the label, so the "(R)" suffix never stops a
+    // set from finding its own published boundaries.
+    const parsed = parseSeries(s.series)
     const done = s.papers.length
     const pct = round1(mean(s.papers.map((p: any) => Number(p.percentage))))
     const lastDate = s.papers.map((p: any) => p.date_taken).sort().slice(-1)[0]
@@ -326,7 +341,12 @@ Deno.serve(async (req) => {
     const { data: papers } = await supabase.from('tutoring_past_papers')
       .select('paper_set,paper_code,percentage,score_raw,max_score,date_taken,sheet_tab')
       .eq('student_id', student.id)
+      // Two papers sat on the same day are common, and a tie with no defined
+      // order lets "latest" and the trend arrow change between refreshes on
+      // identical data. The extra keys only ever break ties.
       .order('date_taken')
+      .order('paper_set')
+      .order('paper_code')
     progress = buildProgress(papers ?? [], student)
 
     const identity = examIdentity(student, papers ?? [])

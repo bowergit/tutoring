@@ -315,16 +315,24 @@ function papersFromSheet_(spreadsheetUrl) {
 
   ss.getSheets().forEach(sheet => {
     const tab = sheet.getName();
-    const values = sheet.getDataRange().getValues();
+    const range = sheet.getDataRange();
+    const values = range.getValues();
+    // Sheets quietly turns "Jun 2018" in the paper-set column into a real
+    // date, so getValues hands back a Date and the set was being recorded as
+    // "Fri Jun 01 2018 00:00:00 GMT+0100 (British Summer Time)". The displayed
+    // text is what the tutor typed and what the boundary lookup needs, so
+    // labels are read from there and only the score and date come from the
+    // underlying values.
+    const shown = range.getDisplayValues();
 
     for (let r = 0; r < values.length; r++) {
-      const cDate = headerIndex_(values[r], PAPER_HEADER_PATTERN);
+      const cDate = headerIndex_(shown[r], PAPER_HEADER_PATTERN);
       if (cDate < 1) continue;
 
-      const cSet   = headerIndex_(values[r], /^paper\s*set$/i);
-      const cPaper = headerIndex_(values[r], /^paper$/i);
+      const cSet   = headerIndex_(shown[r], /^paper\s*set$/i);
+      const cPaper = headerIndex_(shown[r], /^paper$/i);
       const cScore = cDate - 1;
-      const scale  = scoreScaleFromHeader_(values[r][cScore]);
+      const scale  = scoreScaleFromHeader_(shown[r][cScore]);
 
       // Paper set is a merged cell spanning its two or three papers, so only
       // the first row of each group carries the text. Everything below it
@@ -332,7 +340,7 @@ function papersFromSheet_(spreadsheetUrl) {
       let lastSet = '';
 
       for (let rr = r + 1; rr < values.length; rr++) {
-        const setCell = cSet >= 0 ? String(values[rr][cSet] || '').trim() : '';
+        const setCell = cSet >= 0 ? String(shown[rr][cSet] || '').trim() : '';
         if (setCell) lastSet = setCell;
 
         const when = resolvePaperDate_(values[rr][cDate], today);
@@ -348,7 +356,7 @@ function papersFromSheet_(spreadsheetUrl) {
         out.push({
           tab: tab,
           set: lastSet,
-          code: cPaper >= 0 ? String(values[rr][cPaper] || '').trim() : '',
+          code: cPaper >= 0 ? String(shown[rr][cPaper] || '').trim() : '',
           raw: raw,
           max: scale.max,
           pct: Math.round(pct * 10) / 10,
