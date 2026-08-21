@@ -53,7 +53,9 @@ In the Stripe dashboard, in **test mode** first:
    **recurring, monthly**. Save it and copy the price ID, which looks like
    `price_1Q...`.
 2. **Developers → API keys.** Copy the **secret key** (`sk_test_...`).
-3. **Developers → Webhooks → Add endpoint.**
+3. **Developers → Webhooks → Add event destination.**
+   Stripe used to call this **Add endpoint**. If your dashboard says
+   **Event destination**, that is the right screen.
    - URL: `https://uilytgubukiinyrqrltj.supabase.co/functions/v1/stripe-webhook`
    - Events to send:
      - `checkout.session.completed`
@@ -81,7 +83,7 @@ Dashboard → **Project Settings → Edge Functions → Secrets**. Add:
 |---|---|
 | `STRIPE_SECRET_KEY` | `sk_test_...` then `sk_live_...` |
 | `STRIPE_PRICE_ID` | the `price_...` for Tutortally Pro |
-| `STRIPE_WEBHOOK_SECRET` | the `whsec_...` from the endpoint |
+| `STRIPE_WEBHOOK_SECRET` | the `whsec_...` from the event destination |
 
 Paste them straight into the dashboard. Do not put them in a file in this repo,
 do not paste them into a chat, and do not email them to yourself.
