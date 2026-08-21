@@ -1405,23 +1405,17 @@ function daysBetween(dateStr) {
 }
 
 function currentSchoolYear(baseYear, asOfDate) {
-  if (baseYear == null || !asOfDate) return null;
-  const ref = new Date(asOfDate);
-  const now = new Date();
-  let bumps = 0;
-  let cursor = new Date(ref.getFullYear(), 7, 1); // 1 August of ref's year
-  if (ref >= cursor) cursor.setFullYear(cursor.getFullYear() + 1);
-  while (cursor <= now) {
-    bumps++;
-    cursor.setFullYear(cursor.getFullYear() + 1);
-  }
-  return Math.min(baseYear + bumps, 13);
+  if (baseYear == null) return null;
+  return baseYear;
 }
 
-const DANIEL_ACCOUNT_EMAIL = 'daniel@bowermagic.co.uk';
+const DANIEL_ACCOUNT_EMAILS = new Set([
+  'daniel@bowermagic.co.uk',
+  'danielbowermagic@gmail.com',
+]);
 
 function isDanielAccount(session) {
-  return (session?.user?.email || '').toLowerCase() === DANIEL_ACCOUNT_EMAIL;
+  return DANIEL_ACCOUNT_EMAILS.has((session?.user?.email || '').toLowerCase());
 }
 
 function septemberSchoolYearLabel(value) {
@@ -1434,18 +1428,24 @@ function septemberSchoolYearLabel(value) {
 }
 
 function studentLessonLocation(student) {
-  if (student?.lesson_location) return student.lesson_location;
-  if (student?.is_zoom) return 'online';
+  if (student?.lesson_location === 'student_home' || student?.lesson_location === 'tutor_home') return student.lesson_location;
   if (student?.address) return 'student_home';
-  return 'tutor_home';
+  return null;
 }
 
 function studentLessonLocationLabel(student) {
   const location = studentLessonLocation(student);
-  if (location === 'online') return 'Online';
   if (location === 'student_home') return "Student's house";
   if (location === 'tutor_home') return "Tutor's house";
   return null;
+}
+
+function studentLessonPills(student) {
+  const pills = [];
+  if (student?.is_zoom) pills.push('Online');
+  const inPerson = studentLessonLocationLabel(student);
+  if (inPerson) pills.push(inPerson);
+  return pills;
 }
 
 const PRESET_BOARDS = ['Edexcel', 'AQA', 'Edexcel IGCSE', 'OCR'];
@@ -1975,8 +1975,9 @@ function GoogleUnverifiedNote({ compact = false }) {
       lineHeight:1.45,
     }}>
       <b style={{color:'var(--ink)'}}>You may see "Google hasn't verified this app".</b>{' '}
-      While TutorTally is this early, tap <b>Advanced</b>, then the <b>Go to...</b> link.
-      Google may label that link "unsafe", but the calendar access is read-only.
+      While TutorTally is this early, tap <b>Advanced</b> at the bottom left, then tap{' '}
+      <b>Go to TutorTally (unsafe)</b>. Google uses that exact scary word, but the
+      calendar access is read-only.
     </div>
   );
 }
@@ -3383,6 +3384,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
   const existingBoard = student?.exam_board || '';
   const initPreset = PRESET_BOARDS.includes(existingBoard) ? existingBoard : (existingBoard ? 'other' : '');
   const initialLessonLocation = studentLessonLocation(student);
+  const initialInPerson = isEdit ? !!initialLessonLocation : true;
 
   const [form, setForm] = useState({
     name: student?.name || '',
@@ -3396,9 +3398,9 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
     exam_tier: student?.exam_tier || '',
     has_extra_time: student?.has_extra_time || false,
     pays_in_cash: !!student?.pays_in_cash,
-    is_zoom: initialLessonLocation === 'online',
-    in_person: initialLessonLocation !== 'online',
-    lesson_location: initialLessonLocation === 'student_home' ? 'student_home' : 'tutor_home',
+    is_zoom: !!student?.is_zoom,
+    in_person: initialInPerson,
+    lesson_location: initialLessonLocation || 'tutor_home',
     zoom_link: student?.zoom_link || '',
     monzo_payer_name: student?.monzo_payer_name || '',
     general_notes: student?.general_notes || '',
@@ -3423,8 +3425,6 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
     setForm(f => ({
       ...f,
       is_zoom: v,
-      in_person: !v,
-      lesson_location: v ? 'online' : (f.lesson_location === 'online' ? 'tutor_home' : f.lesson_location || 'tutor_home'),
       zoom_link: v && !f.zoom_link ? 'https://zoom.us/' : f.zoom_link,
     }));
   }
@@ -3432,10 +3432,8 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
   function toggleInPerson(v) {
     setForm(f => ({
       ...f,
-      is_zoom: !v,
       in_person: v,
-      lesson_location: v ? (f.lesson_location === 'online' ? 'tutor_home' : f.lesson_location || 'tutor_home') : 'online',
-      zoom_link: !v && !f.zoom_link ? 'https://zoom.us/' : f.zoom_link,
+      lesson_location: f.lesson_location || 'tutor_home',
     }));
   }
 
@@ -3482,7 +3480,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
       has_extra_time: form.has_extra_time,
       pays_in_cash: form.pays_in_cash,
       is_zoom: form.is_zoom,
-      lesson_location: form.is_zoom ? 'online' : (form.in_person ? form.lesson_location : null),
+      lesson_location: form.in_person ? form.lesson_location : null,
       zoom_link: form.zoom_link || null,
       monzo_payer_name: danielOnly ? (form.monzo_payer_name || null) : (student?.monzo_payer_name || null),
       general_notes: form.general_notes,
@@ -3659,7 +3657,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         <div className="field">
           <div style={{display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
             <Toggle checked={form.is_zoom} onChange={toggleOnline} label="Online lesson" />
-            <Toggle checked={form.in_person} onChange={toggleInPerson} label="In-person lesson" />
+            <Toggle checked={form.in_person} onChange={toggleInPerson} label="In person lesson" />
           </div>
         </div>
         {form.is_zoom && (
@@ -3672,7 +3670,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         )}
         {form.in_person && (
           <div className="field">
-            <label>In-person location</label>
+            <label>In person location</label>
             <div style={{display:'flex', alignItems:'center', gap:10, flexWrap:'wrap'}}>
               <button type="button" className={`billing-btn ${form.lesson_location === 'student_home' ? '' : 'ghost'}`}
                 onClick={() => setForm({...form, lesson_location:'student_home'})}>
@@ -4614,7 +4612,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const displayYear = currentSchoolYear(student.school_year, student.school_year_as_of_date);
   const referredBy = danielOnly && student.referred_by_student_id ? allStudents.find(s => s.id === student.referred_by_student_id) : null;
   const referrals = danielOnly ? allStudents.filter(s => s.referred_by_student_id === student.id) : [];
-  const lessonLocationLabel = studentLessonLocationLabel(student);
+  const lessonPills = studentLessonPills(student);
 
   const currentRate = getCurrentRate(student.id, rateHistory);
   const unpaidCount = balance > 0 && currentRate > 0 ? Math.ceil(balance / currentRate) : 0;
@@ -4674,7 +4672,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
             )}
             {displayYear && <span className="pill neutral">Y{displayYear}</span>}
             <span className="pill neutral">{M(currentRate, student.id + ':rate')}</span>
-            {lessonLocationLabel && <span className="pill neutral">{lessonLocationLabel}</span>}
+            {lessonPills.map(label => <span className="pill neutral" key={label}>{label}</span>)}
           </div>
         </div>
         <span className={`chevron ${open ? 'open' : ''}`}>›</span>
@@ -4690,20 +4688,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                   {student.school}{displayYear ? `, Year ${displayYear}` : ''}{student.exam_board ? ` · ${student.exam_board}` : ''}{student.exam_tier && student.exam_tier !== 'not_sure' ? ` (${student.exam_tier})` : ''}
                 </div>
               )}
-              {displayYear && student.school_year && (() => {
-                const now = new Date();
-                const thisAug = new Date(now.getFullYear(), 7, 1);
-                const nextAug = now < thisAug ? thisAug : new Date(now.getFullYear() + 1, 7, 1);
-                const nextDisplayYear = Math.min(displayYear + 1, 13);
-                const daysToUpdate = Math.ceil((nextAug - now) / 86400000);
-                const startedLabel = student.school_year !== displayYear ? ` · started Y${student.school_year}` : '';
-                // Only worth mentioning when it's imminent - "Y12 in 360d" is
-                // noise for eleven and a half months of the year.
-                const updateLabel = (nextDisplayYear <= 13 && daysToUpdate <= 14)
-                  ? ` · Y${nextDisplayYear} in ${daysToUpdate}d`
-                  : '';
-                return <div style={{fontSize:'0.76rem', color:'var(--muted)', marginBottom:4}}>{`Y${displayYear}${startedLabel}${updateLabel}`}</div>;
-              })()}
               {referredBy && (
                 <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>Referred by {N(referredBy.name, referredBy.id).split(' ')[0]}</div>
               )}
@@ -4951,7 +4935,7 @@ const WT_STEPS = [
   {
     key: 'calendar',
     title: 'Connect your Google Calendar',
-    body: "This is the one that matters. Your lessons come straight out of your calendar, so you never type a timetable in by hand. If Google says the app is not verified yet, tap Advanced, then the Go to... link. The access is read-only.",
+    body: "This is the one that matters. Your lessons come straight out of your calendar, so you never type a timetable in by hand. If Google says \"Google hasn't verified this app\", tap Advanced at the bottom left, then tap \"Go to TutorTally (unsafe)\". Google uses that exact scary word, but the calendar access is read-only.",
     action: { label: '📅 Open calendar settings', tool: 'gcal' },
   },
   {
@@ -5562,7 +5546,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v5.7</div>}
+        {!loading && <div className="version-tag">v5.8</div>}
       </div>
 
       {showAddModal && (
