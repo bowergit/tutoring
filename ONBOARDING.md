@@ -1,10 +1,10 @@
-# Getting a tutor onto Tutortally
+# Getting a tutor onto TutorTally
 
 Written 21 Aug 2026. Covers the one-time setup you do once, then the two ways a
 tutor gets an account, then the admin commands for everything after.
 
 The short version: a tutor can now sign themselves up at
-`tutoring.bowermaths.co.uk/?signup=1`, land on the free plan, and use the app
+`tutoring.bowermaths.co.uk/?signup=1`, land on TutorTally Lite, and use the app
 without you touching anything. You only get involved if you want to.
 
 ---
@@ -43,13 +43,13 @@ take about ten minutes and are free at this volume. Send from
 `noreply@bowermaths.co.uk` so it does not land in spam.
 
 While you are there, edit the **Confirm signup** template. The default says
-"Confirm your signup" with no mention of Tutortally, which reads like phishing.
+"Confirm your signup" with no mention of TutorTally, which reads like phishing.
 
 ### 1c. Stripe (needed before anyone goes past 3 students)
 
 In the Stripe dashboard, in **test mode** first:
 
-1. **Products → Add product.** Name it `Tutortally Pro`. Price **£5.00 GBP**,
+1. **Products → Add product.** Name it `TutorTally Pro`. Price **£5.00 GBP**,
    **recurring, monthly**. Save it and copy the price ID, which looks like
    `price_1Q...`.
 2. **Developers → API keys.** Copy the **secret key** (`sk_test_...`).
@@ -82,7 +82,7 @@ Dashboard → **Project Settings → Edge Functions → Secrets**. Add:
 | Name | Value |
 |---|---|
 | `STRIPE_SECRET_KEY` | `sk_test_...` then `sk_live_...` |
-| `STRIPE_PRICE_ID` | the `price_...` for Tutortally Pro |
+| `STRIPE_PRICE_ID` | the `price_...` for TutorTally Pro |
 | `STRIPE_WEBHOOK_SECRET` | the `whsec_...` from the event destination |
 
 Paste them straight into the dashboard. Do not put them in a file in this repo,
@@ -97,7 +97,7 @@ With test-mode keys set:
 
 1. Sign in as a test account with 4 or more active students, so the upgrade bar
    appears.
-2. Tools → Billing → **Go Pro**.
+2. Tools → Billing → **Get TutorTally Pro**.
 3. Use Stripe's test card `4242 4242 4242 4242`, any future expiry, any CVC.
 4. You should come back to `/?billing=done`, see "your subscription is active",
    and the bar should disappear within a few seconds as the webhook lands.
@@ -169,7 +169,7 @@ from tutoring_account_overview
 order by joined desc;
 ```
 
-### Give someone Pro free, permanently (friends, family, you)
+### Give someone TutorTally Pro free, permanently (friends, family, you)
 
 ```sql
 update tutoring_subscriptions set plan = 'comp'
@@ -179,7 +179,7 @@ where owner_id = (select id from auth.users where email = 'them@example.com');
 A comped account never sees a payment prompt, and the Stripe webhook will not
 downgrade it.
 
-### Give someone free Pro for a while (beta, referral months, goodwill)
+### Give someone TutorTally Pro free for a while (beta, referral months, goodwill)
 
 ```sql
 select tutoring_grant_pro_months(
@@ -187,7 +187,7 @@ select tutoring_grant_pro_months(
 ```
 
 Adds three months to whatever they already have and returns the new date. They
-keep the free plan underneath, so when it runs out they drop back to 3 students
+keep TutorTally Lite underneath, so when it runs out they drop back to 3 students
 rather than being locked out, unless they are over the limit.
 
 ### Change someone's free student limit
@@ -199,7 +199,7 @@ where owner_id = (select id from auth.users where email = 'them@example.com');
 
 Useful for a tutor you want to keep sweet without comping them entirely.
 
-### Take Pro back off someone
+### Take TutorTally Pro back off someone
 
 ```sql
 update tutoring_subscriptions
@@ -218,10 +218,10 @@ Worth knowing so you can answer questions without reading the code.
 
 | Situation | What they get |
 |---|---|
-| 3 or fewer active students, free plan | Everything. No prompts beyond a quiet bar at exactly 3. |
-| At 3, pressing "+ Add" | A modal explaining Pro, with archive suggested as the alternative. |
-| Over 3, no Pro | Read-only. They can look and export, but not change. |
-| Pro via Stripe | Everything, no limit. |
+| 3 or fewer active students, TutorTally Lite | Everything. No prompts beyond a quiet bar at exactly 3. |
+| At 3, pressing "+ Add" | A modal explaining TutorTally Pro, with archive suggested as the alternative. |
+| Over 3, no TutorTally Pro | Read-only. They can look and export, but not change. |
+| TutorTally Pro via Stripe | Everything, no limit. |
 | Card failed (`past_due`) | Everything, still. Stripe retries for days; locking them out over an expired card is worse. |
 | Comped | Everything, forever, no billing UI. |
 | Billing row unreadable | Everything. It fails open on purpose. |

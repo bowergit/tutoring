@@ -1,8 +1,8 @@
-# Tutortally Brand Pack
+# TutorTally Brand Pack
 
 ## Positioning
 
-Tutortally is the tiny finance desk for solo tutors.
+TutorTally is the tiny finance desk for solo tutors.
 
 It is for private tutors who teach alone, manage parents directly, and do not want a full CRM. They need to know what happened, what was paid, and what still needs chasing, without rebuilding their diary in another tool.
 
@@ -16,7 +16,7 @@ They are not buying "software". They are buying relief from the awkward moment o
 
 ## Promise
 
-Tutortally turns your calendar into a clear record of lessons, payments, parent links, and polite chase messages.
+TutorTally turns your calendar into a clear record of lessons, payments, parent links, and polite chase messages.
 
 Short version: tutoring admin, finally totalled.
 
@@ -24,7 +24,7 @@ Short version: tutoring admin, finally totalled.
 
 Clear, warm, precise, and quietly on the tutor's side.
 
-Tutortally should feel like a small, sensible tool made by someone who has actually taught lessons and chased parents. It should never sound corporate, over-automated, or like a generic school platform.
+TutorTally should feel like a small, sensible tool made by someone who has actually taught lessons and chased parents. It should never sound corporate, over-automated, or like a generic school platform.
 
 ## Voice
 
@@ -59,7 +59,7 @@ Avoid:
 
 ## Visual Identity
 
-Logo idea: a compact tally-mark icon beside the Tutortally wordmark. The mark should feel like counting lessons on a ledger, not like a school badge.
+Logo idea: a compact tally-mark icon beside the TutorTally wordmark. The mark should feel like counting lessons on a ledger, not like a school badge.
 
 Logo files:
 - `brand/tutortally-mark.svg`

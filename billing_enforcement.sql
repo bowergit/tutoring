@@ -1,8 +1,8 @@
--- Tutortally billing enforcement.
+-- TutorTally billing enforcement.
 -- Free accounts can have up to free_student_limit active students.
--- Pro access comes from a comped account, a live free Pro grant, or a live
--- Stripe subscription status. If a Pro account later lapses while over the
--- limit, ordinary writes become read-only until students are archived or Pro
+-- TutorTally Pro access comes from a comped account, a live free TutorTally Pro grant, or a live
+-- Stripe subscription status. If a TutorTally Pro account later lapses while over the
+-- limit, ordinary writes become read-only until students are archived or TutorTally Pro
 -- is active again.
 
 create or replace function public.tutoring_has_pro_access(p_owner uuid)
@@ -67,11 +67,11 @@ begin
     end if;
     raise exception using
       errcode = 'P0001',
-      message = 'This account is over the free plan student limit, so Tutortally is read-only until students are archived or Pro is active.';
+      message = 'This account is over the TutorTally Lite student limit, so TutorTally is read-only until students are archived or TutorTally Pro is active.';
   elsif tg_op = 'DELETE' and v_read_only then
     raise exception using
       errcode = 'P0001',
-      message = 'This account is over the free plan student limit. Archive students instead of deleting them, or activate Pro.';
+      message = 'This account is over the TutorTally Lite student limit. Archive students instead of deleting them, or activate TutorTally Pro.';
   end if;
 
   if tg_op in ('INSERT', 'UPDATE')
@@ -88,7 +88,7 @@ begin
     if v_count >= v_limit then
       raise exception using
         errcode = 'P0001',
-        message = format('The free plan covers %s active students. Pro is £5 a month for as many as you like.', v_limit);
+        message = format('TutorTally Lite covers %s active students. TutorTally Pro is £5 a month for as many as you like.', v_limit);
     end if;
   end if;
 
@@ -111,7 +111,7 @@ begin
   if not public.tutoring_can_write_account(v_owner) then
     raise exception using
       errcode = 'P0001',
-      message = 'This account is over the free plan student limit, so Tutortally is read-only until students are archived or Pro is active.';
+      message = 'This account is over the TutorTally Lite student limit, so TutorTally is read-only until students are archived or TutorTally Pro is active.';
   end if;
 
   if tg_op = 'DELETE' then

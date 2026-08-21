@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 190" role="img" aria-labelledby="title desc">
-  <title id="title">Tutortally logo</title>
-  <desc id="desc">Tutortally wordmark with a smart tally mark icon.</desc>
+  <title id="title">TutorTally logo</title>
+  <desc id="desc">TutorTally wordmark with a smart tally mark icon.</desc>
   <defs>
     <filter id="soft-shadow" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#15211f" flood-opacity="0.16"/>

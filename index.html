@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>Tutortally</title>
+<title>TutorTally</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
@@ -591,11 +591,11 @@ const DEMO_MODE = new URLSearchParams(window.location.search).has('demo');
 // stay readable and exportable, so lapsing blocks writing, not looking.
 let WRITES_BLOCKED = false;
 let notifyBlockedWrite = () => {};
-const BLOCKED_MESSAGE = "You are over the free plan's student limit, so Tutortally is read-only for now. Nothing has been deleted.";
+const BLOCKED_MESSAGE = "You are over TutorTally Lite's student limit, so TutorTally is read-only for now. Nothing has been deleted.";
 
-// Set when the account is on the free plan and already using every slot.
+// Set when the account is on TutorTally Lite and already using every slot.
 // Adding one more student is refused on its own, rather than the whole app
-// locking, so the tutor hits a clear "this needs Pro" at the moment they try.
+  // locking, so the tutor hits a clear "this needs TutorTally Pro" at the moment they try.
 let NEW_STUDENT_BLOCKED = false;
 let CURRENT_FREE_LIMIT = 3;
 let notifyStudentLimit = () => {};
@@ -613,7 +613,7 @@ function refuseWrite(table, op, args) {
     const unarchiving = op === 'update' && payload && payload.active === true;
     if (adding || unarchiving) {
       return {
-        message: `The free plan covers ${CURRENT_FREE_LIMIT} active students. Pro is £5 a month for as many as you like.`,
+        message: `TutorTally Lite covers ${CURRENT_FREE_LIMIT} active students. TutorTally Pro is £5 a month for as many as you like.`,
         notify: () => notifyStudentLimit(),
       };
     }
@@ -1036,10 +1036,10 @@ if (DEMO_MODE) {
 const supabase = DEMO_MODE ? makeDemoClient() : guardedClient(realSupabase);
 
 // ---------- Billing ----------
-// Free forever up to a student count, Pro when you outgrow it. So the gate is
+// TutorTally Lite up to a student count, TutorTally Pro when you outgrow it. So the gate is
 // a count, not a date.
 //
-// Pro comes from any of three things: a comped account, a pro_free_until date
+// TutorTally Pro comes from any of three things: a comped account, a pro_free_until date
 // still in the future (beta periods, referral months, goodwill), or a live
 // Stripe subscription. past_due counts as live, because Stripe retries a failed
 // card for days and locking a tutor out of their own lesson records over an
@@ -1063,6 +1063,15 @@ const ADDONS = [
 ];
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
+function tutorCopyName(name) {
+  const clean = String(name || '').trim();
+  return clean ? `${clean}'s TutorTally` : 'TutorTally';
+}
+function planCopyName(st, ownerName) {
+  const base = tutorCopyName(ownerName);
+  if (st?.unknown) return base;
+  return `${base} ${st?.pro ? 'Pro' : 'Lite'}`;
+}
 
 function readEntitlement(ent, activeStudents = 0) {
   const limit = ent?.free_student_limit ?? DEFAULT_FREE_LIMIT;
@@ -1136,7 +1145,7 @@ async function refreshBillingFromStripe(accessToken) {
   return body.entitlement ?? null;
 }
 
-function GoProButton({ label = 'Go Pro - £5 a month', ghost }) {
+function GoProButton({ label = 'Get TutorTally Pro - £5 a month', ghost }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   return (
@@ -1150,7 +1159,7 @@ function GoProButton({ label = 'Go Pro - £5 a month', ghost }) {
   );
 }
 
-function BillingBar({ entitlement, activeStudents, blockedOnce, suppressFreePrompt = false }) {
+function BillingBar({ entitlement, activeStudents, blockedOnce, suppressFreePrompt = false, ownerName = '' }) {
   if (DEMO_MODE) {
     return (
       <div className="billing-bar demo">
@@ -1162,15 +1171,17 @@ function BillingBar({ entitlement, activeStudents, blockedOnce, suppressFreeProm
 
   if (!entitlement) return null;
   const st = readEntitlement(entitlement, activeStudents);
+  const liteName = planCopyName({ ...st, pro: false }, ownerName);
+  const proName = planCopyName({ ...st, pro: true }, ownerName);
 
-  // Over the limit with no Pro: the whole app is read-only, as the terms say.
+  // Over the limit with no TutorTally Pro: the whole app is read-only, as the terms say.
   if (!st.access) {
     return (
       <div className="billing-bar warn">
         <span>
-          <b>Read-only.</b>{blockedOnce ? ' That change was not saved.' : ''} You have{' '}
-          {activeStudents} active students and the free plan covers {st.limit}. Archive a few,
-          or go Pro for as many as you like. Nothing has been deleted.
+          <b>Read-only.</b>{blockedOnce ? ' That change was not saved.' : ''} {liteName} covers{' '}
+          {st.limit} active students, and you have {activeStudents}. Archive a few,
+          or switch to {proName}. Nothing has been deleted.
         </span>
         <GoProButton />
       </div>
@@ -1187,27 +1198,27 @@ function BillingBar({ entitlement, activeStudents, blockedOnce, suppressFreeProm
     );
   }
 
-  // On the free plan and using every slot: say so before they hit the wall.
+  // On TutorTally Lite and using every slot: say so before they hit the wall.
   if (!st.pro && st.atLimit) {
     return (
       <div className="billing-bar">
         <span>
-          You're using {activeStudents} of your {st.limit} free students. Pro is £5 a month
-          for as many as you like.
+          You're using all {st.limit} slots in {liteName}. {proName} is £5 a month for as many
+          as you like.
         </span>
         <GoProButton ghost />
       </div>
     );
   }
 
-  // Free Pro running out, and no card on file to carry it on.
+  // A free TutorTally Pro period running out, and no card on file to carry it on.
   if (st.granted && !st.paying && !st.comped && st.grantDaysLeft != null && st.grantDaysLeft <= 21) {
     return (
       <div className="billing-bar">
         <span>
           {st.grantDaysLeft <= 0
-            ? 'Your free Pro ends today.'
-            : `${st.grantDaysLeft} day${st.grantDaysLeft === 1 ? '' : 's'} of free Pro left.`}
+            ? 'Your TutorTally Pro free period ends today.'
+            : `${st.grantDaysLeft} day${st.grantDaysLeft === 1 ? '' : 's'} of TutorTally Pro left.`}
           {' '}£5 a month after that, or drop back to {st.limit} students and pay nothing.
         </span>
         <GoProButton label="Add a card" ghost />
@@ -1218,7 +1229,7 @@ function BillingBar({ entitlement, activeStudents, blockedOnce, suppressFreeProm
   return null;
 }
 
-function BillingPanel({ entitlement, activeStudents }) {
+function BillingPanel({ entitlement, activeStudents, ownerName = '' }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const fmt = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
@@ -1242,6 +1253,9 @@ function BillingPanel({ entitlement, activeStudents }) {
   const st = readEntitlement(entitlement, activeStudents);
   const activeAddons = ADDONS.filter(a => st.addons.includes(a.key));
   const hasStripeCustomer = !!entitlement.stripe_customer_id;
+  const liteName = planCopyName({ ...st, pro: false }, ownerName);
+  const proName = planCopyName({ ...st, pro: true }, ownerName);
+  const currentPlanName = planCopyName(st, ownerName);
 
   return (
     <div style={{fontSize:'0.88rem', lineHeight:1.6}}>
@@ -1249,46 +1263,46 @@ function BillingPanel({ entitlement, activeStudents }) {
         display:'flex', alignItems:'baseline', gap:8, marginBottom:4,
         fontSize:'1.05rem', fontWeight:700, letterSpacing:'-0.02em'
       }}>
-        {st.comped ? 'Pro, on the house' : st.pro ? 'Pro' : 'Free plan'}
+        {st.comped ? `${currentPlanName}, on the house` : currentPlanName}
         {st.pro && !st.comped && !st.paying && <span style={{fontSize:'0.78rem', fontWeight:600, color:'var(--gold)'}}>free period</span>}
       </div>
 
       <div style={{color:'var(--muted)', fontSize:'0.84rem', marginBottom:14}}>
         {activeStudents} active student{activeStudents === 1 ? '' : 's'}
-        {st.pro ? ' · no limit' : ` of ${st.limit} included`}
+        {st.pro ? ' · no limit' : ` of ${st.limit} included in Lite`}
       </div>
 
       {st.comped && (
         <p style={{color:'var(--accent)'}}>
-          This account has Pro permanently. Nothing to pay and nothing to cancel.
+          This account has {proName} permanently. Nothing to pay and nothing to cancel.
         </p>
       )}
 
       {st.reason === 'free' && !st.atLimit && (
         <p>
-          You are well inside the free plan. Nothing to pay. If you go past {st.limit} active
-          students, Pro is £5 a month for as many as you like.
+          You are well inside {liteName}. Nothing to pay. If you go past {st.limit} active
+          students, {proName} is £5 a month for as many as you like.
         </p>
       )}
 
       {st.reason === 'free' && st.atLimit && !st.over && (
         <p>
-          You are using every slot on the free plan. Adding a {st.limit + 1}th student needs Pro,
-          which is £5 a month with no limit.
+          You are using every slot on {liteName}. Adding a {st.limit + 1}th student needs
+          {proName}, which is £5 a month with no limit.
         </p>
       )}
 
       {st.reason === 'over' && (
         <p style={{color:'var(--warn)'}}>
-          You have {activeStudents} active students and the free plan covers {st.limit}, so
-          Tutortally is read-only. Archive some students or go Pro. Nothing has been
+          You have {activeStudents} active students and {liteName} covers {st.limit}, so
+          TutorTally is read-only. Archive some students or switch to {proName}. Nothing has been
           deleted and your export still works.
         </p>
       )}
 
       {st.granted && !st.comped && (
         <p>
-          Pro is free on this account until <b>{fmt(entitlement.pro_free_until)}</b>
+          {proName} is free on this account until <b>{fmt(entitlement.pro_free_until)}</b>
           {st.grantDaysLeft != null ? ` (${st.grantDaysLeft} day${st.grantDaysLeft === 1 ? '' : 's'})` : ''}.
           {entitlement.stripe_customer_id
             ? ' Your card is saved, so it carries on by itself after that.'
@@ -1298,14 +1312,14 @@ function BillingPanel({ entitlement, activeStudents }) {
 
       {st.paying && (
         <p>
-          £5 a month{activeAddons.length ? ` plus ${activeAddons.length} add-on` : ''}
+          {proName} is £5 a month{activeAddons.length ? ` plus ${activeAddons.length} add-on` : ''}
           {activeAddons.length > 1 ? 's' : ''}.
           {entitlement.cancel_at_period_end
             ? ` Cancelling on ${fmt(entitlement.current_period_end)}.`
             : ` Next payment ${fmt(entitlement.current_period_end)}.`}
           {entitlement.stripe_status === 'past_due' && (
             <><br /><span style={{color:'var(--warn)'}}>
-              Your last payment did not go through. Update your card to avoid losing Pro.
+              Your last payment did not go through. Update your card to avoid losing TutorTally Pro.
             </span></>
           )}
         </p>
@@ -1331,7 +1345,7 @@ function BillingPanel({ entitlement, activeStudents }) {
           {!st.paying && (
             <button className="billing-btn" disabled={busy}
               onClick={() => billingRedirect('stripe-checkout', setBusy, setError)}>
-              {busy ? 'Opening…' : 'Go Pro - £5 a month'}
+              {busy ? 'Opening…' : 'Get TutorTally Pro - £5 a month'}
             </button>
           )}
           {hasStripeCustomer && (
@@ -1347,17 +1361,19 @@ function BillingPanel({ entitlement, activeStudents }) {
   );
 }
 
-// Shown when a write is refused because it would step past the free plan,
+// Shown when a write is refused because it would step past TutorTally Lite,
 // rather than letting the form close as though it had saved.
-function StudentLimitModal({ limit, onClose }) {
+function StudentLimitModal({ limit, ownerName = '', onClose }) {
   const [cls, close] = useAnimatedClose(onClose);
+  const liteName = planCopyName({ pro: false }, ownerName);
+  const proName = planCopyName({ pro: true }, ownerName);
   return (
     <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
       <div className={`sheet${cls}`}>
-        <h2>That's one more than the free plan holds</h2>
+        <h2>That's one more than {liteName} holds</h2>
         <div style={{fontSize:'0.9rem', color:'var(--ink-dim)', lineHeight:1.6, marginBottom:16}}>
           <p style={{marginTop:0}}>
-            The free plan covers {limit} active students, and you have {limit}. Pro is £5 a
+            {liteName} covers {limit} active students, and you have {limit}. {proName} is £5 a
             month for as many as you like, everything else included.
           </p>
           <p style={{marginBottom:0}}>
@@ -1925,7 +1941,7 @@ function GoogleUnverifiedNote({ compact = false }) {
       lineHeight:1.45,
     }}>
       <b style={{color:'var(--ink)'}}>You may see "Google hasn't verified this app".</b>{' '}
-      While Tutortally is this early, tap <b>Advanced</b>, then the <b>Go to...</b> link.
+      While TutorTally is this early, tap <b>Advanced</b>, then the <b>Go to...</b> link.
       Google may label that link "unsafe", but the calendar access is read-only.
     </div>
   );
@@ -2614,7 +2630,7 @@ function ChangePassword() {
 }
 
 // ---------- Your name ----------
-// Sets the header from "Tutortally" to "{name}'s Tutortally" - useful
+// Sets the header from "TutorTally" to "{name}'s TutorTally" - useful
 // now that more than one tutor's account exists on the same app, so each
 // person's own copy is visibly theirs. Stored in Supabase Auth's own user
 // metadata (auth.updateUser({ data })), not a new table: it's private to the
@@ -2646,7 +2662,7 @@ function YourName({ session }) {
   return (
     <form onSubmit={save}>
       <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
-        Shown in the header as "{name.trim() || '…'}'s Tutortally". The email
+        Shown in the header as "{name.trim() || '…'}'s TutorTally". The email
         and phone here are what the "message the tutor" buttons on each student's
         lesson link use - nobody else's copy changes.
       </div>
@@ -3055,7 +3071,11 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               {backBtn}
               <h2 style={{margin:0}}>Billing</h2>
             </div>
-            <BillingPanel entitlement={entitlement} activeStudents={students.filter(s => s.active).length} />
+            <BillingPanel
+              entitlement={entitlement}
+              activeStudents={students.filter(s => s.active).length}
+              ownerName={session?.user?.user_metadata?.display_name}
+            />
           </>
         )}
         {tool === 'privacy' && (
@@ -3204,7 +3224,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               <h2 style={{margin:0}}>About &amp; data sources</h2>
             </div>
             {[
-              { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase for Tutortally. Name, school, exam board, rate, WhatsApp number, Zoom link, spreadsheet link, and the bank name to expect payments from - all edited via the Edit button on each card.' },
+              { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase for TutorTally. Name, school, exam board, rate, WhatsApp number, Zoom link, spreadsheet link, and the bank name to expect payments from - all edited via the Edit button on each card.' },
               { icon: '📅', title: 'Lessons', body: 'Each lesson row has a date, start time, status (scheduled / completed / missed) and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load. History is grouped by month - tap a month to expand it, then tap a lesson for its detail, where you can also mark it free.' },
               { icon: '🔄', title: 'Fresh start - 27 July 2026', body: 'Everything taught before 27 July 2026 is marked as already paid for. Those lessons still show in history (tagged "settled") but never count towards a balance, and all payments predating that date were cleared out. The old records were archived inside the database rather than destroyed, so they can be recovered if ever needed.' },
               { icon: '💷', title: 'Payments', body: 'Open a student and expand Payments to see every payment, or log a new one (cash or bank transfer). Tap a payment to see which lessons it covers, edit it, or delete it. Balance = completed lessons since the reset − total paid.' },
@@ -5169,6 +5189,8 @@ function App() {
   const activeStudents = students.filter(s => s.active);
   const archivedCount = students.filter(s => !s.active).length;
   const billingReadState = readEntitlement(entitlement, activeStudents.length);
+  const tutorDisplayName = session?.user?.user_metadata?.display_name;
+  const headerTitle = planCopyName(billingReadState, tutorDisplayName);
   const billingConfirmed = billingNotice === 'done'
     && entitlement !== undefined
     && entitlement !== null
@@ -5228,6 +5250,7 @@ function App() {
         activeStudents={activeStudents.length}
         blockedOnce={blockedOnce}
         suppressFreePrompt={billingStillChecking}
+        ownerName={tutorDisplayName}
       />
       {billingNotice && (
         <div style={{
@@ -5240,7 +5263,7 @@ function App() {
             ? billingConfirmed
               ? 'Thanks - your subscription is active.'
               : billingNeedsAttention
-                ? 'Stripe has not confirmed Pro yet. Open Tools: Billing & subscription, or try Go Pro again.'
+                ? 'Stripe has not confirmed TutorTally Pro yet. Open Tools: Billing & subscription, or try upgrading again.'
                 : 'Checking Stripe before updating your plan...'
             : 'Payment was cancelled. Nothing has been charged.'}
         </div>
@@ -5269,9 +5292,7 @@ function App() {
         <div className="header-row">
           <div>
             <div className="header-title">
-              {session?.user?.user_metadata?.display_name
-                ? `${session.user.user_metadata.display_name}'s Tutortally`
-                : 'Tutortally'}
+              {headerTitle}
             </div>
             <div className="header-sub">
               {activeStudents.length} active{archivedCount > 0 ? ` · ${archivedCount} archived` : ''}{syncLabel ? ` · ${syncLabel}` : ''}
@@ -5422,7 +5443,11 @@ function App() {
       )}
 
       {limitPrompt && (
-        <StudentLimitModal limit={CURRENT_FREE_LIMIT} onClose={() => setLimitPrompt(false)} />
+        <StudentLimitModal
+          limit={CURRENT_FREE_LIMIT}
+          ownerName={tutorDisplayName}
+          onClose={() => setLimitPrompt(false)}
+        />
       )}
 
       {editingStudent && (

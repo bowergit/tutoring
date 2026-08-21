@@ -52,9 +52,9 @@ Deno.serve(async (req) => {
       .select('stripe_customer_id, stripe_status, pro_free_until, plan')
       .eq('owner_id', user.id).maybeSingle()
 
-    if (sub?.plan === 'comp') return json({ ok: false, problem: 'comped', message: 'This account has Pro permanently. There is nothing to pay.' }, 400)
+    if (sub?.plan === 'comp') return json({ ok: false, problem: 'comped', message: 'This account has TutorTally Pro permanently. There is nothing to pay.' }, 400)
     if (sub?.stripe_status === 'active' || sub?.stripe_status === 'trialing') {
-      return json({ ok: false, problem: 'already_subscribed', message: 'You already have Pro. Use Manage billing to change it.' }, 400)
+      return json({ ok: false, problem: 'already_subscribed', message: 'You already have TutorTally Pro. Use Manage billing to change it.' }, 400)
     }
 
     const PRICES = addonPrices()
