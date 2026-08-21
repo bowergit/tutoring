@@ -1881,6 +1881,25 @@ function guessStudentName(title) {
   return kept.join(' ').trim() || title.trim();
 }
 
+function GoogleUnverifiedNote({ compact = false }) {
+  return (
+    <div style={{
+      marginTop: compact ? 8 : 10,
+      padding: compact ? '9px 10px' : '10px 12px',
+      border:'1px solid color-mix(in srgb, var(--gold) 45%, transparent)',
+      borderRadius:'var(--r-md)',
+      background:'color-mix(in srgb, var(--gold) 10%, var(--card))',
+      color:'var(--ink-dim)',
+      fontSize: compact ? '0.76rem' : '0.78rem',
+      lineHeight:1.45,
+    }}>
+      <b style={{color:'var(--ink)'}}>You may see "Google hasn't verified this app".</b>{' '}
+      While Tutortally is this early, tap <b>Advanced</b>, then the <b>Go to...</b> link.
+      Google may label that link "unsafe", but the calendar access is read-only.
+    </div>
+  );
+}
+
 function GoogleCalendarPanel({ session, onDataChanged }) {
   const [status, setStatus] = useState(null);
   const [calendars, setCalendars] = useState(null);
@@ -1998,6 +2017,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
             Google will ask you to approve read-only access to your calendars.
             Nothing is shared with anyone else — this connects only your own account.
           </div>
+          <GoogleUnverifiedNote />
         </>
       )}
 
@@ -4712,7 +4732,7 @@ const WT_STEPS = [
   {
     key: 'calendar',
     title: 'Connect your Google Calendar',
-    body: "This is the one that matters. Your lessons come straight out of your calendar, so you never type a timetable in by hand. Tap below, then Connect, and pick whichever calendar has your lessons on it.",
+    body: "This is the one that matters. Your lessons come straight out of your calendar, so you never type a timetable in by hand. If Google says the app is not verified yet, tap Advanced, then the Go to... link. The access is read-only.",
     action: { label: '📅 Open calendar settings', tool: 'gcal' },
   },
   {
