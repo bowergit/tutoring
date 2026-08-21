@@ -1693,7 +1693,7 @@ function Toggle({ checked, onChange, label }) {
 }
 
 // ---------- Summary Widget ----------
-function SummaryWidget({ students, rateHistory }) {
+function SummaryWidget({ students, rateHistory, showNet = false }) {
   const M = useMoney();
   const active = students.filter(s => s.active);
   const readSavedTarget = () => {
@@ -1739,8 +1739,10 @@ function SummaryWidget({ students, rateHistory }) {
 
   const stats = [
     { label: 'students', value: active.length,  accent: false },
-    { label: 'net/week', value: M(weeklyNet, 'summary-week', fmt),  accent: true  },
-    { label: 'net/year', value: M(annualNet, 'summary-year', fmt),  accent: true  },
+    ...(showNet ? [
+      { label: 'net/week', value: M(weeklyNet, 'summary-week', fmt),  accent: true  },
+      { label: 'net/year', value: M(annualNet, 'summary-year', fmt),  accent: true  },
+    ] : []),
   ];
 
   return (
@@ -2794,6 +2796,60 @@ function SetupChecklist({ session, students, onOpenTool, onAddStudent }) {
   );
 }
 
+function PlatformStats({ session }) {
+  const [stats, setStats] = useState(null);
+  const [state, setState] = useState('idle');
+
+  useEffect(() => {
+    if (!isDanielAccount(session) || !session?.access_token) return;
+    let cancelled = false;
+    setState('loading');
+    fetch(`${FN_BASE}/platform-stats`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(body => {
+        if (cancelled) return;
+        setStats(body);
+        setState('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setState('error');
+      });
+    return () => { cancelled = true; };
+  }, [session?.access_token]);
+
+  if (!isDanielAccount(session)) return null;
+  const fmtMoney = n => n >= 1000000 ? `£${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n || 0)}`;
+
+  return (
+    <div style={{
+      border:'1px solid var(--line)', background:'var(--card-2)', borderRadius:'var(--r-lg)',
+      padding:'14px', margin:'18px 0 6px',
+    }}>
+      <div style={{fontSize:'0.72rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700, marginBottom:10}}>
+        TutorTally admin
+      </div>
+      {state === 'loading' && <div style={{fontSize:'0.84rem', color:'var(--muted)'}}>Loading platform stats...</div>}
+      {state === 'error' && <div style={{fontSize:'0.84rem', color:'var(--warn)'}}>Could not load platform stats.</div>}
+      {state === 'ready' && stats && (
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10}}>
+          {[
+            ['Tutors using it', stats.tutors_using_it],
+            ['Students total', stats.students_total],
+            ['Annualised gross', fmtMoney(stats.annualised_gross)],
+          ].map(([label, value]) => (
+            <div key={label}>
+              <div style={{fontSize:'1.35rem', lineHeight:1, fontWeight:800, color:'var(--ink)'}}>{value}</div>
+              <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginTop:5}}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- Revenue trend ----------
 // Two different questions, one chart. "Earned" is what the lessons taught in
 // a month were worth; "received" is what actually landed in the bank that
@@ -3111,7 +3167,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   // three, and the pair you actually wanted is one tap away instead of a
   // return trip through the menu.
   const GROUPS = {
-    money:   { title: 'Money',        tabs: [['revenue', 'Revenue trend'], ['growth', 'Growth calculator']] },
+    money:   { title: 'Money',        tabs: danielOnly ? [['revenue', 'Revenue trend'], ['growth', 'Growth calculator']] : [['revenue', 'Revenue trend']] },
     archive: { title: 'Archive',      tabs: [['archived', 'Students'], ['deletedpay', 'Payments']] },
     account: { title: 'Your account', tabs: [['yourname', 'Your details'], ['password', 'Password']] },
   };
@@ -3153,7 +3209,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
             <div className="tools-menu">
               <button onClick={() => setTool('gcal')}>📅 Google Calendar</button>
               {danielOnly && <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>}
-              <button onClick={() => setTool('revenue')}>💹 Money: revenue trend and growth calculator</button>
+              <button onClick={() => setTool('revenue')}>{danielOnly ? '💹 Money: revenue trend and growth calculator' : '💹 Money: revenue trend'}</button>
               <button onClick={() => setTool('archived')}>
                 🗄 Archive: students and payments{archived.length > 0 ? ` (${archived.length})` : ''}
               </button>
@@ -3232,7 +3288,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
             <RevenueTrend payments={payments} lessons={lessons} students={students} rateHistory={rateHistory} />
           </>
         )}
-        {tool === 'growth' && (
+        {tool === 'growth' && danielOnly && (
           <>
             {groupHeader('growth')}
             <GrowthCalculator
@@ -5509,7 +5565,7 @@ function App() {
           </>
         )}
 
-        {!loading && <SummaryWidget students={students} rateHistory={rateHistory} />}
+        {!loading && <SummaryWidget students={students} rateHistory={rateHistory} showNet={isDanielAccount(session)} />}
 
         {!loading && (
           <NeedsAttention
@@ -5546,7 +5602,9 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v5.8</div>}
+        {!loading && <PlatformStats session={session} />}
+
+        {!loading && <div className="version-tag">v5.9</div>}
       </div>
 
       {showAddModal && (
