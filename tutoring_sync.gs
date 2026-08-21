@@ -1,5 +1,5 @@
 /**
- * Past-paper sync — Google Sheets → Supabase
+ * Past-paper sync - Google Sheets → Supabase
  *
  * Calendar syncing used to live here too. It doesn't any more: every tutor's
  * calendar is now synced server-side via their own Google OAuth connection
@@ -12,7 +12,7 @@
  * SETUP
  * 1. Script Properties:
  *      SUPABASE_URL           your project URL
- *      SUPABASE_SERVICE_KEY   service_role legacy JWT (not the sb_secret_ one —
+ *      SUPABASE_SERVICE_KEY   service_role legacy JWT (not the sb_secret_ one -
  *                             UrlFetchApp gets blocked by Supabase's browser
  *                             detection on the new keys)
  *      TUTOR_OWNER_ID         your own user id, so this only ever touches your
@@ -38,7 +38,7 @@ function syncPastPapers() {
     throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY script properties.');
   }
   if (!config.ownerId) {
-    throw new Error('Missing TUTOR_OWNER_ID script property — refusing to run ' +
+    throw new Error('Missing TUTOR_OWNER_ID script property - refusing to run ' +
       'unscoped, since the service key would otherwise read every tutor of ' +
       'every account, not just yours.');
   }
@@ -52,7 +52,7 @@ function syncPastPapers() {
     if (result.ok) updated++; else failed++;
   });
 
-  Logger.log('Papers — students updated: ' + updated + ' | failed: ' + failed +
+  Logger.log('Papers - students updated: ' + updated + ' | failed: ' + failed +
              ' | papers recorded: ' + papers);
 }
 

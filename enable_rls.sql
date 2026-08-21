@@ -17,7 +17,7 @@
 -- The step that actually closed the hole was dropping the pre-existing
 -- "Allow all access" policies (see the bottom of this file). RLS was
 -- already switched on before any of this, but that one permissive policy
--- meant it granted everyone everything — policies are OR'd, so the most
+-- meant it granted everyone everything - policies are OR'd, so the most
 -- permissive one always wins. Verified afterwards: anonymous reads return
 -- [] on every table and an anonymous insert returns HTTP 401.
 --

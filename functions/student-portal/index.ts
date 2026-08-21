@@ -13,7 +13,7 @@ const CORS = {
 
 // No login system: security is the token itself being unguessable (a v4
 // UUID), same trust model as a Stripe invoice link. Deliberately returns
-// only a student's own name, lessons, payment status and past papers —
+// only a student's own name, lessons, payment status and past papers -
 // nothing else on their row, and nothing about any other student or the
 // tutor's business as a whole. The tutor's own contact details ARE included,
 // since they are the point of the "message the tutor" buttons.

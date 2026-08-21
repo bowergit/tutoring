@@ -294,7 +294,7 @@
     display: flex; align-items: flex-end; justify-content: center;
     z-index: 100; animation: overlayIn 0.2s ease forwards;
   }
-  /* Closing needs its own state because React unmounts instantly otherwise —
+  /* Closing needs its own state because React unmounts instantly otherwise -
      the sheet would vanish with no exit animation at all. */
   .overlay.closing { animation: overlayOut 0.2s ease forwards; }
   .sheet {
@@ -1067,8 +1067,8 @@ function todayISO() { return new Date().toISOString().slice(0, 10); }
 function readEntitlement(ent, activeStudents = 0) {
   const limit = ent?.free_student_limit ?? DEFAULT_FREE_LIMIT;
 
-  // Fails open. If the row cannot be read — a network blip, a policy change, a
-  // row that never got created — the tutor keeps working. Locking a paying
+  // Fails open. If the row cannot be read - a network blip, a policy change, a
+  // row that never got created - the tutor keeps working. Locking a paying
   // customer out because of a billing bug is far worse than a few free days.
   if (!ent) {
     return {
@@ -1121,7 +1121,7 @@ async function billingRedirect(fn, setBusy, setError, addons) {
   setBusy(false);
 }
 
-function GoProButton({ label = 'Go Pro — £5 a month', ghost }) {
+function GoProButton({ label = 'Go Pro - £5 a month', ghost }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   return (
@@ -1135,7 +1135,7 @@ function GoProButton({ label = 'Go Pro — £5 a month', ghost }) {
   );
 }
 
-function BillingBar({ entitlement, activeStudents, blockedOnce }) {
+function BillingBar({ entitlement, activeStudents, blockedOnce, suppressFreePrompt = false }) {
   if (DEMO_MODE) {
     return (
       <div className="billing-bar demo">
@@ -1158,6 +1158,16 @@ function BillingBar({ entitlement, activeStudents, blockedOnce }) {
           or go Pro for as many as you like. Nothing has been deleted.
         </span>
         <GoProButton />
+      </div>
+    );
+  }
+
+  if (suppressFreePrompt) {
+    return (
+      <div className="billing-bar">
+        <span>
+          Checking Stripe before changing your plan banner. Billing lives in Tools: Billing &amp; subscription.
+        </span>
       </div>
     );
   }
@@ -1196,7 +1206,7 @@ function BillingBar({ entitlement, activeStudents, blockedOnce }) {
 function BillingPanel({ entitlement, activeStudents }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const fmt = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
+  const fmt = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '-';
 
   if (DEMO_MODE) {
     return <div style={{fontSize:'0.88rem', color:'var(--ink-dim)', lineHeight:1.6}}>
@@ -1216,6 +1226,7 @@ function BillingPanel({ entitlement, activeStudents }) {
 
   const st = readEntitlement(entitlement, activeStudents);
   const activeAddons = ADDONS.filter(a => st.addons.includes(a.key));
+  const hasStripeCustomer = !!entitlement.stripe_customer_id;
 
   return (
     <div style={{fontSize:'0.88rem', lineHeight:1.6}}>
@@ -1266,7 +1277,7 @@ function BillingPanel({ entitlement, activeStudents }) {
           {st.grantDaysLeft != null ? ` (${st.grantDaysLeft} day${st.grantDaysLeft === 1 ? '' : 's'})` : ''}.
           {entitlement.stripe_customer_id
             ? ' Your card is saved, so it carries on by itself after that.'
-            : ' Add a card any time — you will not be charged until that date.'}
+            : ' Add a card any time. You will not be charged until that date.'}
         </p>
       )}
 
@@ -1302,15 +1313,16 @@ function BillingPanel({ entitlement, activeStudents }) {
 
       {!st.comped && (
         <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:16}}>
-          {entitlement.stripe_customer_id && st.paying ? (
-            <button className="billing-btn" disabled={busy}
-              onClick={() => billingRedirect('stripe-portal', setBusy, setError)}>
-              {busy ? 'Opening…' : 'Manage card, invoices and cancelling'}
-            </button>
-          ) : (
+          {!st.paying && (
             <button className="billing-btn" disabled={busy}
               onClick={() => billingRedirect('stripe-checkout', setBusy, setError)}>
-              {busy ? 'Opening…' : 'Go Pro — £5 a month'}
+              {busy ? 'Opening…' : 'Go Pro - £5 a month'}
+            </button>
+          )}
+          {hasStripeCustomer && (
+            <button className="billing-btn ghost" disabled={busy}
+              onClick={() => billingRedirect('stripe-portal', setBusy, setError)}>
+              {busy ? 'Opening…' : 'Manage billing in Stripe'}
             </button>
           )}
         </div>
@@ -1387,7 +1399,7 @@ function recentPaper(student, withinDays = 7) {
 
 // Set once per render from App. Faking is applied at the RATE level rather
 // than at each place a number is printed, because rates are what every other
-// figure is computed from — fake the rate and the balances, totals and
+// figure is computed from - fake the rate and the balances, totals and
 // statements all come out consistent for free. Masking at print time instead
 // produced totals that didn't add up to their own rows.
 let PRIVACY_MONEY_MODE = 'normal';
@@ -1438,12 +1450,12 @@ function moneyScaleFor(studentId, rateHistory) {
 }
 
 // ---------- Privacy (show / hide / fake, for money and names independently) ----------
-// Modes: 'normal' (real data), 'hidden' (fixed-width mask, reveals nothing —
+// Modes: 'normal' (real data), 'hidden' (fixed-width mask, reveals nothing -
 // not even digit count), 'dummy' (plausible fake, stable per element so it
 // doesn't flicker between renders or make totals look inconsistent).
 //
 // Deliberately scoped to DISPLAY ONLY. Nothing that feeds an editable form
-// field or a "Copy as text" meant for a parent ever goes through these — a
+// field or a "Copy as text" meant for a parent ever goes through these - a
 // demo mode must never risk writing a fake number into the real books, or
 // sending a parent a fake balance.
 const PrivacyContext = React.createContext({ moneyMode: 'normal', nameMode: 'normal' });
@@ -1473,7 +1485,7 @@ function dummyNameFor(seedKey) {
   return `The ${dummyTraitFor(seedKey)} One`;
 }
 
-// The payer of a given student — same trait, "Big" added.
+// The payer of a given student - same trait, "Big" added.
 function dummyPayerNameFor(seedKey) {
   return `The Big ${dummyTraitFor(seedKey)} One`;
 }
@@ -1509,8 +1521,8 @@ const HIDDEN_TEXT_MASK = '•••••';
 const HIDDEN_MONEY_MASK = '£•••';
 
 // Money display. By the time a number reaches here it is ALREADY correct for
-// the current mode — rates are faked at source and payments are pre-scaled by
-// moneyScaleFor — so fake mode just formats. Only hidden mode substitutes,
+// the current mode - rates are faked at source and payments are pre-scaled by
+// moneyScaleFor - so fake mode just formats. Only hidden mode substitutes,
 // with a fixed-width mask so a £45 and a £100 look identical.
 function useMoney() {
   const { moneyMode } = usePrivacy();
@@ -1521,7 +1533,7 @@ function useMoney() {
   };
 }
 
-// For amounts that arrive already real and have no student to scale against —
+// For amounts that arrive already real and have no student to scale against -
 // chiefly unmatched Monzo transfers, which come straight off the bank API. Fake
 // mode substitutes a plausible transfer: one to four sessions at a fake rate.
 function useRawMoney() {
@@ -1550,7 +1562,7 @@ function useNameDisplay() {
   };
 }
 
-// One physical switch with three detents: fake (left) — real (middle) —
+// One physical switch with three detents: fake (left) - real (middle) -
 // hidden (right). The knob slides; tapping a third of the track jumps to it.
 const TRI_GLYPH = { dummy: '≈', normal: '✓', hidden: '✕' };
 const TRI_WORD  = { dummy: 'Showing fake data', normal: 'Showing real data', hidden: 'Hidden' };
@@ -1582,7 +1594,7 @@ function PrivacyToggle3({ title, sub, value, onChange }) {
 // no exit animation. This keeps the sheet mounted for the length of the close
 // animation, then calls the real onClose. Returns the class suffix to apply to
 // .overlay/.sheet, plus the close function to use everywhere instead of
-// onClose — including internal Close/Cancel buttons, or those would still snap.
+// onClose - including internal Close/Cancel buttons, or those would still snap.
 function useAnimatedClose(onClose) {
   const [closing, setClosing] = useState(false);
   const timer = React.useRef(null);
@@ -1718,7 +1730,7 @@ function SummaryWidget({ students, rateHistory }) {
   );
 }
 
-// "£81" rather than "£81.00", but "£81.50" kept intact — pennies only appear
+// "£81" rather than "£81.00", but "£81.50" kept intact - pennies only appear
 // when there actually are any. Matches how amounts already read everywhere
 // else in the app; the messages sent to parents were the one place still
 // showing a trailing .00.
@@ -1827,7 +1839,7 @@ function PerspectiveCalculator({ addNetW }) {
   if (moneyMode === 'hidden') {
     return (
       <div style={{fontSize:'0.9rem', color:'var(--muted)', padding:'8px 0'}}>
-        🎯 Amounts hidden — every count on this screen is derived from the figure above, so hiding one means hiding all of them.
+        🎯 Amounts hidden - every count on this screen is derived from the figure above, so hiding one means hiding all of them.
       </div>
     );
   }
@@ -1863,10 +1875,10 @@ function PerspectiveCalculator({ addNetW }) {
 // login, manually edited to add each new tutor), any signed-in user connects
 // their own calendar here with no one else's involvement. All calls carry
 // the caller's own Supabase session, and the sync Edge Function only ever
-// touches that same account's rows — see google-calendar-connect's comments
+// touches that same account's rows - see google-calendar-connect's comments
 // for how the OAuth state param prevents this being spoofable.
 // Best-effort strip of the generic lesson-y words tutors tend to put in
-// calendar titles alongside a student's name — never trusted outright, just
+// calendar titles alongside a student's name - never trusted outright, just
 // a starting guess the tutor confirms or overrides with one tap.
 const CALENDAR_TITLE_STOPWORDS = new Set([
   'maths', 'math', 'lesson', 'lessons', 'tutoring', 'tutor', 'session', 'call',
@@ -1877,7 +1889,7 @@ const CALENDAR_TITLE_STOPWORDS = new Set([
   'economics', 'computer', 'computing', 'cs', 'music', 'drama', 'art',
 ]);
 function guessStudentName(title) {
-  const cleaned = title.replace(/[-–—:|()]/g, ' ').replace(/\s+/g, ' ').trim();
+  const cleaned = title.replace(/[-\u2013\u2014:|()]/g, ' ').replace(/\s+/g, ' ').trim();
   const kept = cleaned.split(' ').filter(w => {
     const key = w.toLowerCase().replace(/[^a-z0-9]/g, '');
     return key && !CALENDAR_TITLE_STOPWORDS.has(key);
@@ -1944,7 +1956,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
     const r = await authedFetch(`google-calendar-connect?return_to=${back}`).catch(e => ({ ok: false, problem: String(e) }));
     setBusy(false);
     if (r.ok && r.authorize_url) window.location.href = r.authorize_url;
-    else setMsg('Could not start the connection — try again.');
+    else setMsg('Could not start the connection - try again.');
   }
 
   async function pick(cal) {
@@ -2007,7 +2019,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
         <span style={{flex:1}}>
           {status === null ? 'Checking…'
             : status.connected && status.calendar_chosen ? `Connected · ${status.calendar_summary}`
-            : status.connected ? 'Connected — pick a calendar below'
+            : status.connected ? 'Connected - pick a calendar below'
             : 'Not connected'}
         </span>
       </div>
@@ -2019,7 +2031,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
           </button>
           <div style={{fontSize:'0.78rem', color:'var(--muted)', marginTop:10, lineHeight:1.45}}>
             Google will ask you to approve read-only access to your calendars.
-            Nothing is shared with anyone else — this connects only your own account.
+            Nothing is shared with anyone else - this connects only your own account.
           </div>
           <GoogleUnverifiedNote />
         </>
@@ -2108,7 +2120,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
           <div style={{fontSize:'0.78rem', color:'var(--muted)', marginBottom:14, lineHeight:1.5}}>
             Also syncs automatically overnight. Matches events whose title
             contains a student's "name in your calendar" (set on their profile),
-            same as before — nothing to reconfigure there.
+            same as before - nothing to reconfigure there.
             {status.last_synced_at && (
               <> Last automatic sync: {new Date(status.last_synced_at).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}.</>
             )}
@@ -2177,7 +2189,7 @@ function MonzoPanel({ students, onDataChanged }) {
         ? `Logged ${r.newly_logged} new payment${r.newly_logged === 1 ? '' : 's'}.`
         : `Problem: ${r.problem}`);
       if (r.ok) onDataChanged();
-    } catch { setMsg('Sync failed — check your connection.'); }
+    } catch { setMsg('Sync failed - check your connection.'); }
     setBusy(false);
     refresh();
   }
@@ -2233,13 +2245,13 @@ function MonzoPanel({ students, onDataChanged }) {
       <div style={{fontSize:'0.78rem', color:'var(--muted)', marginBottom:10, lineHeight:1.45}}>
         Money that came in but doesn't match a student. Assign one and every future
         transfer from that account is logged automatically; "Never tutoring" hides
-        that payer for good. Read live from Monzo — nothing is stored unless you
+        that payer for good. Read live from Monzo - nothing is stored unless you
         assign it.
       </div>
 
       {pending === null && <div style={{fontSize:'0.85rem', color:'var(--muted)'}}>Loading…</div>}
       {pending?.length === 0 && (
-        <div style={{fontSize:'0.85rem', color:'var(--muted)'}}>Nothing waiting — all caught up.</div>
+        <div style={{fontSize:'0.85rem', color:'var(--muted)'}}>Nothing waiting - all caught up.</div>
       )}
 
       {pending?.map(t => (
@@ -2254,7 +2266,7 @@ function MonzoPanel({ students, onDataChanged }) {
           <div style={{fontSize:'0.75rem', color:'var(--muted)', marginTop:2}}>
             {new Date(t.date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' })}
             {/* Free-text bank reference can contain a name, so it's hidden
-                entirely rather than shown in privacy mode — there's no safe
+                entirely rather than shown in privacy mode - there's no safe
                 way to partially redact arbitrary text. */}
             {nameModeIsNormal && t.reference && t.reference !== t.from ? ` · ${t.reference}` : ''}
           </div>
@@ -2385,7 +2397,7 @@ function LoginGate() {
     setState('busy');
     // Origin + path only. Supabase checks this against its allowed-redirect
     // list and, if it doesn't match, silently falls back to the project's
-    // Site URL — which on this project is the other app entirely. A stray
+    // Site URL - which on this project is the other app entirely. A stray
     // ?v=… left in the address bar was enough to cause that, so anything
     // beyond the path is stripped before asking.
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
@@ -2587,7 +2599,7 @@ function ChangePassword() {
 }
 
 // ---------- Your name ----------
-// Sets the header from "Tutortally" to "{name}'s Tutortally" — useful
+// Sets the header from "Tutortally" to "{name}'s Tutortally" - useful
 // now that more than one tutor's account exists on the same app, so each
 // person's own copy is visibly theirs. Stored in Supabase Auth's own user
 // metadata (auth.updateUser({ data })), not a new table: it's private to the
@@ -2621,7 +2633,7 @@ function YourName({ session }) {
       <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
         Shown in the header as "{name.trim() || '…'}'s Tutortally". The email
         and phone here are what the "message the tutor" buttons on each student's
-        lesson link use — nobody else's copy changes.
+        lesson link use - nobody else's copy changes.
       </div>
       <div className="field">
         <label>Your first name</label>
@@ -2644,7 +2656,7 @@ function YourName({ session }) {
         <div style={{fontSize:'0.82rem', color:'var(--accent)', marginBottom:12, fontWeight:600}}>Saved.</div>
       )}
       {state === 'error' && (
-        <div style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:12}}>Could not save — try again.</div>
+        <div style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:12}}>Could not save - try again.</div>
       )}
       <button className="btn save" style={{width:'100%'}} type="submit" disabled={state === 'busy'}>
         {state === 'busy' ? 'Saving…' : 'Save'}
@@ -2708,7 +2720,7 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
   const average = monthsWithMoney > 0 ? received / monthsWithMoney : 0;
 
   // Compare the two most recent complete months, ignoring the current partial
-  // one — otherwise every month looks like a collapse until it's over.
+  // one - otherwise every month looks like a collapse until it's over.
   const prior = rows.slice(0, -1);
   const lastFull = prior[prior.length - 1];
   const prevFull = prior[prior.length - 2];
@@ -2751,7 +2763,7 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
             <span className="rev-fill" style={{width: `${Math.max(2, (r.total / peak) * 100)}%`}} />
           </span>
           <span className="rev-val" style={{color: r.total > 0 ? 'var(--ink)' : 'var(--muted)'}}>
-            {r.total > 0 ? M(r.total) : '—'}
+            {r.total > 0 ? M(r.total) : '-'}
           </span>
         </div>
       ))}
@@ -2866,7 +2878,7 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
   );
 }
 
-// Deliberately harder to trigger than a tap — this fires a permanent delete,
+// Deliberately harder to trigger than a tap - this fires a permanent delete,
 // so a drag past 90% of the track is the confirmation, not a click.
 function SlideToConfirm({ onConfirm }) {
   const trackRef = React.useRef(null);
@@ -2934,7 +2946,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   const [extraCash, setExtraCash] = useState(false);
 
   // avgRate is derived from rates that are themselves faked in privacy mode, but
-  // extraRate was seeded once at mount — so without this it would keep showing
+  // extraRate was seeded once at mount - so without this it would keep showing
   // the real average after the switch was flipped, leaking the very figure the
   // switch is meant to hide.
   useEffect(() => { setExtraRate(avgRate); }, [moneyMode]);
@@ -2949,7 +2961,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   const [deletingId, setDeletingId] = useState(null);
 
   // Monzo transactions aren't owned by the student the way lessons/payments
-  // are — they're real bank history — so unmatch rather than let the delete
+  // are - they're real bank history - so unmatch rather than let the delete
   // cascade take them. Everything else (lessons, payments, rate history,
   // bundles) has ON DELETE CASCADE and goes with the student.
   async function deleteStudent(id) {
@@ -3005,19 +3017,19 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
             <div className="tools-menu">
               <button onClick={() => setTool('gcal')}>📅 Google Calendar</button>
               <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>
-              <button onClick={() => setTool('revenue')}>💹 Money — revenue trend and growth calculator</button>
+              <button onClick={() => setTool('revenue')}>💹 Money: revenue trend and growth calculator</button>
               <button onClick={() => setTool('archived')}>
-                🗄 Archive — students and payments{archived.length > 0 ? ` (${archived.length})` : ''}
+                🗄 Archive: students and payments{archived.length > 0 ? ` (${archived.length})` : ''}
               </button>
               <button onClick={() => setTool('privacy')}>
-                🕶 Privacy mode{privacyOn ? ' — on' : ''}
+                🕶 Privacy mode{privacyOn ? ' - on' : ''}
               </button>
               <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
-              <button onClick={() => setTool('yourname')}>👤 Your account — details and password</button>
-              <button onClick={() => setTool('billing')}>💳 Billing &amp; subscription</button>
+              <button onClick={() => setTool('yourname')}>👤 Your account: details and password</button>
+              <button onClick={() => setTool('billing')}>💳 Billing &amp; subscription: manage Stripe</button>
               <button onClick={onReplayWalkthrough}>🧭 Replay walkthrough</button>
               <button onClick={() => supabase.auth.signOut()} style={{color:'var(--muted)'}}>
-                ⏻ Sign out{userEmail ? ` — ${userEmail}` : ''}
+                ⏻ Sign out{userEmail ? ` - ${userEmail}` : ''}
               </button>
             </div>
           </>
@@ -3056,7 +3068,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
             />
             <div style={{fontSize:'0.76rem', color:'var(--gold)', marginTop:14, lineHeight:1.5}}>
               While either switch is off centre, the add/edit forms show masked
-              values and go read-only — a field displaying a fake number that you
+              values and go read-only - a field displaying a fake number that you
               could still save would put fake data in your real records. The text
               the payment record copies for a parent stays real either way.
             </div>
@@ -3177,14 +3189,14 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               <h2 style={{margin:0}}>About &amp; data sources</h2>
             </div>
             {[
-              { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase for Tutortally. Name, school, exam board, rate, WhatsApp number, Zoom link, spreadsheet link, and the bank name to expect payments from — all edited via the Edit button on each card.' },
-              { icon: '📅', title: 'Lessons', body: 'Each lesson row has a date, start time, status (scheduled / completed / missed) and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load. History is grouped by month — tap a month to expand it, then tap a lesson for its detail, where you can also mark it free.' },
-              { icon: '🔄', title: 'Fresh start — 27 July 2026', body: 'Everything taught before 27 July 2026 is marked as already paid for. Those lessons still show in history (tagged "settled") but never count towards a balance, and all payments predating that date were cleared out. The old records were archived inside the database rather than destroyed, so they can be recovered if ever needed.' },
+              { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase for Tutortally. Name, school, exam board, rate, WhatsApp number, Zoom link, spreadsheet link, and the bank name to expect payments from - all edited via the Edit button on each card.' },
+              { icon: '📅', title: 'Lessons', body: 'Each lesson row has a date, start time, status (scheduled / completed / missed) and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load. History is grouped by month - tap a month to expand it, then tap a lesson for its detail, where you can also mark it free.' },
+              { icon: '🔄', title: 'Fresh start - 27 July 2026', body: 'Everything taught before 27 July 2026 is marked as already paid for. Those lessons still show in history (tagged "settled") but never count towards a balance, and all payments predating that date were cleared out. The old records were archived inside the database rather than destroyed, so they can be recovered if ever needed.' },
               { icon: '💷', title: 'Payments', body: 'Open a student and expand Payments to see every payment, or log a new one (cash or bank transfer). Tap a payment to see which lessons it covers, edit it, or delete it. Balance = completed lessons since the reset − total paid.' },
-              { icon: '🏦', title: 'Monzo', body: 'Tools → Monzo payments pulls incoming bank transfers and logs them against the right student automatically. Set "Expect bank transfers from" on a student to teach it a parent\'s name; after the first match it remembers their account, so it keeps working even when the bank formats the name differently. Only money coming IN from real people is ever looked at — card spending, pot transfers and declines are filtered out, and unrecognised transfers are read live and never stored. Nothing before 27 July 2026 is considered.' },
-              { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script runs nightly. It reads your tutoring calendar, matches events to students by their "calendar name" field, and writes lesson rows into Supabase with their start times — marking sessions complete once the date passes. Delete an event from the calendar and the lesson is removed too, unless a payment is attached to it, in which case it is kept and flagged in the log. Lessons you add by hand in the app are never touched by the sync.' },
+              { icon: '🏦', title: 'Monzo', body: 'Tools → Monzo payments pulls incoming bank transfers and logs them against the right student automatically. Set "Expect bank transfers from" on a student to teach it a parent\'s name; after the first match it remembers their account, so it keeps working even when the bank formats the name differently. Only money coming IN from real people is ever looked at - card spending, pot transfers and declines are filtered out, and unrecognised transfers are read live and never stored. Nothing before 27 July 2026 is considered.' },
+              { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script runs nightly. It reads your tutoring calendar, matches events to students by their "calendar name" field, and writes lesson rows into Supabase with their start times - marking sessions complete once the date passes. Delete an event from the calendar and the lesson is removed too, unless a payment is attached to it, in which case it is kept and flagged in the log. Lessons you add by hand in the app are never touched by the sync.' },
               { icon: '📈', title: 'Spreadsheet links', body: 'Each student can have a Google Sheets link (set via Edit). Tap the 📈 button on a card to open it. Links are stored in Supabase and can also be set directly in the database.' },
-              { icon: '💰', title: 'Rate history', body: 'Every rate change is recorded with a date. The app always uses the rate that was in effect on a given day — so historical balances stay accurate when you put prices up.' },
+              { icon: '💰', title: 'Rate history', body: 'Every rate change is recorded with a date. The app always uses the rate that was in effect on a given day - so historical balances stay accurate when you put prices up.' },
               { icon: '🔐', title: 'Security', body: 'Monzo credentials live only in Supabase\'s secret store, and the Monzo tables are locked so the key embedded in this page cannot read any bank data. Student details are not yet behind a login, so treat the site URL as private until that is added.' },
             ].map(({ icon, title, body }) => (
               <div key={title} style={{marginBottom:14, paddingBottom:14, borderBottom:'1px solid var(--line)'}}>
@@ -3210,7 +3222,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
   const isEdit = !!student;
 
   // With privacy on, the form shows masked values so it can be demonstrated
-  // without exposing anything — and becomes read-only, because a field you can
+  // without exposing anything - and becomes read-only, because a field you can
   // edit while it displays a fake value is one Save away from writing that
   // fake value into the real record.
   const demo = moneyMode !== 'normal' || nameMode !== 'normal';
@@ -3335,7 +3347,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
     if (studentId && ratePerSession && !isNaN(rateNum) && (rateChanged || schedulingFutureRise)) {
       // Backdating a correction must win over anything it's meant to replace.
       // The rate lookup picks whichever row has the latest effective_from_date
-      // that's still on/before a lesson's date — so without this, an existing
+      // that's still on/before a lesson's date - so without this, an existing
       // row dated after the new backdated date (but still in the past) would
       // keep outranking it, and the correction would silently never apply.
       // Future-scheduled rises (effective_from_date > today) are left alone.
@@ -3440,13 +3452,13 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
           })()}
         </div>
         <div className="field">
-          <label>School year (7–13, as of today)</label>
+          <label>School year (7-13, as of today)</label>
           <input type="number" min="7" max="13" value={form.school_year} onChange={e => setForm({...form, school_year: e.target.value})} />
         </div>
         <div className="field">
           <label>Exam board</label>
           <select value={form.exam_board_preset} onChange={e => setForm({...form, exam_board_preset: e.target.value})}>
-            <option value="">—</option>
+            <option value="">-</option>
             <option value="Edexcel">Edexcel</option>
             <option value="AQA">AQA</option>
             <option value="Edexcel IGCSE">Edexcel IGCSE</option>
@@ -3462,7 +3474,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         <div className="field">
           <label>Exam tier</label>
           <select value={form.exam_tier} onChange={e => setForm({...form, exam_tier: e.target.value})}>
-            <option value="">—</option>
+            <option value="">-</option>
             <option value="foundation">Foundation</option>
             <option value="higher">Higher</option>
             <option value="not_sure">Not sure yet</option>
@@ -3505,7 +3517,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         <div className="field">
           <label>Referred by</label>
           <select value={form.referred_by_student_id} onChange={e => setForm({...form, referred_by_student_id: e.target.value})}>
-            <option value="">— not a referral —</option>
+            <option value="">- not a referral -</option>
             {allStudents.filter(s => s.id !== student?.id).map(s => (
               <option key={s.id} value={s.id}>{N(s.name, s.id)}</option>
             ))}
@@ -3518,7 +3530,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
             placeholder="e.g. Saskia" />
           <div style={{fontSize: '0.78rem', color: 'var(--muted)', marginTop: 4}}>
             The word that appears in your Google Calendar event titles for this
-            student's lessons. Leave blank to just use their name — only worth
+            student's lessons. Leave blank to just use their name - only worth
             filling in if your calendar calls them something else.
           </div>
         </div>
@@ -3547,7 +3559,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
 
 // ---------- Payment Modal (add / edit) ----------
 // Records the money only. Which lessons it pays for is worked out by the
-// database, oldest unpaid first — so paying per lesson, paying for several at
+// database, oldest unpaid first - so paying per lesson, paying for several at
 // once, and paying in advance are all the same action. The preview below
 // shows what it will settle before you commit.
 function PaymentModal({ student, payment, lessons, currentRate, rateHistory = [],
@@ -3612,14 +3624,14 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
     const amt = parseFloat(amount) || 0;
 
     // Allocation is handled by a database trigger, so it happens identically
-    // however the payment arrives — here, from Monzo, or by hand.
+    // however the payment arrives - here, from Monzo, or by hand.
     if (editing) {
       await supabase.from('tutoring_payments')
         .update({ amount: amt, date_paid: datePaid, method })
         .eq('id', payment.id);
     } else {
       // owner_id set explicitly: see the comment on the same pattern in
-      // StudentFormModal — the column DEFAULT belongs to Daniel's account, so
+      // StudentFormModal - the column DEFAULT belongs to Daniel's account, so
       // a second tenant's insert would otherwise fail the RLS WITH CHECK.
       const ownerId = (await supabase.auth.getUser()).data.user?.id;
       await supabase.from('tutoring_payments').insert({
@@ -3630,7 +3642,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
     setSaving(false);
 
     // Cash leaves no paper trail the way a bank transfer does, so offer a
-    // WhatsApp receipt right away rather than closing straight out — only for
+    // WhatsApp receipt right away rather than closing straight out - only for
     // a genuinely new cash payment, not edits, and only if there's a number
     // to send it to.
     if (!editing && method === 'cash' && normaliseUKPhone(student.parent_phone)) {
@@ -3675,7 +3687,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
   return (
     <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && close()}>
       <div className={`sheet${cls}`}>
-        <h2>{editing ? 'Edit payment' : 'Log payment'} — {N(student.name, student.id)}</h2>
+        <h2>{editing ? 'Edit payment' : 'Log payment'} - {N(student.name, student.id)}</h2>
 
         {demo && (
           <div style={{
@@ -3718,7 +3730,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
             <div style={{fontSize:'0.85rem', color:'var(--muted)', padding:'6px 0'}}>
               {(parseFloat(amount) || 0) <= 0
                 ? 'Enter an amount to see which lessons it covers.'
-                : 'Nothing outstanding — the whole amount will sit as credit against future lessons.'}
+                : 'Nothing outstanding - the whole amount will sit as credit against future lessons.'}
             </div>
           ) : (
             <div className="session-list">
@@ -3740,7 +3752,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
           )}
           {leftOver > 0.005 && (
             <div style={{fontSize:'0.78rem', color:'var(--gold)', marginTop:6}}>
-              {M(leftOver)} left over — held as credit against future lessons.
+              {M(leftOver)} left over - held as credit against future lessons.
             </div>
           )}
           <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:6, lineHeight:1.45}}>
@@ -3783,7 +3795,7 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
   async function handleDelete() {
     setBusy(true);
     // Archived, not destroyed. A hard delete took the date, method and Monzo
-    // link with it, so undoing meant retyping the payment from memory —
+    // link with it, so undoing meant retyping the payment from memory -
     // which is exactly how a correct set of payments ends up wrong.
     await supabase.from('tutoring_payments')
       .update({ deleted_at: new Date().toISOString() }).eq('id', payment.id);
@@ -3810,7 +3822,7 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
         <div className="section-label">Covers {covered.length} lesson{covered.length !== 1 ? 's' : ''}</div>
         {covered.length === 0 ? (
           <div style={{fontSize:'0.85rem', color:'var(--muted)', padding:'6px 0 10px'}}>
-            Nothing was outstanding when this arrived — it is sitting as credit
+            Nothing was outstanding when this arrived - it is sitting as credit
             and will settle the next lesson automatically.
           </div>
         ) : (
@@ -3931,7 +3943,7 @@ function DeletedPayments({ students, onDataChanged }) {
 
 // ---------- Statement ----------
 // A plain, chronological record of every chargeable lesson and exactly which
-// money settled it — the thing to read out when a parent asks "when did I pay
+// money settled it - the thing to read out when a parent asks "when did I pay
 // for that?". Copyable as text so it can be pasted straight into WhatsApp.
 function StatementSheet({ student, lessons, payments, allocations, payState, scale, onClose }) {
   const M = useMoney();
@@ -3966,10 +3978,10 @@ function StatementSheet({ student, lessons, payments, allocations, payState, sca
   const dPlain = d => new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' });
   const METHODS = { cash:'cash', bank_transfer:'transfer', monzo_auto:'transfer', other:'payment' };
 
-  // Always the real figures — this is what gets sent to a parent.
+  // Always the real figures - this is what gets sent to a parent.
   function asText() {
     const money = n => `£${n.toFixed(2).replace(/\.00$/, '')}`;
-    const L = [`${student.name} — lessons and payments`, ''];
+    const L = [`${student.name} - lessons and payments`, ''];
     L.push('LESSONS');
     rows.forEach(({ lesson: l, st }) => {
       const when = dPlain(l.lesson_date) + (l.start_time ? ` ${l.start_time}` : '');
@@ -3977,17 +3989,17 @@ function StatementSheet({ student, lessons, payments, allocations, payState, sca
         ? `paid ${st.payments.map(p => dPlain(p.date_paid)).join(' + ')}`
         : st.partial ? `part paid ${money(st.paid)}`
         : l.status === 'scheduled' ? 'not yet due' : 'UNPAID';
-      L.push(`  ${when} — ${money(st.rate)} — ${paidNote}`);
+      L.push(`  ${when} - ${money(st.rate)} - ${paidNote}`);
     });
     L.push('', 'PAYMENTS RECEIVED');
     if (received.length === 0) L.push('  none yet');
     received.forEach(r => {
-      L.push(`  ${dPlain(r.payment.date_paid)} — ${money(r.amount)} by ${METHODS[r.payment.method] || r.payment.method}` +
+      L.push(`  ${dPlain(r.payment.date_paid)} - ${money(r.amount)} by ${METHODS[r.payment.method] || r.payment.method}` +
              (r.covers ? ` (covers ${r.covers} lesson${r.covers !== 1 ? 's' : ''})` : ''));
     });
     L.push('', `Charged: ${money(totalCharged)}`);
     L.push(`Paid: ${money(totalPaid)}`);
-    L.push(outstanding > 0.005 ? `OUTSTANDING: ${money(outstanding)}` : 'Fully settled — thank you!');
+    L.push(outstanding > 0.005 ? `OUTSTANDING: ${money(outstanding)}` : 'Fully settled - thank you!');
     L.push('', 'Payments are applied to the oldest unpaid lesson first.');
     return L.join('\n');
   }
@@ -3997,7 +4009,7 @@ function StatementSheet({ student, lessons, payments, allocations, payState, sca
       await navigator.clipboard.writeText(asText());
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch { /* clipboard blocked — everything is on screen anyway */ }
+    } catch { /* clipboard blocked - everything is on screen anyway */ }
   }
 
   const masked = moneyMode !== 'normal' || nameMode !== 'normal';
@@ -4128,10 +4140,10 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
   return (
     <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && close()}>
       <div className={`sheet${cls}`}>
-        <h2>More tools — {N(student.name, student.id)}</h2>
+        <h2>More tools - {N(student.name, student.id)}</h2>
         <div className="tools-menu">
           <button onClick={onTrackCash}>💷 Log a payment</button>
-          <button onClick={onStatement}>🧾 Lessons &amp; payments — send to a parent</button>
+          <button onClick={onStatement}>🧾 Lessons &amp; payments - send to a parent</button>
           <div style={{display:'flex', gap:7}}>
             <button style={{flex:1, textAlign:'center'}} onClick={copyStudentLink}>
               {linkCopied ? '✓ Copied' : '🔗 Copy link'}
@@ -4231,7 +4243,7 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
           </div>
         )}
         {/* Lesson notes come straight from the calendar event title, which
-            usually contains the student's name — hidden whenever names are. */}
+            usually contains the student's name - hidden whenever names are. */}
         {lesson.lesson_notes && nameMode === 'normal' && (
           <div style={{fontSize:'0.83rem',color:'var(--ink-dim)',marginBottom:16,lineHeight:1.55,background:'var(--card-2)',padding:'10px 12px',borderRadius:8,border:'1px solid var(--line)'}}>
             {lesson.lesson_notes}
@@ -4241,7 +4253,7 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
           <>
             <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:10, lineHeight:1.45}}>
               {lesson.google_event_id
-                ? 'This one came from your calendar, so remove it there too — otherwise the next sync puts it straight back.'
+                ? 'This one came from your calendar, so remove it there too - otherwise the next sync puts it straight back.'
                 : 'This was added by hand, so it won’t come back.'}
               {' '}Any money covering it moves to the next unpaid lesson.
             </div>
@@ -4340,7 +4352,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
     };
   }
 
-  // Money received that isn't yet attached to a lesson — i.e. credit in hand.
+  // Money received that isn't yet attached to a lesson - i.e. credit in hand.
   const allocatedTotal = studentAllocations.reduce((sum, a) => sum + parseFloat(a.amount) * moneyScale, 0);
 
   const daysSinceLastPayment = lastPaymentDate ? daysBetween(lastPaymentDate) : null;
@@ -4358,7 +4370,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
     setToggling(true);
     await supabase.from('tutoring_lessons').update({ is_complimentary: !lesson.is_complimentary }).eq('id', lesson.id);
     // Same reason as a rate change: this moves what's owed, so anything
-    // already allocated to this lesson has to be redistributed — otherwise
+    // already allocated to this lesson has to be redistributed - otherwise
     // making a lesson free strands its payment there instead of letting it
     // settle the next one.
     await supabase.rpc('reallocate_student_payments', { p_student_id: student.id });
@@ -4367,7 +4379,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
     onDataChanged();
   }
 
-  // The escape hatch for a lesson that shouldn't exist — a calendar event
+  // The escape hatch for a lesson that shouldn't exist - a calendar event
   // created by mistake, or one the sync picked up before it was cancelled.
   // Without this the only option was marking it free, which leaves a lesson
   // in the history that never happened and quietly distorts the record.
@@ -4482,7 +4494,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                 const nextDisplayYear = Math.min(displayYear + 1, 13);
                 const daysToUpdate = Math.ceil((nextAug - now) / 86400000);
                 const startedLabel = student.school_year !== displayYear ? ` · started Y${student.school_year}` : '';
-                // Only worth mentioning when it's imminent — "Y12 in 360d" is
+                // Only worth mentioning when it's imminent - "Y12 in 360d" is
                 // noise for eleven and a half months of the year.
                 const updateLabel = (nextDisplayYear <= 13 && daysToUpdate <= 14)
                   ? ` · Y${nextDisplayYear} in ${daysToUpdate}d`
@@ -4494,7 +4506,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               )}
               {referrals.length > 0 && (
                 <div style={{ fontSize: '0.82rem', color: 'var(--accent)', marginTop: 2 }}>
-                  Referred {referrals.map(s => N(s.name, s.id).split(' ')[0]).join(', ')} — use "mark free" on their next lesson
+                  Referred {referrals.map(s => N(s.name, s.id).split(' ')[0]).join(', ')} - use "mark free" on their next lesson
                 </div>
               )}
               {paperRecent && (
@@ -4779,7 +4791,7 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
   const [step, setStep] = useState(startAt);
   const [paused, setPausedState] = useState(false);
   // Told to the app as well, so the Tools button can come back while they
-  // wander — looking around is the whole point of pausing, and Tools is where
+  // wander - looking around is the whole point of pausing, and Tools is where
   // half the app lives.
   const setPaused = v => { setPausedState(v); onPausedChange?.(v); };
   const [saving, setSaving] = useState(false);
@@ -4892,7 +4904,7 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
               <label>Your usual fee per lesson</label>
               <input type="number" min="0" step="1" value={rate} onChange={e => setRate(e.target.value)} placeholder="e.g. 50" />
               <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
-                Just the starting figure for new students — you can charge each one
+                Just the starting figure for new students - you can charge each one
                 differently, and change it whenever you like.
               </div>
             </div>
@@ -4908,9 +4920,9 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
             border:'1px solid var(--line)',
           }}>
             {calStatus.connected && calStatus.calendar_chosen
-              ? `✓ Connected to “${calStatus.calendar_summary}” — ${activeCount} student${activeCount === 1 ? '' : 's'} so far`
+              ? `✓ Connected to “${calStatus.calendar_summary}” - ${activeCount} student${activeCount === 1 ? '' : 's'} so far`
               : calStatus.connected
-                ? 'Connected — now pick which calendar has your lessons'
+                ? 'Connected - now pick which calendar has your lessons'
                 : 'Not connected yet'}
           </div>
         )}
@@ -4973,6 +4985,7 @@ function App() {
   const [blockedOnce, setBlockedOnce] = useState(false);
   const [limitPrompt, setLimitPrompt] = useState(false);
   const [billingNotice, setBillingNotice] = useState(null);
+  const [billingCheckExpired, setBillingCheckExpired] = useState(false);
   const [billingTick, setBillingTick] = useState(0);
 
   useEffect(() => {
@@ -5016,16 +5029,25 @@ function App() {
     notifyStudentLimit = () => setLimitPrompt(true);
   }, [entitlement, students]);
 
-  // Stripe redirects back before its webhook necessarily has; re-read twice.
+  // Stripe redirects back before its webhook necessarily has, so keep checking
+  // for long enough to avoid showing an old free-plan banner underneath.
   useEffect(() => {
-    if (billingNotice !== 'done') return;
-    const a = setTimeout(() => setBillingTick(n => n + 1), 2500);
-    const b = setTimeout(() => setBillingTick(n => n + 1), 7000);
-    return () => { clearTimeout(a); clearTimeout(b); };
+    if (billingNotice !== 'done') {
+      setBillingCheckExpired(false);
+      return;
+    }
+    setBillingCheckExpired(false);
+    const timers = [1000, 2500, 5000, 10000, 20000, 40000, 65000]
+      .map(ms => setTimeout(() => setBillingTick(n => n + 1), ms));
+    const expired = setTimeout(() => setBillingCheckExpired(true), 70000);
+    return () => {
+      timers.forEach(clearTimeout);
+      clearTimeout(expired);
+    };
   }, [billingNotice]);
 
-  // -1 means finished or skipped. Anything else — including never having had
-  // the field at all, which is every account that predates this — means show
+  // -1 means finished or skipped. Anything else - including never having had
+  // the field at all, which is every account that predates this - means show
   // it. Saving a step writes to user metadata and so bounces back through the
   // auth listener above; the walkthrough keeps its own step in local state so
   // that round trip can't reset it mid-flow.
@@ -5059,13 +5081,13 @@ function App() {
     if (billing) {
       setBillingNotice(billing);
       window.history.replaceState({}, '', window.location.pathname);
-      setTimeout(() => setBillingNotice(null), 9000);
+      if (billing !== 'done') setTimeout(() => setBillingNotice(null), 9000);
     }
   }, []);
 
   // A failed read must never look like an empty diary. Every result is checked
   // for an error, and if any table fails the previous data is left on screen
-  // with a banner saying so — `data || []` on a failed query yields [], which
+  // with a banner saying so - `data || []` on a failed query yields [], which
   // renders as "no lessons" and is indistinguishable from genuinely having
   // none. That is exactly how a momentary connection drop once emptied the
   // whole app while the database was perfectly intact.
@@ -5073,7 +5095,7 @@ function App() {
     if (isManualRefresh) setRefreshing(true);
     try {
       // Auto-complete lessons that have already happened. Two passes, because a
-      // lesson earlier TODAY has passed too — checking the date alone left this
+      // lesson earlier TODAY has passed too - checking the date alone left this
       // morning's lesson showing as upcoming until tomorrow.
       const today = new Date().toISOString().slice(0, 10);
       const nowHHMM = new Date().toTimeString().slice(0, 5);
@@ -5111,12 +5133,25 @@ function App() {
     }
   }
 
-  // Only fetch once signed in — with RLS on, an anonymous fetch returns
+  // Only fetch once signed in - with RLS on, an anonymous fetch returns
   // nothing anyway, and firing it would just show a misleading empty state.
   useEffect(() => { if (session) loadAll(); }, [session]);
 
   const activeStudents = students.filter(s => s.active);
   const archivedCount = students.filter(s => !s.active).length;
+  const billingReadState = readEntitlement(entitlement, activeStudents.length);
+  const billingConfirmed = billingNotice === 'done'
+    && entitlement !== undefined
+    && entitlement !== null
+    && billingReadState.pro;
+  const billingStillChecking = billingNotice === 'done' && !billingConfirmed && !billingCheckExpired;
+  const billingNeedsAttention = billingNotice === 'done' && !billingConfirmed && billingCheckExpired;
+
+  useEffect(() => {
+    if (!billingConfirmed) return;
+    const t = setTimeout(() => setBillingNotice(null), 9000);
+    return () => clearTimeout(t);
+  }, [billingConfirmed]);
 
   const syncLabel = lastSynced
     ? `synced ${lastSynced.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
@@ -5131,7 +5166,7 @@ function App() {
 
   // Search matches name or school, so "Hasmonean" finds everyone there.
   // (auth gate is applied at the end of this component, after all hooks have
-  // run — bailing out earlier would change the hook order between renders)
+  // run - bailing out earlier would change the hook order between renders)
   const q = query.trim().toLowerCase();
   const shownStudents = q
     ? activeStudents.filter(s =>
@@ -5159,16 +5194,25 @@ function App() {
   return (
     <PrivacyContext.Provider value={{ moneyMode, nameMode }}>
     <div>
-      <BillingBar entitlement={entitlement} activeStudents={activeStudents.length} blockedOnce={blockedOnce} />
+      <BillingBar
+        entitlement={entitlement}
+        activeStudents={activeStudents.length}
+        blockedOnce={blockedOnce}
+        suppressFreePrompt={billingStillChecking}
+      />
       {billingNotice && (
         <div style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600, maxWidth:'92vw',
-          background: billingNotice === 'done' ? 'var(--accent)' : 'var(--warn)',
+          background: billingNotice === 'done' && !billingNeedsAttention ? 'var(--accent)' : 'var(--warn)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {billingNotice === 'done'
-            ? 'Thanks — your subscription is active.'
+            ? billingConfirmed
+              ? 'Thanks - your subscription is active.'
+              : billingNeedsAttention
+                ? 'Stripe has not confirmed Pro yet. Open Tools: Billing & subscription, or try Go Pro again.'
+                : 'Checking Stripe before updating your plan...'
             : 'Payment was cancelled. Nothing has been charged.'}
         </div>
       )}
@@ -5189,7 +5233,7 @@ function App() {
           background: googleStatus === 'connected' ? 'var(--accent)' : 'var(--warn)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
-          {googleStatus === 'connected' ? '📅 Google Calendar connected — pick a calendar in Tools to finish' : 'Google Calendar connection was cancelled or denied'}
+          {googleStatus === 'connected' ? '📅 Google Calendar connected - pick a calendar in Tools to finish' : 'Google Calendar connection was cancelled or denied'}
         </div>
       )}
       <div className="app-header">
@@ -5243,8 +5287,8 @@ function App() {
         }}>
           <b>Couldn't reach your data.</b>{' '}
           {lastSynced
-            ? 'Showing what was last loaded — nothing has been lost or changed.'
-            : 'Nothing is loaded yet, so this page is empty — that is not your real data.'}
+            ? 'Showing what was last loaded - nothing has been lost or changed.'
+            : 'Nothing is loaded yet, so this page is empty - that is not your real data.'}
           <button onClick={() => loadAll(true)} disabled={refreshing} style={{
             marginLeft:8, padding:'3px 10px', borderRadius:8, cursor:'pointer',
             border:'1px solid var(--warn)', background:'none', color:'var(--warn)',

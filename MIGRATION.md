@@ -1,7 +1,7 @@
 # Moving to tutoring.bowermaths.co.uk
 
 The code side is done. Nothing in the app or the edge functions refers to
-`bowergit.github.io` any more — student links are built from whatever domain
+`bowergit.github.io` any more - student links are built from whatever domain
 is serving the app, and the Google callback returns to whichever domain
 started the connection. So both URLs can be live at once, and the switch is
 config rather than code.
@@ -20,7 +20,7 @@ Cloudflare → **Workers & Pages** → **Create** → **Pages** → **Connect to
 - Build command: **leave empty**
 - Output directory: **/** (the repo root)
 
-There is no build step — it's a single HTML file that compiles itself in the
+There is no build step - it's a single HTML file that compiles itself in the
 browser. Anything Cloudflare offers to run will only get in the way.
 
 Deploy. You'll get a `*.pages.dev` URL. Open it and check the app loads and
@@ -50,7 +50,7 @@ domain fail.
 **Leave Site URL alone.** It points at the CEO dashboard, and changing it
 would break that app's emails instead. See the note at the bottom.
 
-## 4. Retire the old URL (~2 min) — only once step 2 works
+## 4. Retire the old URL (~2 min) - only once step 2 works
 
 GitHub → repo **Settings** → **Pages** → change the source branch from
 `master` to **`legacy-redirect`**.
@@ -59,12 +59,12 @@ That branch holds two small redirect pages instead of the app. Every link
 already sent to a parent keeps working: `student.html` passes the `?t=<token>`
 straight through, so the new page still knows whose lessons to show.
 
-Do not merge that branch into master — Cloudflare builds the real app from
+Do not merge that branch into master - Cloudflare builds the real app from
 master, and these stubs would replace it.
 
 ---
 
-## Not affected — don't change these
+## Not affected - don't change these
 
 **The Google OAuth redirect URI.** It points at
 `…supabase.co/functions/v1/google-calendar-auth`, not at the app, so the
@@ -81,7 +81,7 @@ than editing code.
 1. `tutoring.bowermaths.co.uk` loads and signs in.
 2. Tools → Google Calendar → **Sync now** returns a lesson count.
 3. A student's **More tools → Copy link** now gives a
-   `tutoring.bowermaths.co.uk/student.html?t=…` link — the app builds it from
+   `tutoring.bowermaths.co.uk/student.html?t=…` link - the app builds it from
    the current domain, so this is the proof the move is complete.
 4. An old `bowergit.github.io/tutoring/student.html?t=…` link forwards to the
    new one and still shows the right student.
@@ -96,7 +96,7 @@ Supabase allows **one** Site URL per project, and yours points at the CEO
 dashboard. The dashboard's **Invite user** button always uses it, which is why
 inviting a tutor sends them to the wrong app.
 
-Password resets started from inside the tutoring app are fine — the app sends
+Password resets started from inside the tutoring app are fine - the app sends
 its own return URL, which is why step 3 above matters.
 
 So for now: **don't use Invite.** Authentication → Users → **Add user**, set a
@@ -105,5 +105,5 @@ did for Djavhan and it works.
 
 The real fix is giving the tutoring app **its own Supabase project**, which is
 also what you'd want before selling this to anyone. That's a genuine migration
-— data, RLS policies, seven edge functions, the cron job and its vault secret
-— so it belongs with the SaaS rebrand rather than with a domain change.
+- data, RLS policies, seven edge functions, the cron job and its vault secret
+- so it belongs with the SaaS rebrand rather than with a domain change.

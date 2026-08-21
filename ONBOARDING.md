@@ -9,7 +9,7 @@ without you touching anything. You only get involved if you want to.
 
 ---
 
-## Part 1 — the one-time setup
+## Part 1 - the one-time setup
 
 Four things. The first two are needed before anyone can sign up. The Stripe ones
 are only needed before anyone goes past 3 students.
@@ -114,7 +114,7 @@ way to see why.
 
 ---
 
-## Part 2 — how a tutor actually gets in
+## Part 2 - how a tutor actually gets in
 
 ### The self-serve path (what you want)
 
@@ -156,7 +156,7 @@ The subscription row is created automatically by the trigger either way.
 
 ---
 
-## Part 3 — admin commands
+## Part 3 - admin commands
 
 All of these run in the Supabase SQL editor.
 
@@ -212,7 +212,7 @@ webhook will put them straight back.
 
 ---
 
-## Part 4 — how the paywall behaves
+## Part 4 - how the paywall behaves
 
 Worth knowing so you can answer questions without reading the code.
 
@@ -231,7 +231,7 @@ their own records. The code errs towards giving away access.
 
 ---
 
-## Part 5 — adding a paid add-on later
+## Part 5 - adding a paid add-on later
 
 The plumbing is built. To sell the Monzo add-on at £5 a month:
 

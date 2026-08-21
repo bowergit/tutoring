@@ -241,7 +241,7 @@
 
   // ── Progress ──────────────────────────────────────────────────────────
   // One series over time, so: a line, one hue, no legend. The y axis is fixed
-  // at 0–100 rather than fitted to the data, because a percentage axis that
+  // at 0-100 rather than fitted to the data, because a percentage axis that
   // starts at 35 turns an ordinary term into a vertical climb.
   const CH = { w: 440, h: 200, l: 30, r: 10, t: 14, b: 28 };
 
@@ -533,7 +533,7 @@
   }
 
   // One delegated listener handles every row, including ones added later by
-  // "Show more" — no need to re-bind click handlers on every re-render.
+  // "Show more" - no need to re-bind click handlers on every re-render.
   app.addEventListener('click', e => {
     const row = e.target.closest('[data-detail]');
     if (!row) return;
@@ -587,7 +587,7 @@
   }
 
   if (!token) {
-    app.innerHTML = '<div class="state">This link is missing something — ask your tutor for the correct one.</div>';
+    app.innerHTML = '<div class="state">This link is missing something - ask your tutor for the correct one.</div>';
     return;
   }
 
@@ -599,13 +599,13 @@
       const res = await fetch(`${FN_BASE}/student-portal?t=${encodeURIComponent(token)}`);
       data = await res.json();
     } catch (e) {
-      app.innerHTML = '<div class="state">Couldn\'t load your lessons right now — try again shortly.</div>';
+      app.innerHTML = '<div class="state">Couldn\'t load your lessons right now - try again shortly.</div>';
       return;
     }
   }
 
   if (!data.ok) {
-    app.innerHTML = '<div class="state">This link doesn\'t look right — ask your tutor for a fresh one.</div>';
+    app.innerHTML = '<div class="state">This link doesn\'t look right - ask your tutor for a fresh one.</div>';
     return;
   }
 
