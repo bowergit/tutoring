@@ -590,7 +590,35 @@ const DEMO_MODE = new URLSearchParams(window.location.search).has('demo');
 // stay readable and exportable, so lapsing blocks writing, not looking.
 let WRITES_BLOCKED = false;
 let notifyBlockedWrite = () => {};
-const BLOCKED_MESSAGE = "Your subscription has lapsed, so Tutortally is read-only for now. Nothing has been deleted.";
+const BLOCKED_MESSAGE = "You are over the free plan's student limit, so Tutortally is read-only for now. Nothing has been deleted.";
+
+// Set when the account is on the free plan and already using every slot.
+// Adding one more student is refused on its own, rather than the whole app
+// locking, so the tutor hits a clear "this needs Pro" at the moment they try.
+let NEW_STUDENT_BLOCKED = false;
+let CURRENT_FREE_LIMIT = 3;
+let notifyStudentLimit = () => {};
+
+// Returns null to allow, or {message, notify} to refuse.
+function refuseWrite(table, op, args) {
+  if (WRITES_BLOCKED) {
+    return { message: BLOCKED_MESSAGE, notify: () => notifyBlockedWrite() };
+  }
+  if (NEW_STUDENT_BLOCKED && table === 'tutoring_students') {
+    const payload = args && args[0];
+    // Un-archiving steps over the limit exactly the way adding one does, so it
+    // is caught here too. Any other edit to an existing student is fine.
+    const adding = op === 'insert';
+    const unarchiving = op === 'update' && payload && payload.active === true;
+    if (adding || unarchiving) {
+      return {
+        message: `The free plan covers ${CURRENT_FREE_LIMIT} active students. Pro is £5 a month for as many as you like.`,
+        notify: () => notifyStudentLimit(),
+      };
+    }
+  }
+  return null;
+}
 
 // Stands in for a PostgREST query builder: every method returns itself, and
 // awaiting it produces a fixed result. Used for refused writes, and for the
@@ -619,14 +647,18 @@ function guardedClient(client) {
       const q = client.from(table);
       return new Proxy(q, {
         get(target, prop) {
-          if (WRITES_BLOCKED && MUTATIONS.includes(prop)) {
-            return () => {
-              notifyBlockedWrite();
-              return chainableResult({ data: null, error: { message: BLOCKED_MESSAGE } });
-            };
-          }
           const v = target[prop];
-          return typeof v === 'function' ? v.bind(target) : v;
+          if (!MUTATIONS.includes(prop)) {
+            return typeof v === 'function' ? v.bind(target) : v;
+          }
+          return (...args) => {
+            const refusal = refuseWrite(table, prop, args);
+            if (refusal) {
+              refusal.notify();
+              return chainableResult({ data: null, error: { message: refusal.message } });
+            }
+            return v.apply(target, args);
+          };
         }
       });
     },
@@ -1003,31 +1035,70 @@ if (DEMO_MODE) {
 const supabase = DEMO_MODE ? makeDemoClient() : guardedClient(realSupabase);
 
 // ---------- Billing ----------
-// The rule: access if the free period is still running, or Stripe says they
-// are paying. past_due counts, because Stripe retries a failed card for days
-// and locking a tutor out of their own lesson records over an expired card is
-// a worse outcome than a few free days.
+// Free forever up to a student count, Pro when you outgrow it. So the gate is
+// a count, not a date.
+//
+// Pro comes from any of three things: a comped account, a pro_free_until date
+// still in the future (beta periods, referral months, goodwill), or a live
+// Stripe subscription. past_due counts as live, because Stripe retries a failed
+// card for days and locking a tutor out of their own lesson records over an
+// expired card is the worse outcome.
 const FN_BILLING = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
 const STRIPE_OK = ['active', 'trialing', 'past_due'];
+const DEFAULT_FREE_LIMIT = 3;
+
+// Addons are extra line items on the same Stripe subscription, so a tutor pays
+// one invoice however many they have. Anything with available:false is
+// plumbing that exists end to end but is not on sale yet, and is deliberately
+// not shown to tutors: listing an unbuilt feature is a promise.
+const ADDONS = [
+  {
+    key: 'monzo',
+    name: 'Monzo payment matching',
+    price: '£5 a month',
+    blurb: 'Bank transfers matched to students automatically, instead of logging them by hand.',
+    available: false,
+  },
+];
 
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
-// Fails open on purpose. If the entitlement row cannot be read — a network
-// blip, a policy change, a row that never got created — the tutor keeps full
-// access. Locking a paying customer out because of a billing bug is far worse
-// than giving away a few free days.
-function readEntitlement(ent) {
-  if (!ent) return { access: true, reason: 'unknown', paying: false, daysLeft: null };
-  if (ent.plan === 'comp') return { access: true, reason: 'comp', paying: false, daysLeft: null };
-  const free = !!(ent.free_until && ent.free_until >= todayISO());
-  const paying = STRIPE_OK.includes(ent.stripe_status);
-  const daysLeft = ent.free_until
-    ? Math.round((new Date(ent.free_until + 'T00:00:00') - new Date(todayISO() + 'T00:00:00')) / 86400000)
+function readEntitlement(ent, activeStudents = 0) {
+  const limit = ent?.free_student_limit ?? DEFAULT_FREE_LIMIT;
+
+  // Fails open. If the row cannot be read — a network blip, a policy change, a
+  // row that never got created — the tutor keeps working. Locking a paying
+  // customer out because of a billing bug is far worse than a few free days.
+  if (!ent) {
+    return {
+      unknown: true, pro: true, access: true, reason: 'unknown',
+      limit, over: false, atLimit: false, addons: [], grantDaysLeft: null,
+    };
+  }
+
+  const comped  = ent.plan === 'comp';
+  const granted = !!(ent.pro_free_until && ent.pro_free_until >= todayISO());
+  const paying  = STRIPE_OK.includes(ent.stripe_status);
+  const pro     = comped || granted || paying;
+
+  const over    = activeStudents > limit;
+  const atLimit = activeStudents >= limit;
+
+  const grantDaysLeft = ent.pro_free_until
+    ? Math.round((new Date(ent.pro_free_until + 'T00:00:00') - new Date(todayISO() + 'T00:00:00')) / 86400000)
     : null;
-  return { access: free || paying, reason: paying ? 'paying' : free ? 'free' : 'lapsed', paying, daysLeft };
+
+  return {
+    unknown: false, pro, comped, granted, paying,
+    limit, over, atLimit,
+    access: pro || !over,
+    grantDaysLeft,
+    addons: Array.isArray(ent.addons) ? ent.addons : [],
+    reason: comped ? 'comp' : paying ? 'paying' : granted ? 'granted' : over ? 'over' : 'free',
+  };
 }
 
-async function billingRedirect(fn, setBusy, setError) {
+async function billingRedirect(fn, setBusy, setError, addons) {
   setBusy(true);
   setError(null);
   try {
@@ -1038,6 +1109,7 @@ async function billingRedirect(fn, setBusy, setError) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${data?.session?.access_token ?? ''}`,
       },
+      body: JSON.stringify({ addons: addons || [] }),
     });
     const body = await res.json();
     if (body.ok && body.url) { window.location.href = body.url; return; }
@@ -1048,10 +1120,21 @@ async function billingRedirect(fn, setBusy, setError) {
   setBusy(false);
 }
 
-function BillingBar({ entitlement, blockedOnce }) {
+function GoProButton({ label = 'Go Pro — £5 a month', ghost }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  return (
+    <>
+      <button className={ghost ? 'billing-btn ghost' : 'billing-btn'} disabled={busy}
+        onClick={() => billingRedirect('stripe-checkout', setBusy, setError)}>
+        {busy ? 'Opening…' : label}
+      </button>
+      {error && <span className="billing-err">{error}</span>}
+    </>
+  );
+}
 
+function BillingBar({ entitlement, activeStudents, blockedOnce }) {
   if (DEMO_MODE) {
     return (
       <div className="billing-bar demo">
@@ -1062,38 +1145,46 @@ function BillingBar({ entitlement, blockedOnce }) {
   }
 
   if (!entitlement) return null;
-  const st = readEntitlement(entitlement);
+  const st = readEntitlement(entitlement, activeStudents);
 
+  // Over the limit with no Pro: the whole app is read-only, as the terms say.
   if (!st.access) {
     return (
       <div className="billing-bar warn">
         <span>
-          <b>Read-only.</b>{blockedOnce ? ' That change was not saved.' : ''} Your free
-          months have run out. Everything you have entered is still here.
+          <b>Read-only.</b>{blockedOnce ? ' That change was not saved.' : ''} You have{' '}
+          {activeStudents} active students and the free plan covers {st.limit}. Archive a few,
+          or go Pro for as many as you like. Nothing has been deleted.
         </span>
-        <button className="billing-btn" disabled={busy}
-          onClick={() => billingRedirect('stripe-checkout', setBusy, setError)}>
-          {busy ? 'Opening…' : 'Add a card — £5 a month'}
-        </button>
-        {error && <span className="billing-err">{error}</span>}
+        <GoProButton />
       </div>
     );
   }
 
-  if (st.reason === 'free' && st.daysLeft != null && st.daysLeft <= 21) {
+  // On the free plan and using every slot: say so before they hit the wall.
+  if (!st.pro && st.atLimit) {
     return (
       <div className="billing-bar">
         <span>
-          {st.daysLeft <= 0
-            ? 'Your free months end today.'
-            : `${st.daysLeft} day${st.daysLeft === 1 ? '' : 's'} left of your free months.`}
-          {' '}£5 a month after that, cancel any time.
+          You're using {activeStudents} of your {st.limit} free students. Pro is £5 a month
+          for as many as you like.
         </span>
-        <button className="billing-btn ghost" disabled={busy}
-          onClick={() => billingRedirect('stripe-checkout', setBusy, setError)}>
-          {busy ? 'Opening…' : 'Add a card'}
-        </button>
-        {error && <span className="billing-err">{error}</span>}
+        <GoProButton ghost />
+      </div>
+    );
+  }
+
+  // Free Pro running out, and no card on file to carry it on.
+  if (st.granted && !st.paying && !st.comped && st.grantDaysLeft != null && st.grantDaysLeft <= 21) {
+    return (
+      <div className="billing-bar">
+        <span>
+          {st.grantDaysLeft <= 0
+            ? 'Your free Pro ends today.'
+            : `${st.grantDaysLeft} day${st.grantDaysLeft === 1 ? '' : 's'} of free Pro left.`}
+          {' '}£5 a month after that, or drop back to {st.limit} students and pay nothing.
+        </span>
+        <GoProButton label="Add a card" ghost />
       </div>
     );
   }
@@ -1101,17 +1192,16 @@ function BillingBar({ entitlement, blockedOnce }) {
   return null;
 }
 
-function BillingPanel({ entitlement }) {
+function BillingPanel({ entitlement, activeStudents }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
-  const st = readEntitlement(entitlement);
   const fmt = (d) => d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : '—';
 
   if (DEMO_MODE) {
     return <div style={{fontSize:'0.88rem', color:'var(--ink-dim)', lineHeight:1.6}}>
       <p>This is the demo, so there is nothing to bill.</p>
-      <p>On a real account: three months free, then £5 a month, cancel in one tap.
-      The first fifty accounts keep £5 for as long as they stay.</p>
+      <p>On a real account: free forever for up to 3 active students, then £5 a month
+      for as many as you like. Cancel in one tap.</p>
       <a className="billing-btn" href="/app" style={{marginTop:6}}>Set up your own</a>
     </div>;
   }
@@ -1123,50 +1213,95 @@ function BillingPanel({ entitlement }) {
     </div>;
   }
 
+  const st = readEntitlement(entitlement, activeStudents);
+  const activeAddons = ADDONS.filter(a => st.addons.includes(a.key));
+
   return (
     <div style={{fontSize:'0.88rem', lineHeight:1.6}}>
-      {st.reason === 'comp' && (
-        <p style={{color:'var(--accent)', fontWeight:600}}>
-          This account is free, permanently. Nothing to pay and nothing to cancel.
+      <div style={{
+        display:'flex', alignItems:'baseline', gap:8, marginBottom:4,
+        fontSize:'1.05rem', fontWeight:700, letterSpacing:'-0.02em'
+      }}>
+        {st.comped ? 'Pro, on the house' : st.pro ? 'Pro' : 'Free plan'}
+        {st.pro && !st.comped && !st.paying && <span style={{fontSize:'0.78rem', fontWeight:600, color:'var(--gold)'}}>free period</span>}
+      </div>
+
+      <div style={{color:'var(--muted)', fontSize:'0.84rem', marginBottom:14}}>
+        {activeStudents} active student{activeStudents === 1 ? '' : 's'}
+        {st.pro ? ' · no limit' : ` of ${st.limit} included`}
+      </div>
+
+      {st.comped && (
+        <p style={{color:'var(--accent)'}}>
+          This account has Pro permanently. Nothing to pay and nothing to cancel.
         </p>
       )}
-      {st.reason === 'free' && (
+
+      {st.reason === 'free' && !st.atLimit && (
         <p>
-          Free until <b>{fmt(entitlement.free_until)}</b>
-          {st.daysLeft != null ? ` (${st.daysLeft} day${st.daysLeft === 1 ? '' : 's'})` : ''}.
-          {' '}After that it is £5 a month.
+          You are well inside the free plan. Nothing to pay. If you go past {st.limit} active
+          students, Pro is £5 a month for as many as you like.
+        </p>
+      )}
+
+      {st.reason === 'free' && st.atLimit && !st.over && (
+        <p>
+          You are using every slot on the free plan. Adding a {st.limit + 1}th student needs Pro,
+          which is £5 a month with no limit.
+        </p>
+      )}
+
+      {st.reason === 'over' && (
+        <p style={{color:'var(--warn)'}}>
+          You have {activeStudents} active students and the free plan covers {st.limit}, so
+          Tutortally is read-only. Archive some students or go Pro. Nothing has been
+          deleted and your export still works.
+        </p>
+      )}
+
+      {st.granted && !st.comped && (
+        <p>
+          Pro is free on this account until <b>{fmt(entitlement.pro_free_until)}</b>
+          {st.grantDaysLeft != null ? ` (${st.grantDaysLeft} day${st.grantDaysLeft === 1 ? '' : 's'})` : ''}.
           {entitlement.stripe_customer_id
-            ? ' Your card is saved, so it will carry on without you doing anything.'
-            : ' Add a card whenever you like — you will not be charged until the free period ends.'}
+            ? ' Your card is saved, so it carries on by itself after that.'
+            : ' Add a card any time — you will not be charged until that date.'}
         </p>
       )}
-      {st.reason === 'paying' && (
+
+      {st.paying && (
         <p>
-          Subscribed at £5 a month.
+          £5 a month{activeAddons.length ? ` plus ${activeAddons.length} add-on` : ''}
+          {activeAddons.length > 1 ? 's' : ''}.
           {entitlement.cancel_at_period_end
             ? ` Cancelling on ${fmt(entitlement.current_period_end)}.`
             : ` Next payment ${fmt(entitlement.current_period_end)}.`}
           {entitlement.stripe_status === 'past_due' && (
-            <><br /><span style={{color:'var(--warn)'}}>Your last payment did not go through. Update your card to avoid losing access.</span></>
+            <><br /><span style={{color:'var(--warn)'}}>
+              Your last payment did not go through. Update your card to avoid losing Pro.
+            </span></>
           )}
         </p>
       )}
-      {st.reason === 'lapsed' && (
-        <p style={{color:'var(--warn)'}}>
-          Your free period ended on {fmt(entitlement.free_until)}. Tutortally is read-only
-          until you subscribe. Nothing has been deleted and your export still works.
-        </p>
+
+      {activeAddons.length > 0 && (
+        <>
+          <div className="section-label" style={{marginTop:16}}>Add-ons</div>
+          {activeAddons.map(a => (
+            <div key={a.key} style={{
+              display:'flex', justifyContent:'space-between', gap:10,
+              padding:'8px 0', borderBottom:'1px solid var(--line)', fontSize:'0.85rem'
+            }}>
+              <span>{a.name}</span>
+              <span style={{color:'var(--muted)'}}>{a.price}</span>
+            </div>
+          ))}
+        </>
       )}
 
-      {entitlement.plan === 'founder' && st.reason !== 'comp' && (
-        <p style={{color:'var(--gold)', fontSize:'0.82rem'}}>
-          Founder price: £5 a month stays £5 for as long as you keep this account.
-        </p>
-      )}
-
-      {st.reason !== 'comp' && (
-        <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:14}}>
-          {entitlement.stripe_customer_id ? (
+      {!st.comped && (
+        <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:16}}>
+          {entitlement.stripe_customer_id && st.paying ? (
             <button className="billing-btn" disabled={busy}
               onClick={() => billingRedirect('stripe-portal', setBusy, setError)}>
               {busy ? 'Opening…' : 'Manage card, invoices and cancelling'}
@@ -1174,12 +1309,39 @@ function BillingPanel({ entitlement }) {
           ) : (
             <button className="billing-btn" disabled={busy}
               onClick={() => billingRedirect('stripe-checkout', setBusy, setError)}>
-              {busy ? 'Opening…' : 'Add a card'}
+              {busy ? 'Opening…' : 'Go Pro — £5 a month'}
             </button>
           )}
         </div>
       )}
       {error && <div style={{color:'var(--warn)', fontSize:'0.8rem', marginTop:8}}>{error}</div>}
+    </div>
+  );
+}
+
+// Shown when a write is refused because it would step past the free plan,
+// rather than letting the form close as though it had saved.
+function StudentLimitModal({ limit, onClose }) {
+  const [cls, close] = useAnimatedClose(onClose);
+  return (
+    <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
+      <div className={`sheet${cls}`}>
+        <h2>That's one more than the free plan holds</h2>
+        <div style={{fontSize:'0.9rem', color:'var(--ink-dim)', lineHeight:1.6, marginBottom:16}}>
+          <p style={{marginTop:0}}>
+            The free plan covers {limit} active students, and you have {limit}. Pro is £5 a
+            month for as many as you like, everything else included.
+          </p>
+          <p style={{marginBottom:0}}>
+            If one of your {limit} has finished, archive them instead and the slot comes back.
+            Archiving keeps all their lessons and payments.
+          </p>
+        </div>
+        <GoProButton />
+        <button className="btn cancel" style={{width:'100%', marginTop:10}} onClick={close}>
+          Not now
+        </button>
+      </div>
     </div>
   );
 }
@@ -2086,16 +2248,29 @@ function MonzoPanel({ students, onDataChanged }) {
   );
 }
 
-// ---------- Sign in ----------
-// Email and password, in a real <form> with the right autocomplete hints so a
-// password manager offers to fill and save it. There is deliberately no
-// sign-up here: the account is created once in the Supabase dashboard, so this
-// screen can only ever let an existing owner back in.
+// ---------- Sign in and sign up ----------
+// A real <form> with the right autocomplete hints, so a password manager
+// offers to fill and save it. Signing up puts the tutor straight on the free
+// plan: the database trigger creates their subscription row, so there is no
+// step here that anyone has to remember to do by hand.
 function LoginGate() {
+  // /?signup=1 is what the marketing page links to, so someone arriving from
+  // "Create my free account" lands on the form they were promised.
+  const [mode, setMode] = useState(
+    new URLSearchParams(window.location.search).has('signup') ? 'signup' : 'signin'
+  );   // signin | signup
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [state, setState] = useState('idle');   // idle | busy | error | reset-sent
+  const [state, setState] = useState('idle');   // idle | busy | error | reset-sent | check-email
   const [detail, setDetail] = useState('');
+
+  function switchMode(next) {
+    setMode(next);
+    setState('idle');
+    setDetail('');
+    setPassword('');
+  }
 
   async function signIn(e) {
     e.preventDefault();
@@ -2112,6 +2287,35 @@ function LoginGate() {
         : error.message);
     }
     // On success the auth listener in App swaps this screen out.
+  }
+
+  async function signUp(e) {
+    e.preventDefault();
+    if (!email.trim() || !password) return;
+    if (password.length < 8) {
+      setState('error');
+      setDetail('Use at least 8 characters for your password.');
+      return;
+    }
+    setState('busy');
+    // Same redirect rule as the reset link below: origin and path only, or
+    // Supabase falls back to the project Site URL, which is a different app.
+    const { data, error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+      options: {
+        data: { display_name: name.trim() || null },
+        emailRedirectTo: window.location.origin + window.location.pathname,
+      },
+    });
+    if (error) {
+      setState('error');
+      setDetail(error.message);
+      return;
+    }
+    // With email confirmation on there is no session yet, so say so rather
+    // than leaving them on a form that looks like it did nothing.
+    if (!data.session) setState('check-email');
   }
 
   async function sendReset() {
@@ -2132,6 +2336,22 @@ function LoginGate() {
     if (error) { setState('error'); setDetail(error.message); }
     else { setState('reset-sent'); }
   }
+
+  const signingUp = mode === 'signup';
+  const notice = (body, backLabel) => (
+    <div style={{
+      background:'var(--accent-light)', border:'1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
+      color:'var(--accent)', borderRadius:'var(--r-md)', padding:'14px 15px',
+      fontSize:'0.87rem', lineHeight:1.5, fontWeight:550
+    }}>
+      {body}
+      <div style={{marginTop:10}}>
+        <button className="btn cancel" style={{width:'100%'}} onClick={() => switchMode('signin')}>
+          {backLabel}
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div style={{
@@ -2158,58 +2378,101 @@ function LoginGate() {
           </div>
         </div>
         <div style={{fontSize:'0.85rem', color:'var(--muted)', marginBottom:22, lineHeight:1.5}}>
-          Sign in to total your lessons, payments, and parent links.
+          {signingUp
+            ? 'Free for up to 3 students. No card, nothing to cancel.'
+            : 'Sign in to total your lessons, payments, and parent links.'}
         </div>
 
-        {state === 'reset-sent' ? (
-          <div style={{
-            background:'var(--accent-light)', border:'1px solid color-mix(in srgb, var(--accent) 30%, transparent)',
-            color:'var(--accent)', borderRadius:'var(--r-md)', padding:'14px 15px',
-            fontSize:'0.87rem', lineHeight:1.5, fontWeight:550
-          }}>
-            Reset link sent to <b>{email}</b>. Opening it signs you straight in — then
-            set a new password from Tools.
-            <div style={{marginTop:10}}>
-              <button className="btn cancel" style={{width:'100%'}} onClick={() => setState('idle')}>
-                Back to sign in
-              </button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={signIn}>
+        {state === 'reset-sent' && notice(
+          <>Reset link sent to <b>{email}</b>. Opening it signs you straight in, then
+          set a new password from Tools.</>,
+          'Back to sign in'
+        )}
+
+        {state === 'check-email' && notice(
+          <>Account created. Check <b>{email}</b> for a link to confirm it, then sign in.
+          If it hasn't arrived in a couple of minutes, look in spam.</>,
+          'Back to sign in'
+        )}
+
+        {state !== 'reset-sent' && state !== 'check-email' && (
+          <form onSubmit={signingUp ? signUp : signIn}>
+            {signingUp && (
+              <div className="field">
+                <label>Your name</label>
+                <input
+                  type="text" value={name} onChange={e => setName(e.target.value)}
+                  placeholder="Sam" autoComplete="name" name="name" autoFocus
+                />
+              </div>
+            )}
             <div className="field">
               <label>Email</label>
               <input
                 type="email" value={email} onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com" autoComplete="username" name="email" autoFocus
+                placeholder="you@example.com" autoComplete="username" name="email"
+                autoFocus={!signingUp}
               />
             </div>
             <div className="field">
               <label>Password</label>
               <input
                 type="password" value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••" autoComplete="current-password" name="password"
+                placeholder={signingUp ? 'At least 8 characters' : '••••••••'}
+                autoComplete={signingUp ? 'new-password' : 'current-password'} name="password"
               />
             </div>
+
             {state === 'error' && (
               <div style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:12, lineHeight:1.45}}>
                 {detail}
               </div>
             )}
+
+            {signingUp && (
+              <div style={{fontSize:'0.74rem', color:'var(--muted)', marginBottom:12, lineHeight:1.5}}>
+                By creating an account you agree to the{' '}
+                <a href="/terms" target="_blank" rel="noopener" style={{color:'var(--accent)'}}>terms</a>
+                {' '}and{' '}
+                <a href="/privacy" target="_blank" rel="noopener" style={{color:'var(--accent)'}}>privacy policy</a>.
+              </div>
+            )}
+
             <button className="btn save" style={{width:'100%'}} type="submit"
                     disabled={state === 'busy' || !email.trim() || !password}>
-              {state === 'busy' ? 'Signing in…' : 'Sign in'}
+              {state === 'busy'
+                ? (signingUp ? 'Creating…' : 'Signing in…')
+                : (signingUp ? 'Create my account' : 'Sign in')}
             </button>
-            <button
-              type="button"
-              onClick={sendReset}
-              style={{
-                display:'block', margin:'14px auto 0', background:'none', border:'none',
-                color:'var(--muted)', fontSize:'0.78rem', fontFamily:'inherit',
-                cursor:'pointer', textDecoration:'underline'
-              }}>
-              Forgot password?
-            </button>
+
+            {!signingUp && (
+              <button
+                type="button"
+                onClick={sendReset}
+                style={{
+                  display:'block', margin:'14px auto 0', background:'none', border:'none',
+                  color:'var(--muted)', fontSize:'0.78rem', fontFamily:'inherit',
+                  cursor:'pointer', textDecoration:'underline'
+                }}>
+                Forgot password?
+              </button>
+            )}
+
+            <div style={{
+              marginTop:18, paddingTop:16, borderTop:'1px solid var(--line)',
+              textAlign:'center', fontSize:'0.8rem', color:'var(--muted)'
+            }}>
+              {signingUp ? 'Already have an account? ' : 'First time here? '}
+              <button
+                type="button"
+                onClick={() => switchMode(signingUp ? 'signin' : 'signup')}
+                style={{
+                  background:'none', border:'none', color:'var(--accent)', fontFamily:'inherit',
+                  fontSize:'0.8rem', fontWeight:650, cursor:'pointer', padding:0
+                }}>
+                {signingUp ? 'Sign in' : 'Create a free account'}
+              </button>
+            </div>
           </form>
         )}
       </div>
@@ -2707,7 +2970,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               {backBtn}
               <h2 style={{margin:0}}>Billing</h2>
             </div>
-            <BillingPanel entitlement={entitlement} />
+            <BillingPanel entitlement={entitlement} activeStudents={students.filter(s => s.active).length} />
           </>
         )}
         {tool === 'privacy' && (
@@ -4650,6 +4913,7 @@ function App() {
   // object = the real entitlement row.
   const [entitlement, setEntitlement] = useState(undefined);
   const [blockedOnce, setBlockedOnce] = useState(false);
+  const [limitPrompt, setLimitPrompt] = useState(false);
   const [billingNotice, setBillingNotice] = useState(null);
   const [billingTick, setBillingTick] = useState(0);
 
@@ -4679,13 +4943,20 @@ function App() {
     return () => { cancelled = true; };
   }, [session?.user?.id, billingTick]);
 
-  // The lock is read by the client wrapper, which lives outside React, so it
-  // is assigned here as a side effect rather than passed down as a prop.
+  // The locks are read by the client wrapper, which lives outside React, so
+  // they are assigned here as a side effect rather than passed down as props.
   useEffect(() => {
-    if (DEMO_MODE) { WRITES_BLOCKED = false; return; }
-    WRITES_BLOCKED = !readEntitlement(entitlement).access;
+    if (DEMO_MODE) { WRITES_BLOCKED = false; NEW_STUDENT_BLOCKED = false; return; }
+    // Counted from `students` rather than the `activeStudents` further down:
+    // this effect is declared above it, and the dependency array is evaluated
+    // during render, when that binding does not exist yet.
+    const st = readEntitlement(entitlement, students.filter(s => s.active).length);
+    WRITES_BLOCKED = !st.access;
+    NEW_STUDENT_BLOCKED = !st.pro && st.atLimit;
+    CURRENT_FREE_LIMIT = st.limit;
     notifyBlockedWrite = () => setBlockedOnce(true);
-  }, [entitlement]);
+    notifyStudentLimit = () => setLimitPrompt(true);
+  }, [entitlement, students]);
 
   // Stripe redirects back before its webhook necessarily has; re-read twice.
   useEffect(() => {
@@ -4830,7 +5101,7 @@ function App() {
   return (
     <PrivacyContext.Provider value={{ moneyMode, nameMode }}>
     <div>
-      <BillingBar entitlement={entitlement} blockedOnce={blockedOnce} />
+      <BillingBar entitlement={entitlement} activeStudents={activeStudents.length} blockedOnce={blockedOnce} />
       {billingNotice && (
         <div style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
@@ -4879,7 +5150,9 @@ function App() {
             <button className="refresh-btn" onClick={() => loadAll(true)} disabled={refreshing}>
               <span style={{display:'inline-block', animation: refreshing ? 'spin 0.8s linear infinite' : 'none'}}>↻</span>
             </button>
-            <button className="add-btn" onClick={() => setShowAddModal(true)}>+ Add</button>
+            <button className="add-btn" onClick={() =>
+              NEW_STUDENT_BLOCKED ? setLimitPrompt(true) : setShowAddModal(true)
+            }>+ Add</button>
           </div>
         </div>
         {/* The controls live in Tools; this is only a reminder that they're on,
@@ -5015,6 +5288,10 @@ function App() {
           onPausedChange={setWalkthroughPaused}
           onDone={() => { setWalkthroughOpen(false); setWalkthroughPaused(false); }}
         />
+      )}
+
+      {limitPrompt && (
+        <StudentLimitModal limit={CURRENT_FREE_LIMIT} onClose={() => setLimitPrompt(false)} />
       )}
 
       {editingStudent && (
