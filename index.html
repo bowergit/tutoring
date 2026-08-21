@@ -1121,6 +1121,21 @@ async function billingRedirect(fn, setBusy, setError, addons) {
   setBusy(false);
 }
 
+async function refreshBillingFromStripe(accessToken) {
+  const token = accessToken ?? (await supabase.auth.getSession()).data?.session?.access_token ?? '';
+  const res = await fetch(`${FN_BILLING}/stripe-refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: '{}',
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body.ok) throw new Error(body.message || 'Could not refresh billing from Stripe');
+  return body.entitlement ?? null;
+}
+
 function GoProButton({ label = 'Go Pro - £5 a month', ghost }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -4999,17 +5014,31 @@ function App() {
   useEffect(() => {
     if (!session || DEMO_MODE) return;
     let cancelled = false;
-    supabase.from('tutoring_subscriptions').select('*').maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return;
-        if (error) {
-          // Fail open: see readEntitlement. Never lock someone out of their
-          // own records because a billing read failed.
-          console.warn('subscription read failed, allowing access:', error.message);
-          setEntitlement(null);
-          return;
+    async function readSubscription() {
+      const { data, error } = await supabase.from('tutoring_subscriptions').select('*').maybeSingle();
+      let next = data;
+      if (!error && next?.stripe_customer_id && !STRIPE_OK.includes(next.stripe_status)) {
+        try {
+          next = await refreshBillingFromStripe(session.access_token);
+        } catch (err) {
+          console.warn('stripe billing refresh failed:', err?.message || err);
         }
-        setEntitlement(data);
+      }
+      if (cancelled) return;
+      if (error) {
+        // Fail open: see readEntitlement. Never lock someone out of their
+        // own records because a billing read failed.
+        console.warn('subscription read failed, allowing access:', error.message);
+        setEntitlement(null);
+        return;
+      }
+      setEntitlement(next);
+    }
+    readSubscription()
+      .catch(error => {
+        if (cancelled) return;
+        console.warn('subscription read failed, allowing access:', error?.message || error);
+        setEntitlement(null);
       });
     return () => { cancelled = true; };
   }, [session?.user?.id, billingTick]);
