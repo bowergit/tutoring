@@ -550,7 +550,8 @@
   .billing-bar.warn .billing-btn { background:var(--warn); color:#fff; }
   .billing-btn.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
   .billing-btn:disabled { opacity:.6; cursor:default; }
-  .billing-err { flex:1 1 100%; color:var(--warn); font-size:0.78rem; }
+  .go-pro-action { display:inline-flex; flex-direction:column; align-items:flex-start; gap:6px; max-width:100%; }
+  .billing-err { display:block; color:var(--warn); font-size:0.78rem; line-height:1.35; max-width:min(440px, 100%); }
 </style>
 </head>
 <body>
@@ -1124,13 +1125,13 @@ function GoProButton({ label = 'Go Pro — £5 a month', ghost }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   return (
-    <>
+    <span className="go-pro-action">
       <button className={ghost ? 'billing-btn ghost' : 'billing-btn'} disabled={busy}
         onClick={() => billingRedirect('stripe-checkout', setBusy, setError)}>
         {busy ? 'Opening…' : label}
       </button>
       {error && <span className="billing-err">{error}</span>}
-    </>
+    </span>
   );
 }
 
@@ -1871,6 +1872,9 @@ const CALENDAR_TITLE_STOPWORDS = new Set([
   'maths', 'math', 'lesson', 'lessons', 'tutoring', 'tutor', 'session', 'call',
   'zoom', 'catchup', 'catch', 'up', 'revision', 'gcse', 'gcses', 'alevel', 'a',
   'level', 'class', 'meeting', 'online', 'with', 'and', 'the', 'exam',
+  'english', 'spanish', 'french', 'german', 'latin', 'dt', 'design', 'technology',
+  'science', 'biology', 'chemistry', 'physics', 'history', 'geography', 'business',
+  'economics', 'computer', 'computing', 'cs', 'music', 'drama', 'art',
 ]);
 function guessStudentName(title) {
   const cleaned = title.replace(/[-–—:|()]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -2095,9 +2099,9 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
                 );
               })}
               <div style={{fontSize:'0.78rem', color:'var(--muted)', lineHeight:1.45}}>
-                The guess strips out common words like "maths" or "lesson" — say no if it's wrong
-                and type the real one. Pulls their lessons in straight away, then you can fill in
-                their details on their card.
+                The guess strips out common lesson words and subjects. Say no if it's wrong
+                and type the real name. Their lessons come in straight away, then you can fill
+                in the details on their card.
               </div>
             </div>
           )}
@@ -4416,8 +4420,8 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const greeting = parentFirstName ? `Hi ${parentFirstName}!` : 'Hi!';
   const phone = normaliseUKPhone(student.parent_phone);
   const waMessage = balance > 0
-    ? `${greeting} Just a friendly reminder we have an outstanding balance of ${moneyText(balance)} for ${studentFirstName}'s maths lessons. Please could you settle this when you get the chance? Thanks!`
-    : `${greeting} Just checking in about ${studentFirstName}'s next maths lesson.`;
+    ? `${greeting} Just a friendly reminder we have an outstanding balance of ${moneyText(balance)} for ${studentFirstName}'s lessons. Please could you settle this when you get the chance? Thanks!`
+    : `${greeting} Just checking in about ${studentFirstName}'s next lesson.`;
   const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}` : null;
   const paymentMsg = `${greeting} Just a note that we have ${unpaidCount} outstanding session${unpaidCount !== 1 ? 's' : ''} totalling ${moneyText(balance)}. Please could you settle this when you get the chance? Thanks!`;
   const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
