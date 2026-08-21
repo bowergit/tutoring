@@ -321,6 +321,12 @@
   }
   .field input::placeholder, .field textarea::placeholder { color: var(--muted); }
   .field textarea { min-height: 70px; resize: vertical; }
+  .money-input { position: relative; width: 100%; }
+  .money-input span {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    color: var(--muted); font-weight: 700; pointer-events: none;
+  }
+  .money-input input { padding-left: 28px !important; }
   .checkbox-row { display: flex; align-items: center; gap: 8px; }
   .checkbox-row input { width: 18px; height: 18px; accent-color: var(--accent); }
   .btn-row { display: flex; gap: 10px; margin-top: 18px; }
@@ -530,7 +536,8 @@
   .toggle-track.off .toggle-thumb { left:3px; }
   .toggle-label { font-size:0.88rem; color:var(--ink); }
   .rate-cash-row { display:flex; align-items:center; gap:12px; }
-  .rate-cash-row input { width:90px !important; flex-shrink:0; }
+  .rate-cash-row .money-input { width:100px; flex-shrink:0; }
+  .rate-cash-row .money-input input { width:100% !important; }
 
   /* ── Billing / demo bar ── */
   .billing-bar {
@@ -1411,6 +1418,36 @@ function currentSchoolYear(baseYear, asOfDate) {
   return Math.min(baseYear + bumps, 13);
 }
 
+const DANIEL_ACCOUNT_EMAIL = 'daniel@bowermagic.co.uk';
+
+function isDanielAccount(session) {
+  return (session?.user?.email || '').toLowerCase() === DANIEL_ACCOUNT_EMAIL;
+}
+
+function septemberSchoolYearLabel(value) {
+  const today = new Date();
+  if (today.getMonth() !== 7) return null;
+  const year = parseInt(value, 10);
+  if (!Number.isFinite(year) || year < 7 || year > 13) return null;
+  if (year >= 13) return 'From September: finished Year 13.';
+  return `From September: Year ${year + 1}.`;
+}
+
+function studentLessonLocation(student) {
+  if (student?.lesson_location) return student.lesson_location;
+  if (student?.is_zoom) return 'online';
+  if (student?.address) return 'student_home';
+  return 'tutor_home';
+}
+
+function studentLessonLocationLabel(student) {
+  const location = studentLessonLocation(student);
+  if (location === 'online') return 'Online';
+  if (location === 'student_home') return "Student's house";
+  if (location === 'tutor_home') return "Tutor's house";
+  return null;
+}
+
 const PRESET_BOARDS = ['Edexcel', 'AQA', 'Edexcel IGCSE', 'OCR'];
 
 // A paper done in the last week earns a sparkle on the card. Written nightly
@@ -1915,9 +1952,6 @@ const CALENDAR_TITLE_STOPWORDS = new Set([
   'maths', 'math', 'lesson', 'lessons', 'tutoring', 'tutor', 'session', 'call',
   'zoom', 'catchup', 'catch', 'up', 'revision', 'gcse', 'gcses', 'alevel', 'a',
   'level', 'class', 'meeting', 'online', 'with', 'and', 'the', 'exam',
-  'english', 'spanish', 'french', 'german', 'latin', 'dt', 'design', 'technology',
-  'science', 'biology', 'chemistry', 'physics', 'history', 'geography', 'business',
-  'economics', 'computer', 'computing', 'cs', 'music', 'drama', 'art',
 ]);
 function guessStudentName(title) {
   const cleaned = title.replace(/[-\u2013\u2014:|()]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -2024,6 +2058,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
       name: title.trim().slice(0, 80),
       calendar_title_pattern: title,
       active: true,
+      lesson_location: 'tutor_home',
       owner_id: ownerId,
     });
     onDataChanged?.();
@@ -2696,6 +2731,68 @@ function YourName({ session }) {
   );
 }
 
+function SetupChecklist({ session, students, onOpenTool, onAddStudent }) {
+  const [calendarStatus, setCalendarStatus] = useState(null);
+  const meta = session?.user?.user_metadata || {};
+  const hasName = !!String(meta.display_name || '').trim();
+  const hasPhone = !!normaliseUKPhone(meta.contact_phone || '');
+  const hasStudent = students.some(s => s.active);
+  const calendarDone = calendarStatus?.connected && calendarStatus?.calendar_chosen;
+
+  useEffect(() => {
+    if (!session?.access_token) return;
+    fetch(`${FN_BASE}/google-calendar-status`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(r => r.json())
+      .then(setCalendarStatus)
+      .catch(() => setCalendarStatus({ ok: false }));
+  }, [session?.access_token]);
+
+  const items = [
+    { key: 'name', done: hasName, text: 'Add your name', tool: 'yourname' },
+    { key: 'phone', done: hasPhone, text: 'Add your phone number', tool: 'yourname' },
+    {
+      key: 'calendar',
+      done: calendarDone,
+      text: calendarStatus?.connected ? 'Pick your lesson calendar' : 'Connect Google Calendar',
+      tool: 'gcal',
+    },
+    { key: 'student', done: hasStudent, text: 'Add your first student', addStudent: true },
+  ];
+  const missing = items.filter(item => !item.done);
+  if (missing.length === 0) return null;
+
+  return (
+    <div style={{
+      border:'1px solid var(--line)', background:'var(--card-2)', borderRadius:'var(--r-md)',
+      padding:'12px', margin:'0 0 12px',
+    }}>
+      <div style={{fontSize:'0.82rem', fontWeight:700, color:'var(--ink)', marginBottom:8}}>Setup checklist</div>
+      <div style={{display:'flex', flexDirection:'column', gap:7}}>
+        {items.map(item => (
+          <button
+            key={item.key}
+            onClick={() => item.addStudent ? onAddStudent?.() : onOpenTool?.(item.tool)}
+            style={{
+              display:'flex', alignItems:'center', justifyContent:'space-between', gap:10,
+              padding:'9px 10px', borderRadius:'var(--r-md)', border:'1px solid var(--line)',
+              background:item.done ? 'var(--card)' : 'var(--card-3)', color:'var(--ink)',
+              fontFamily:'inherit', cursor:item.done ? 'default' : 'pointer', textAlign:'left',
+            }}
+            disabled={item.done}
+          >
+            <span>{item.text}</span>
+            <span style={{color:item.done ? 'var(--accent)' : 'var(--muted)', fontWeight:700}}>
+              {item.done ? 'Done' : 'Open'}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ---------- Revenue trend ----------
 // Two different questions, one chart. "Earned" is what the lessons taught in
 // a month were worth; "received" is what actually landed in the bank that
@@ -2957,7 +3054,7 @@ function SlideToConfirm({ onConfirm }) {
 }
 
 // ---------- Global Tools Sheet ----------
-function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], userEmail, session, entitlement, initialTool = null, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onReplayWalkthrough, onDataChanged }) {
+function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], userEmail, session, entitlement, initialTool = null, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onReplayWalkthrough, onDataChanged, onAddStudent }) {
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
   // Opens straight onto a panel when the walkthrough sent them here, so the
@@ -2966,6 +3063,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   const [buysOpen, setBuysOpen] = useState(false);
   const privacyOn = moneyMode !== 'normal' || nameMode !== 'normal';
   const archived = students.filter(s => !s.active);
+  const danielOnly = isDanielAccount(session);
 
   // Growth calculator state (shared with perspective calc)
   const active = students.filter(s => s.active);
@@ -3045,9 +3143,15 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
         {!tool && (
           <>
             <h2>Tools</h2>
+            <SetupChecklist
+              session={session}
+              students={students}
+              onOpenTool={setTool}
+              onAddStudent={() => { close(); setTimeout(() => onAddStudent?.(), 220); }}
+            />
             <div className="tools-menu">
               <button onClick={() => setTool('gcal')}>📅 Google Calendar</button>
-              <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>
+              {danielOnly && <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>}
               <button onClick={() => setTool('revenue')}>💹 Money: revenue trend and growth calculator</button>
               <button onClick={() => setTool('archived')}>
                 🗄 Archive: students and payments{archived.length > 0 ? ` (${archived.length})` : ''}
@@ -3164,7 +3268,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
             <GoogleCalendarPanel session={session} onDataChanged={onDataChanged} />
           </>
         )}
-        {tool === 'monzo' && (
+        {tool === 'monzo' && danielOnly && (
           <>
             <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
               {backBtn}
@@ -3224,16 +3328,20 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               <h2 style={{margin:0}}>About &amp; data sources</h2>
             </div>
             {[
-              { icon: '🗄️', title: 'Student profiles', body: 'Stored in Supabase for TutorTally. Name, school, exam board, rate, WhatsApp number, Zoom link, spreadsheet link, and the bank name to expect payments from - all edited via the Edit button on each card.' },
+              { icon: '🗄️', title: 'Student profiles', body: danielOnly
+                ? 'Stored in Supabase for TutorTally. Name, school, exam board, rate, WhatsApp number, online link, spreadsheet link, and the bank name to expect payments from - all edited via the Edit button on each card.'
+                : 'Stored in Supabase for TutorTally. Name, school, exam board, rate, WhatsApp number, lesson location, online link, and spreadsheet link are all edited via the Edit button on each card.' },
               { icon: '📅', title: 'Lessons', body: 'Each lesson row has a date, start time, status (scheduled / completed / missed) and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load. History is grouped by month - tap a month to expand it, then tap a lesson for its detail, where you can also mark it free.' },
               { icon: '🔄', title: 'Fresh start - 27 July 2026', body: 'Everything taught before 27 July 2026 is marked as already paid for. Those lessons still show in history (tagged "settled") but never count towards a balance, and all payments predating that date were cleared out. The old records were archived inside the database rather than destroyed, so they can be recovered if ever needed.' },
               { icon: '💷', title: 'Payments', body: 'Open a student and expand Payments to see every payment, or log a new one (cash or bank transfer). Tap a payment to see which lessons it covers, edit it, or delete it. Balance = completed lessons since the reset − total paid.' },
-              { icon: '🏦', title: 'Monzo', body: 'Tools → Monzo payments pulls incoming bank transfers and logs them against the right student automatically. Set "Expect bank transfers from" on a student to teach it a parent\'s name; after the first match it remembers their account, so it keeps working even when the bank formats the name differently. Only money coming IN from real people is ever looked at - card spending, pot transfers and declines are filtered out, and unrecognised transfers are read live and never stored. Nothing before 27 July 2026 is considered.' },
+              danielOnly && { icon: '🏦', title: 'Monzo', body: 'Tools → Monzo payments pulls incoming bank transfers and logs them against the right student automatically. Set "Expect bank transfers from" on a student to teach it a parent\'s name; after the first match it remembers their account, so it keeps working even when the bank formats the name differently. Only money coming IN from real people is ever looked at - card spending, pot transfers and declines are filtered out, and unrecognised transfers are read live and never stored. Nothing before 27 July 2026 is considered.' },
               { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script runs nightly. It reads your tutoring calendar, matches events to students by their "calendar name" field, and writes lesson rows into Supabase with their start times - marking sessions complete once the date passes. Delete an event from the calendar and the lesson is removed too, unless a payment is attached to it, in which case it is kept and flagged in the log. Lessons you add by hand in the app are never touched by the sync.' },
               { icon: '📈', title: 'Spreadsheet links', body: 'Each student can have a Google Sheets link (set via Edit). Tap the 📈 button on a card to open it. Links are stored in Supabase and can also be set directly in the database.' },
               { icon: '💰', title: 'Rate history', body: 'Every rate change is recorded with a date. The app always uses the rate that was in effect on a given day - so historical balances stay accurate when you put prices up.' },
-              { icon: '🔐', title: 'Security', body: 'Monzo credentials live only in Supabase\'s secret store, and the Monzo tables are locked so the key embedded in this page cannot read any bank data. Student details are not yet behind a login, so treat the site URL as private until that is added.' },
-            ].map(({ icon, title, body }) => (
+              { icon: '🔐', title: 'Security', body: danielOnly
+                ? 'Monzo credentials live only in Supabase\'s secret store, and the Monzo tables are locked so the key embedded in this page cannot read any bank data. Student details are tied to each tutor account.'
+                : 'Student details are tied to each tutor account, and calendar connection tokens are handled by Supabase Edge Functions rather than stored in this page.' },
+            ].filter(Boolean).map(({ icon, title, body }) => (
               <div key={title} style={{marginBottom:14, paddingBottom:14, borderBottom:'1px solid var(--line)'}}>
                 <div style={{fontSize:'0.88rem', fontWeight:600, color:'var(--gold)', marginBottom:4}}>{icon} {title}</div>
                 <div style={{fontSize:'0.83rem', color:'var(--ink-dim)', lineHeight:1.55}}>{body}</div>
@@ -3250,11 +3358,12 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
 }
 
 // ---------- Add/Edit Student Modal ----------
-function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHistory = [], defaultRate = null }) {
+function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHistory = [], defaultRate = null, session }) {
   const [cls, close] = useAnimatedClose(onClose);
   const { moneyMode, nameMode } = usePrivacy();
   const N = useNameDisplay();
   const isEdit = !!student;
+  const danielOnly = isDanielAccount(session);
 
   // With privacy on, the form shows masked values so it can be demonstrated
   // without exposing anything - and becomes read-only, because a field you can
@@ -3273,6 +3382,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
     : '•••';
   const existingBoard = student?.exam_board || '';
   const initPreset = PRESET_BOARDS.includes(existingBoard) ? existingBoard : (existingBoard ? 'other' : '');
+  const initialLessonLocation = studentLessonLocation(student);
 
   const [form, setForm] = useState({
     name: student?.name || '',
@@ -3286,7 +3396,9 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
     exam_tier: student?.exam_tier || '',
     has_extra_time: student?.has_extra_time || false,
     pays_in_cash: !!student?.pays_in_cash,
-    is_zoom: !!student?.is_zoom,
+    is_zoom: initialLessonLocation === 'online',
+    in_person: initialLessonLocation !== 'online',
+    lesson_location: initialLessonLocation === 'student_home' ? 'student_home' : 'tutor_home',
     zoom_link: student?.zoom_link || '',
     monzo_payer_name: student?.monzo_payer_name || '',
     general_notes: student?.general_notes || '',
@@ -3305,6 +3417,27 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
   const [originalRate, setOriginalRate] = useState(null);
   const [rateFrom, setRateFrom] = useState(todayStr);
   const [saving, setSaving] = useState(false);
+  const septemberLabel = septemberSchoolYearLabel(form.school_year);
+
+  function toggleOnline(v) {
+    setForm(f => ({
+      ...f,
+      is_zoom: v,
+      in_person: !v,
+      lesson_location: v ? 'online' : (f.lesson_location === 'online' ? 'tutor_home' : f.lesson_location || 'tutor_home'),
+      zoom_link: v && !f.zoom_link ? 'https://zoom.us/' : f.zoom_link,
+    }));
+  }
+
+  function toggleInPerson(v) {
+    setForm(f => ({
+      ...f,
+      is_zoom: !v,
+      in_person: v,
+      lesson_location: v ? (f.lesson_location === 'online' ? 'tutor_home' : f.lesson_location || 'tutor_home') : 'online',
+      zoom_link: !v && !f.zoom_link ? 'https://zoom.us/' : f.zoom_link,
+    }));
+  }
 
   useEffect(() => {
     if (!isEdit || !student?.id) return;
@@ -3349,15 +3482,16 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
       has_extra_time: form.has_extra_time,
       pays_in_cash: form.pays_in_cash,
       is_zoom: form.is_zoom,
-      zoom_link: form.is_zoom ? (form.zoom_link || null) : null,
-      monzo_payer_name: form.monzo_payer_name || null,
+      lesson_location: form.is_zoom ? 'online' : (form.in_person ? form.lesson_location : null),
+      zoom_link: form.zoom_link || null,
+      monzo_payer_name: danielOnly ? (form.monzo_payer_name || null) : (student?.monzo_payer_name || null),
       general_notes: form.general_notes,
       // Blank must be stored as null, not '': an empty string is a pattern
       // that matches every event title, which would hand this student the
       // tutor's entire calendar.
       calendar_title_pattern: form.calendar_title_pattern.trim() || null,
       spreadsheet_url: form.spreadsheet_url || null,
-      referred_by_student_id: form.referred_by_student_id || null,
+      referred_by_student_id: danielOnly ? (form.referred_by_student_id || null) : (student?.referred_by_student_id || null),
       active: form.active,
     };
 
@@ -3445,10 +3579,6 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
           <input type="text" value={maskText(form.parent_phone, dummyPhoneFor)} onChange={e => setForm({...form, parent_phone: e.target.value})} placeholder="07700 900000" />
         </div>
         <div className="field">
-          <label>Address</label>
-          <input type="text" value={maskText(form.address, dummyAddressFor)} onChange={e => setForm({...form, address: e.target.value})} />
-        </div>
-        <div className="field">
           <label>School</label>
           <input type="text" list="school-options" value={maskText(form.school, dummySchoolFor)} onChange={e => setForm({...form, school: e.target.value})} />
           <datalist id="school-options">
@@ -3459,9 +3589,12 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
           <label>Rate per session</label>
           <div className="rate-cash-row">
             {/* type=text while masked, because a number input cannot render dots */}
-            <input type={demo ? 'text' : 'number'} min="0" step="5"
-              value={maskRate(ratePerSession)}
-              onChange={e => setRatePerSession(e.target.value)} placeholder="e.g. 90" />
+            <div className="money-input">
+              <span>£</span>
+              <input type={demo ? 'text' : 'number'} min="0" step="5"
+                value={maskRate(ratePerSession)}
+                onChange={e => setRatePerSession(e.target.value)} placeholder="90" />
+            </div>
             <Toggle checked={form.pays_in_cash} onChange={v => setForm({...form, pays_in_cash: v})} label="Cash" />
           </div>
           <label style={{marginTop:10}}>Effective from</label>
@@ -3489,6 +3622,11 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         <div className="field">
           <label>School year (7-13, as of today)</label>
           <input type="number" min="7" max="13" value={form.school_year} onChange={e => setForm({...form, school_year: e.target.value})} />
+          {septemberLabel && (
+            <div style={{fontSize:'0.76rem', color:'var(--gold)', marginTop:5, lineHeight:1.45}}>
+              {septemberLabel}
+            </div>
+          )}
         </div>
         <div className="field">
           <label>Exam board</label>
@@ -3519,27 +3657,53 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
           <Toggle checked={form.has_extra_time} onChange={v => setForm({...form, has_extra_time: v})} label="Has extra time (25%)" />
         </div>
         <div className="field">
-          <Toggle checked={form.is_zoom} onChange={v => setForm({...form, is_zoom: v})} label="Zoom lesson" />
+          <div style={{display:'flex', alignItems:'center', gap:16, flexWrap:'wrap'}}>
+            <Toggle checked={form.is_zoom} onChange={toggleOnline} label="Online lesson" />
+            <Toggle checked={form.in_person} onChange={toggleInPerson} label="In-person lesson" />
+          </div>
         </div>
         {form.is_zoom && (
           <div className="field">
-            <label>Zoom link</label>
+            <label>Online link</label>
             <input type="text" value={form.zoom_link}
               onChange={e => setForm({...form, zoom_link: e.target.value})}
-              placeholder="https://zoom.us/j/..." />
+              placeholder="https://zoom.us/..." />
           </div>
         )}
-        <div className="field">
-          <label>Expect bank transfers from</label>
-          <input type="text" value={maskName(form.monzo_payer_name, true)}
-            onChange={e => setForm({...form, monzo_payer_name: e.target.value})}
-            placeholder="e.g. Sarah Simons" />
-          <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
-            The parent's name as it appears on their bank account. Used to match
-            incoming Monzo transfers. After the first match the account is
-            remembered, so the name no longer has to be exact.
+        {form.in_person && (
+          <div className="field">
+            <label>In-person location</label>
+            <div style={{display:'flex', alignItems:'center', gap:10, flexWrap:'wrap'}}>
+              <button type="button" className={`billing-btn ${form.lesson_location === 'student_home' ? '' : 'ghost'}`}
+                onClick={() => setForm({...form, lesson_location:'student_home'})}>
+                Student's house
+              </button>
+              <button type="button" className={`billing-btn ${form.lesson_location === 'tutor_home' ? '' : 'ghost'}`}
+                onClick={() => setForm({...form, lesson_location:'tutor_home'})}>
+                Tutor's house
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+        {form.in_person && form.lesson_location === 'student_home' && (
+          <div className="field">
+            <label>Address</label>
+            <input type="text" value={maskText(form.address, dummyAddressFor)} onChange={e => setForm({...form, address: e.target.value})} />
+          </div>
+        )}
+        {danielOnly && (
+          <div className="field">
+            <label>Expect bank transfers from</label>
+            <input type="text" value={maskName(form.monzo_payer_name, true)}
+              onChange={e => setForm({...form, monzo_payer_name: e.target.value})}
+              placeholder="e.g. Sarah Simons" />
+            <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
+              The parent's name as it appears on their bank account. Used to match
+              incoming Monzo transfers. After the first match the account is
+              remembered, so the name no longer has to be exact.
+            </div>
+          </div>
+        )}
         <div className="field">
           <label>Progress tracker link (optional)</label>
           <input type="text" value={form.spreadsheet_url} onChange={e => setForm({...form, spreadsheet_url: e.target.value})} placeholder="Google Sheet, Drive or Dropbox link" />
@@ -3549,15 +3713,17 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
             use one.
           </div>
         </div>
-        <div className="field">
-          <label>Referred by</label>
-          <select value={form.referred_by_student_id} onChange={e => setForm({...form, referred_by_student_id: e.target.value})}>
-            <option value="">- not a referral -</option>
-            {allStudents.filter(s => s.id !== student?.id).map(s => (
-              <option key={s.id} value={s.id}>{N(s.name, s.id)}</option>
-            ))}
-          </select>
-        </div>
+        {danielOnly && (
+          <div className="field">
+            <label>Referred by</label>
+            <select value={form.referred_by_student_id} onChange={e => setForm({...form, referred_by_student_id: e.target.value})}>
+              <option value="">- not a referral -</option>
+              {allStudents.filter(s => s.id !== student?.id).map(s => (
+                <option key={s.id} value={s.id}>{N(s.name, s.id)}</option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="field">
           <label>Student's name in your calendar</label>
           <input type="text" value={maskName(form.calendar_title_pattern)}
@@ -4321,9 +4487,10 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
   );
 }
 
-function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, focused, onEdit, onDataChanged }) {
+function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, focused, session, onEdit, onDataChanged }) {
   const M = useMoney();
   const N = useNameDisplay();
+  const danielOnly = isDanielAccount(session);
   const [open, setOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [showMoreTools, setShowMoreTools] = useState(false);
@@ -4445,8 +4612,9 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   }
 
   const displayYear = currentSchoolYear(student.school_year, student.school_year_as_of_date);
-  const referredBy = student.referred_by_student_id ? allStudents.find(s => s.id === student.referred_by_student_id) : null;
-  const referrals = allStudents.filter(s => s.referred_by_student_id === student.id);
+  const referredBy = danielOnly && student.referred_by_student_id ? allStudents.find(s => s.id === student.referred_by_student_id) : null;
+  const referrals = danielOnly ? allStudents.filter(s => s.referred_by_student_id === student.id) : [];
+  const lessonLocationLabel = studentLessonLocationLabel(student);
 
   const currentRate = getCurrentRate(student.id, rateHistory);
   const unpaidCount = balance > 0 && currentRate > 0 ? Math.ceil(balance / currentRate) : 0;
@@ -4506,7 +4674,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
             )}
             {displayYear && <span className="pill neutral">Y{displayYear}</span>}
             <span className="pill neutral">{M(currentRate, student.id + ':rate')}</span>
-            {student.is_zoom && <span className="pill neutral">Zoom</span>}
+            {lessonLocationLabel && <span className="pill neutral">{lessonLocationLabel}</span>}
           </div>
         </div>
         <span className={`chevron ${open ? 'open' : ''}`}>›</span>
@@ -5390,10 +5558,11 @@ function App() {
           <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
             allocations={allocations} allStudents={students} rateHistory={rateHistory}
             focused={focusStudentId === s.id}
+            session={session}
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v5.6</div>}
+        {!loading && <div className="version-tag">v5.7</div>}
       </div>
 
       {showAddModal && (
@@ -5401,6 +5570,7 @@ function App() {
           allStudents={students}
           rateHistory={rateHistory}
           defaultRate={session?.user?.user_metadata?.default_rate ?? null}
+          session={session}
           onClose={() => setShowAddModal(false)}
           onSaved={() => { setShowAddModal(false); loadAll(); }}
         />
@@ -5428,6 +5598,7 @@ function App() {
           onClose={() => { setShowGlobalTools(false); setToolsInitial(null); }}
           onReplayWalkthrough={replayWalkthrough}
           onDataChanged={loadAll}
+          onAddStudent={() => setShowAddModal(true)}
         />
       )}
 
@@ -5455,6 +5626,7 @@ function App() {
           student={editingStudent}
           allStudents={students}
           rateHistory={rateHistory}
+          session={session}
           onClose={() => setEditingStudent(null)}
           onSaved={() => { setEditingStudent(null); loadAll(); }}
         />
