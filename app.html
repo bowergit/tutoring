@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>TutorTally - the tiny finance desk for solo tutors</title>
-<meta name="description" content="TutorTally turns a solo tutor's calendar into clear lesson records, payment totals, parent links, and polite chase messages. Free forever for up to 3 active students, then £5 a month.">
+<meta name="description" content="TutorTally turns your teaching calendar into accurate lesson records, clear balances and ready-to-send payment messages. Free forever for up to 3 active students, then £5 a month.">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0f766e">
 <meta property="og:title" content="TutorTally - the tiny finance desk for solo tutors">
-<meta property="og:description" content="Your lessons come out of your calendar automatically. Know exactly who owes what. Free forever for up to 3 active students, then £5 a month.">
+<meta property="og:description" content="Your calendar already knows what you taught. TutorTally tells you exactly who owes what and writes the message to ask for it.">
 <meta property="og:type" content="website">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script>document.documentElement.classList.add('js')</script>
@@ -141,6 +141,13 @@
   .chip.warn { background: var(--warn-light); color: var(--warn); }
   .chip.neutral { background: var(--card-3); color: var(--ink-dim); }
   .spacer { margin-left: auto; }
+  .demo-student { width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color .16s, transform .16s, background .16s; }
+  .demo-student:hover, .demo-student:focus-visible { border-color: var(--accent); background: var(--accent-light); outline: none; }
+  .demo-student:active { transform: scale(.985); }
+  .demo-detail { margin-top: 12px; padding: 13px; border: 1px solid var(--accent); border-radius: var(--r-md); background: var(--accent-light); }
+  .demo-detail-title { display:flex; justify-content:space-between; gap:10px; align-items:baseline; font-weight:720; }
+  .demo-detail-copy { color: var(--ink-dim); font-size:.82rem; margin:5px 0 10px; }
+  .demo-detail .btn { padding:8px 12px; font-size:.78rem; }
 
   /* ── Sync animation ── */
   .flow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin-top: 8px; }
@@ -246,14 +253,17 @@
   /* ── FAQ ── */
   details {
     background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
-    padding: 15px 18px; margin-bottom: 10px;
+    padding: 15px 18px; margin-bottom: 10px; overflow: hidden;
   }
   details[open] { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
   summary { cursor: pointer; font-weight: 640; list-style: none; font-size: 0.98rem; }
   summary::-webkit-details-marker { display: none; }
   summary::after { content: '+'; float: right; color: var(--accent); font-weight: 700; }
   details[open] summary::after { content: '-'; }
-  details p { margin: 11px 0 0; color: var(--ink-dim); font-size: 0.94rem; }
+  .faq-answer { display:grid; grid-template-rows:0fr; transition:grid-template-rows .23s ease; }
+  .faq-answer p { overflow:hidden; margin:0; color:var(--ink-dim); font-size:.94rem; opacity:0; transform:translateY(-5px); transition:opacity .18s ease, transform .18s ease, margin .23s ease; }
+  details[open] .faq-answer { grid-template-rows:1fr; }
+  details[open] .faq-answer p { margin:11px 0 0; opacity:1; transform:none; }
 
   footer { border-top: 1px solid var(--line); padding: 34px 0; color: var(--muted); font-size: 0.86rem; }
 </style>
@@ -273,22 +283,21 @@
   <div class="wrap hero-grid">
     <div>
       <div class="eyebrow">For solo tutors</div>
-      <h1>Tutoring admin, <span class="hl">finally totalled</span>.</h1>
+      <h1>Your calendar already knows <span class="hl">what you taught.</span></h1>
       <p class="lede">
-        You book the lesson. TutorTally does the boring bit: clean records,
-        payment totals, parent links, and polite chase messages without turning
-        you into an accounts department.
+        TutorTally turns it into accurate lesson records, tells you exactly who
+        owes what, and writes the WhatsApp message to chase it.
       </p>
       <div class="cta-row">
-        <a href="/?signup=1" class="btn btn-primary btn-lg">Start free</a>
-        <a href="/?demo=1" class="btn btn-ghost btn-lg">Try the demo</a>
+        <a href="/?signup=1" class="btn btn-primary btn-lg">Get started free</a>
+        <a href="/?demo=1" class="btn btn-ghost btn-lg">Try the real demo</a>
       </div>
-      <p class="cta-note">No card. Setup takes about three minutes.</p>
+      <p class="cta-note">No card. Built by a working tutor who got fed up of tracking this manually.</p>
 
       <div class="trust">
         <div><b>3 min</b>to set up</div>
         <div><b>Free</b>up to 3 active students</div>
-        <div><b>0</b>lessons typed in by hand</div>
+        <div><b>0</b>lessons retyped by hand</div>
       </div>
     </div>
 
@@ -302,16 +311,17 @@
           <div class="pill-btn">+ Add</div>
         </div>
 
-        <div class="srow"><span class="dot ok"></span><span class="sname">Amira K.</span>
-          <span class="spacer"></span><span class="chip">Paid up</span><span class="chip neutral">Tue 16:00</span></div>
-        <div class="srow"><span class="dot warn"></span><span class="sname">Joe F.</span>
-          <span class="spacer"></span><span class="chip warn">Owes £180</span><span class="chip neutral">Y11</span></div>
-        <div class="srow"><span class="dot ok"></span><span class="sname">Priya S.</span>
-          <span class="spacer"></span><span class="chip">Paid up</span><span class="chip neutral">Online</span></div>
-        <div class="srow"><span class="dot warn"></span><span class="sname">Tom B.</span>
-          <span class="spacer"></span><span class="chip warn">Owes £90</span><span class="chip neutral">Y9</span></div>
+        <button type="button" class="srow demo-student" data-student="amira"><span class="dot ok"></span><span class="sname">Amira K.</span>
+          <span class="spacer"></span><span class="chip">Paid up</span><span class="chip neutral">Y11</span></button>
+        <button type="button" class="srow demo-student" data-student="joe"><span class="dot warn"></span><span class="sname">Joe F.</span>
+          <span class="spacer"></span><span class="chip warn">Owes £180</span><span class="chip neutral">Y11</span></button>
+        <button type="button" class="srow demo-student" data-student="priya"><span class="dot ok"></span><span class="sname">Priya S.</span>
+          <span class="spacer"></span><span class="chip">Paid up</span><span class="chip neutral">Y13</span></button>
+        <button type="button" class="srow demo-student" data-student="tom"><span class="dot warn"></span><span class="sname">Tom B.</span>
+          <span class="spacer"></span><span class="chip warn">Owes £90</span><span class="chip neutral">Y9</span></button>
+        <div id="demoDetail" class="demo-detail" aria-live="polite"></div>
       </div>
-      <p class="cta-note" style="text-align:center">Two of them owe you £270. TutorTally spotted it before the month got away.</p>
+      <p class="cta-note" style="text-align:center">2 of them owe you £270. Tap a name to see the useful bit.</p>
     </div>
   </div>
 </header>
@@ -324,15 +334,15 @@
         <div class="eyebrow">Built for one-person tutor businesses</div>
         <h2>Most tutors track money in their head. It leaks.</h2>
         <p class="lede">
-          Not because you're disorganised. Because once there are five or more regular
-          students, three reschedules a week, and a bank app that just says
+          Not because you're disorganised. Once there are 5 or more regular
+          students, 3 reschedules a week, and a bank app that just says
           "FASTER PAYMENT", your head stops being a system.
         </p>
       </div>
       <ul class="pain rv">
-        <li>You think someone's two lessons behind but you're not certain enough to ask.</li>
+        <li>You think someone's 2 lessons behind but you're not certain enough to ask.</li>
         <li>A parent says "I paid you in September" and you have no way to check.</li>
-        <li>You write it in Notes, then stop updating Notes by week three.</li>
+        <li>You write it in Notes, then stop updating Notes by week 3.</li>
         <li>You cancel a lesson and forget to take it off the total.</li>
         <li>You quietly write off money every term because chasing it feels awkward.</li>
       </ul>
@@ -345,8 +355,8 @@
   <div class="wrap">
     <div class="rv" style="max-width:640px">
       <div class="eyebrow">How it works</div>
-      <h2>You already did the admin. It was called booking the lesson.</h2>
-      <p class="lede">Connect your teaching calendar once. Everything after that is automatic.</p>
+      <h2>You already did the admin when you booked the lesson.</h2>
+      <p class="lede">Connect Google Calendar once. TutorTally keeps lesson records and balances right as plans change.</p>
     </div>
 
     <div class="flow rv" style="margin-top:34px">
@@ -367,7 +377,7 @@
 
     <div class="grid g3" style="margin-top:34px">
       <div class="card rv"><span class="ico">📅</span><h3>It reads your calendar</h3>
-        <p class="muted" style="font-size:.93rem">Finds the names in your event titles and offers to turn each one into a student. One tap each. It re-checks every couple of hours, so a lesson you book on your phone is in here before you get home.</p></div>
+        <p class="muted" style="font-size:.93rem">It finds the names in your event titles and offers to make each one a student. Book, move or cancel a lesson in your calendar and TutorTally keeps the record right.</p></div>
       <div class="card rv"><span class="ico">⚖️</span><h3>It does the arithmetic</h3>
         <p class="muted" style="font-size:.93rem">Every payment settles the oldest unpaid lesson first, so the number on each card is simply what that family still owes. Change someone's rate and it recalculates the history properly.</p></div>
       <div class="card rv"><span class="ico">💬</span><h3>It writes the awkward message</h3>
@@ -387,7 +397,7 @@
         WhatsApp with it written out. Nothing sends until you tap send.
       </p>
       <p class="muted" style="font-size:.93rem">
-        Most tutors put this off for weeks. It takes four seconds.
+        Most tutors put this off for weeks. It takes 4 seconds.
       </p>
     </div>
 
@@ -413,17 +423,17 @@
   <div class="wrap">
     <div class="rv" style="max-width:640px">
       <div class="eyebrow">Inside</div>
-      <h2>A calm little command centre.</h2>
-      <p class="lede">Built on a phone, for a tutor standing in a hallway between lessons. You can try the whole thing below without signing up for anything.</p>
+      <h2>Everything you need before you ask for money.</h2>
+      <p class="lede">Each student has the answers in one place. You can try the real app with dummy data before signing up.</p>
     </div>
 
     <div class="grid g2" style="margin-top:30px">
       <div class="card rv"><span class="ico">🗂</span><h3>Student cards</h3>
-        <p class="muted" style="font-size:.93rem">Each family gets a tidy card showing the next lesson, recent history, paid status, and the balance that actually needs chasing.</p></div>
+        <p class="muted" style="font-size:.93rem">See the next lesson, what has been paid, what is overdue, and the balance that actually needs chasing.</p></div>
       <div class="card rv"><span class="ico">💬</span><h3>Payment requests</h3>
         <p class="muted" style="font-size:.93rem">Tap once and WhatsApp opens with the amount, the lesson count and the dates already written in human language.</p></div>
-      <div class="card rv"><span class="ico">📅</span><h3>Calendar sync</h3>
-        <p class="muted" style="font-size:.93rem">New students and rescheduled lessons come from your calendar, so your teaching diary stays the source of truth. Google is the direct connection; Apple Calendar works when it syncs into Google.</p></div>
+      <div class="card rv"><span class="ico">📅</span><h3>Changes stay accurate</h3>
+        <p class="muted" style="font-size:.93rem">Your teaching calendar stays the source of truth, so cancellations and rescheduled lessons do not leave a wrong balance behind.</p></div>
       <div class="card rv"><span class="ico">🔗</span><h3>Parent pages</h3>
         <p class="muted" style="font-size:.93rem">Every family gets a private lesson page, which makes a one-person tutoring business feel organised without extra admin.</p></div>
     </div>
@@ -432,8 +442,8 @@
       <div>
         <h3 style="margin-bottom:6px">Have a proper poke around first.</h3>
         <p class="muted" style="font-size:.95rem;margin:0">
-          The demo is the real app running on a made-up tutor's students. Add a payment,
-          chase someone, change a rate. Nothing you do is saved and nothing is real.
+          The demo is the real app with made-up students. Add a payment, chase someone,
+          open a parent page or change a rate. Nothing is saved and nothing is real.
         </p>
       </div>
       <a class="btn btn-primary btn-lg" href="/?demo=1">Open the demo</a>
@@ -445,17 +455,17 @@
 <section style="background:var(--bg-tint)">
   <div class="wrap grid g2" style="align-items:center;gap:44px">
     <div class="rv">
-      <div class="eyebrow">Small business energy</div>
+      <div class="eyebrow">A page parents can trust</div>
       <h2>Every parent gets their own page.</h2>
       <p class="lede">
-        A private link showing their child's upcoming lessons and exactly what's been
-        paid. No login, no app to install. They stop asking you, and you look like a
-        proper setup rather than a notebook with good intentions.
+        A private link showing their child's upcoming lessons and exactly what has been
+        paid. No login or app needed. It answers the parent before they have to ask you.
       </p>
-      <p class="muted" style="font-size:.93rem">Tapping any lesson tells them the date it was paid.</p>
+      <a class="btn btn-primary" href="/student.html?t=demo-amira">Open Amira's sample parent page</a>
+      <p class="cta-note">Tap a paid lesson to see the payment date.</p>
     </div>
     <div class="rv">
-      <div class="mock" style="max-width:340px;margin:0 auto">
+      <a class="mock" href="/student.html?t=demo-amira" style="display:block;max-width:340px;margin:0 auto;text-decoration:none;color:inherit">
         <div style="font-weight:750;font-size:1.05rem;letter-spacing:-.02em">Amira</div>
         <div class="mock-sub" style="margin-bottom:14px">Your lessons and payment status</div>
         <div class="srow"><span class="sname" style="font-weight:560">Tue 19 Aug · 16:00</span><span class="spacer"></span><span class="chip neutral">Scheduled</span></div>
@@ -463,7 +473,7 @@
         <div class="mock-sub" style="margin:14px 0 8px">RECENT</div>
         <div class="srow"><span class="sname" style="font-weight:560">Tue 12 Aug · 16:00</span><span class="spacer"></span><span class="chip">Paid</span></div>
         <div class="srow" style="margin-bottom:0"><span class="sname" style="font-weight:560">Tue 5 Aug · 16:00</span><span class="spacer"></span><span class="chip">Paid</span></div>
-      </div>
+      </a>
     </div>
   </div>
 </section>
@@ -487,36 +497,35 @@
         <p class="muted" style="font-size:.9rem">For up to 3 active students. No card needed.</p>
 
         <ul class="stack">
-          <li>Automatic calendar sync, every 2 hours <span class="val">no typing</span></li>
-          <li>Who owes what, worked out for you <span class="val">oldest lesson first</span></li>
-          <li>One-tap payment requests <span class="val">pre-written</span></li>
-          <li>A private lesson page for every parent <span class="val">unlimited</span></li>
-          <li>Cash receipts sent over WhatsApp <span class="val">included</span></li>
-          <li>Rate changes that fix your history <span class="val">retrospective</span></li>
+          <li>Lessons from your teaching calendar <span class="val">automatic</span></li>
+          <li>Every unpaid lesson behind a balance <span class="val">clear</span></li>
+          <li>Ready-to-send WhatsApp chasers <span class="val">1 tap</span></li>
+          <li>A private page for every parent <span class="val">included</span></li>
+          <li>Payment history and cash receipts <span class="val">organised</span></li>
           <li>Up to 3 active students <span class="val">free</span></li>
         </ul>
 
         <a href="/?signup=1" class="btn btn-primary btn-lg" style="width:100%">Create my free account</a>
-        <p class="cta-note" style="text-align:center">Upgrade only when you add your fourth active student.</p>
+        <p class="cta-note" style="text-align:center">Upgrade only when you add your 4th active student.</p>
       </div>
 
       <div class="rv">
         <div class="banner" style="margin-bottom:18px">
           <b>TutorTally Pro is simple.</b> £5 a month once you have 4 or more active students.
-          Unlimited students, unlimited parent pages, no awkward tiers.
+          Unlimited students and parent pages.
         </div>
 
         <div class="card">
           <div class="eyebrow">Built for tutors who</div>
-          <h3 style="margin-bottom:12px">Have enough students for admin to hurt.</h3>
+          <h3 style="margin-bottom:12px">Already use an online calendar.</h3>
           <div class="ref-step"><div class="ref-n">1</div><div>
-            <b>Teach 5+ regular students.</b>
-            <div class="muted" style="font-size:.9rem">Or want to start free while you grow to that point.</div></div></div>
+            <b>Put lessons in Google Calendar.</b>
+            <div class="muted" style="font-size:.9rem">That is what TutorTally reads. A paper diary is not a match yet.</div></div></div>
           <div class="ref-step"><div class="ref-n">2</div><div>
             <b>Get paid by bank transfer or cash.</b>
             <div class="muted" style="font-size:.9rem">You record payments. TutorTally does the sums.</div></div></div>
           <div class="ref-step"><div class="ref-n">3</div><div>
-            <b>Talk to parents on WhatsApp or email.</b>
+            <b>Want an answer before chasing.</b>
             <div class="muted" style="font-size:.9rem">The message is written for you. You decide when to send it.</div></div></div>
         </div>
       </div>
@@ -529,18 +538,18 @@
   <div class="wrap" style="max-width:760px">
     <div class="rv"><div class="eyebrow">Questions</div><h2>The things people ask.</h2></div>
     <div class="rv" style="margin-top:24px">
-      <details open><summary>Do I have to change how I book lessons?</summary>
-        <p>No. Keep using your teaching calendar. Google Calendar is the direct connection. If you use Apple Calendar, it can work by syncing that calendar into Google first.</p></details>
+      <details><summary>Do I have to change how I book lessons?</summary>
+        <div class="faq-answer"><p>No. Keep using your teaching calendar. Google Calendar is the direct connection. If you use Apple Calendar to view a Google calendar, it is already covered. Outlook and iCloud calendar connections are not built in yet.</p></div></details>
       <details><summary>What if I teach something other than maths?</summary>
-        <p>It doesn't care what you teach. Lessons, students, money owed. Tutors of any subject use it the same way.</p></details>
+        <div class="faq-answer"><p>It does not care what you teach. Lessons, students and money owed work the same way for English, languages, DT or any other subject.</p></div></details>
       <details><summary>Does it connect to my bank?</summary>
-        <p>No. You log payments yourself, which takes a couple of seconds, and it does the arithmetic from there. Bank connections are regulated and would push the price well past £5.</p></details>
+        <div class="faq-answer"><p>No. You record payments yourself, which takes a few seconds, and TutorTally does the arithmetic from there. It will never quietly assume that a bank transfer belongs to a lesson.</p></div></details>
       <details><summary>Can parents see each other's information?</summary>
-        <p>No. Each parent's link only ever shows their own child's lessons and payments. They can't see your other students, your rates, or anything else.</p></details>
+        <div class="faq-answer"><p>No. Each parent's link only shows their own child's lessons and payments. They cannot see your other students, your rates or anything else.</p></div></details>
       <details><summary>What happens to my data if I stop paying?</summary>
-        <p>Nothing is deleted. You keep read access to your records and can export them. Losing your payment history because you cancelled would be a rotten way to treat someone.</p></details>
+        <div class="faq-answer"><p>Nothing is deleted. You keep read access to your records and can export them.</p></div></details>
       <details><summary>Is it actually £5, or £5 and then more later?</summary>
-        <p>TutorTally Lite is free forever for up to 3 active students. TutorTally Pro is £5 a month when you have 4 or more active students, with everything included and no student limit.</p></details>
+        <div class="faq-answer"><p>TutorTally Lite is free forever for up to 3 active students. TutorTally Pro is £5 a month when you have 4 or more active students, with everything included and no student limit.</p></div></details>
     </div>
   </div>
 </section>
@@ -549,14 +558,14 @@
 <section id="start">
   <div class="wrap" style="text-align:center;max-width:680px">
     <div class="rv">
-      <h2>Find out what you're owed.</h2>
+      <h2>Stop wondering who owes you.</h2>
       <p class="lede" style="margin:0 auto 6px">
-        Three minutes to set up. Free forever for your first 3 active students.
-        Upgrade only when tutoring gets busy.
+        3 minutes to set up. Free forever for your first 3 active students.
+        Upgrade only when you add a 4th.
       </p>
       <div class="cta-row" style="justify-content:center">
-        <a class="btn btn-primary btn-lg" href="/?signup=1">Create my free account</a>
-        <a class="btn btn-ghost btn-lg" href="/?demo=1">Try the demo first</a>
+        <a class="btn btn-primary btn-lg" href="/?signup=1">Get started free</a>
+        <a class="btn btn-ghost btn-lg" href="/?demo=1">Try the real demo</a>
       </div>
       <p class="cta-note">
         No card. Or if you would rather I set it up with you,
@@ -639,6 +648,21 @@
   } else {
     target.textContent = MSG;
   }
+
+  const demoStudents = {
+    amira: { name: 'Amira Khan', year: 'Year 11', summary: 'Paid up. Next lesson: Tuesday at 16:00.', link: '/?demo=1' },
+    joe: { name: 'Joe Fletcher', year: 'Year 11', summary: '3 lessons unpaid, £180 outstanding. Last payment: 6 August.', link: '/?demo=1' },
+    priya: { name: 'Priya Shah', year: 'Year 13', summary: 'Paid up. Online lesson: Thursday at 18:00.', link: '/?demo=1' },
+    tom: { name: 'Tom Bennett', year: 'Year 9', summary: '2 lessons unpaid, £90 outstanding. Next lesson: Monday at 17:00.', link: '/?demo=1' },
+  };
+  const detail = document.getElementById('demoDetail');
+  function showDemoStudent(key) {
+    const student = demoStudents[key];
+    if (!student || !detail) return;
+    detail.innerHTML = `<div class="demo-detail-title"><span>${student.name}</span><span class="mock-sub">${student.year}</span></div><p class="demo-detail-copy">${student.summary}</p><a class="btn btn-primary" href="${student.link}">Open this student in the demo</a>`;
+  }
+  document.querySelectorAll('.demo-student').forEach(button => button.addEventListener('click', () => showDemoStudent(button.dataset.student)));
+  showDemoStudent('joe');
 </script>
 </body>
 </html>

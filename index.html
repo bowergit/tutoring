@@ -250,21 +250,6 @@
   .attn-item:active { background: color-mix(in srgb, var(--warn) 10%, transparent); }
   .attn-why { font-size: 0.74rem; color: var(--warn); font-weight: 600; white-space: nowrap; }
 
-  /* ── Recent past paper ── */
-  @keyframes sparkle {
-    0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
-    50%      { transform: scale(1.22) rotate(9deg); opacity: .82; }
-  }
-  .sparkle { display: inline-block; animation: sparkle 2.4s ease-in-out infinite; font-size: 0.92rem; }
-  @media (prefers-reduced-motion: reduce) { .sparkle { animation: none; } }
-  .paper-chip {
-    display: inline-flex; align-items: baseline; gap: 6px;
-    background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    color: var(--accent); border-radius: var(--r-sm); padding: 6px 10px;
-    font-size: 0.75rem; font-weight: 600; margin-top: 8px;
-  }
-  .paper-chip b { font-size: 0.9rem; font-weight: 750; }
-
   /* ── Revenue trend ── */
   .rev-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
   .rev-month { font-size: 0.75rem; color: var(--muted); width: 54px; flex-shrink: 0; }
@@ -2618,7 +2603,7 @@ function LoginGate() {
                   color:'var(--muted)', fontSize:'0.78rem', fontFamily:'inherit',
                   cursor:'pointer', textDecoration:'underline'
                 }}>
-                Forgot password?
+                Reset password
               </button>
             )}
 
@@ -2686,9 +2671,72 @@ function ChangePassword() {
         </div>
       )}
       <button className="btn save" style={{width:'100%'}} type="submit" disabled={state === 'busy'}>
-        {state === 'busy' ? 'Saving…' : 'Set password'}
+        {state === 'busy' ? 'Saving…' : 'Reset password'}
       </button>
     </form>
+  );
+}
+
+// Account deletion is deliberately a separate, typed confirmation. The Edge
+// Function only accepts the signed-in tutor's JWT, cancels any Stripe plan, and
+// then removes that tutor's data before deleting the Auth account.
+function DeleteAccount({ session }) {
+  const [confirming, setConfirming] = useState(false);
+  const [word, setWord] = useState('');
+  const [state, setState] = useState('idle');
+  const [detail, setDetail] = useState('');
+
+  async function removeAccount() {
+    if (word !== 'DELETE' || !session?.access_token) return;
+    setState('busy');
+    setDetail('');
+    try {
+      const res = await fetch(`${FN_BASE}/delete-account`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ confirm: 'DELETE' }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok || !body.ok) throw new Error(body.message || 'Could not delete your account.');
+      await supabase.auth.signOut();
+    } catch (err) {
+      setState('error');
+      setDetail(err.message || 'Could not delete your account.');
+    }
+  }
+
+  if (!confirming) {
+    return (
+      <div>
+        <p style={{fontSize:'0.84rem', color:'var(--ink-dim)', lineHeight:1.5, marginTop:0}}>
+          Delete your TutorTally account, students, lessons, payments and calendar connection.
+          If you have TutorTally Pro, the subscription is cancelled too.
+        </p>
+        <button className="btn" style={{width:'100%', background:'var(--warn)', color:'#fff'}} onClick={() => setConfirming(true)}>
+          Delete my account
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{background:'var(--warn-light)', border:'1px solid var(--warn)', borderRadius:'var(--r-md)', padding:'12px', color:'var(--ink-dim)', fontSize:'0.84rem', lineHeight:1.5, marginBottom:14}}>
+        <b style={{color:'var(--warn)'}}>Are you sure?</b> This permanently deletes your TutorTally account and the records in it. Type DELETE to continue.
+      </div>
+      <div className="field">
+        <label>Type DELETE</label>
+        <input value={word} onChange={e => setWord(e.target.value)} autoComplete="off" />
+      </div>
+      {state === 'error' && <div style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:12}}>{detail}</div>}
+      <div style={{display:'flex', gap:8}}>
+        <button className="btn" style={{flex:1, background:'var(--card-2)', color:'var(--ink)', border:'1px solid var(--line)'}} onClick={() => { setConfirming(false); setWord(''); setState('idle'); }} disabled={state === 'busy'}>Keep my account</button>
+        <button className="btn" style={{flex:1, background:'var(--warn)', color:'#fff'}} onClick={removeAccount} disabled={state === 'busy' || word !== 'DELETE'}>{state === 'busy' ? 'Deleting…' : 'Delete permanently'}</button>
+      </div>
+    </div>
   );
 }
 
@@ -3215,7 +3263,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   const GROUPS = {
     money:   { title: 'Money',        tabs: danielOnly ? [['revenue', 'Revenue trend'], ['growth', 'Growth calculator']] : [['revenue', 'Revenue trend']] },
     archive: { title: 'Archive',      tabs: [['archived', 'Students'], ['deletedpay', 'Payments']] },
-    account: { title: 'Your account', tabs: [['yourname', 'Your details'], ['password', 'Password']] },
+    account: { title: 'Your account', tabs: [['yourname', 'Your details'], ['password', 'Reset password'], ['deleteaccount', 'Delete account']] },
   };
 
   function groupHeader(leaf) {
@@ -3302,7 +3350,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               <ToolsSection title="Account">
                 <ToolsRow
                   title="Your account"
-                  subtitle="Your details and password"
+                  subtitle="Your details, password and account deletion"
                   onClick={() => setTool('yourname')}
                 />
                 <ToolsRow
@@ -3374,6 +3422,12 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
           <>
             {groupHeader('password')}
             <ChangePassword />
+          </>
+        )}
+        {tool === 'deleteaccount' && (
+          <>
+            {groupHeader('deleteaccount')}
+            <DeleteAccount session={session} />
           </>
         )}
         {tool === 'revenue' && (
@@ -4834,9 +4888,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           <div className="student-name">
             <span className={`dot ${balance > 0.005 ? 'warn' : nextLesson ? 'ok' : 'idle'}`} />
             {N(student.name, student.id)}{!student.active && ' (inactive)'}
-            {paperRecent && (
-              <span className="sparkle" title={`Past paper ${paperRecent.label}`}>✨</span>
-            )}
           </div>
           <div className="status-row">
             {balance > 0 && (
@@ -4875,13 +4926,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               {referrals.length > 0 && (
                 <div style={{ fontSize: '0.82rem', color: 'var(--accent)', marginTop: 2 }}>
                   Referred {referrals.map(s => N(s.name, s.id).split(' ')[0]).join(', ')} - use "mark free" on their next lesson
-                </div>
-              )}
-              {paperRecent && (
-                <div className="paper-chip">
-                  ✨ Past paper {paperRecent.label}
-                  {paperRecent.score != null && <b>{paperRecent.score}%</b>}
-                  {paperRecent.name && <span style={{color:'var(--muted)'}}>· {paperRecent.name}</span>}
                 </div>
               )}
             </React.Fragment>
@@ -5105,7 +5149,7 @@ const WT_STEPS = [
   {
     key: 'welcome',
     title: "Let's get you running",
-    body: "About 3 minutes and your whole timetable will be in here. Stop whenever you like. It picks up where you left off, and nothing you do here can break anything.",
+    body: "This takes about 3 minutes. You can stop at any point and TutorTally remembers where you got to. Start with your details, then connect your calendar.",
   },
   {
     key: 'you',
@@ -5116,29 +5160,29 @@ const WT_STEPS = [
   {
     key: 'calendar',
     title: 'Connect your Google Calendar',
-    body: "This is the one that matters. Your lessons come straight out of your calendar, so you never type a timetable in by hand. If Google says \"Google hasn't verified this app\", tap Advanced at the bottom left, then tap \"Go to TutorTally (unsafe)\". Google uses that exact scary word, but the calendar access is read-only.",
+    body: "Your lessons come from this calendar, so you never type a timetable twice. Google may show a page saying \"Google hasn't verified this app\". Tap Advanced at the bottom left, then tap \"Go to TutorTally (unsafe)\". Google uses that scary word because TutorTally is new. The access is read only: it can see lesson names and times, but cannot change or delete anything.",
     action: { label: '📅 Open calendar settings', tool: 'gcal' },
   },
   {
     key: 'students',
     title: 'Turn the names into students',
-    body: "Tap Sync now. Any name in your calendar that isn't a student yet gets listed with an Add button. Tap Add for each real one and their lessons appear straight away. It guesses the name from the event title; correct it there if the guess is off.",
+    body: "Tap Sync now. TutorTally lists any new name it finds with an Add button. Tap Add for each real student and their lessons appear straight away. It ignores common words such as \"maths\" and \"lesson\" when guessing a name. If it gets one wrong, tap No and type the real name.",
     action: { label: '📅 Open calendar settings', tool: 'gcal' },
   },
   {
     key: 'details',
     title: 'Fill in the gaps',
-    body: "Tap a student, then Edit, to add their school, year, exam board, the parent's number and any notes. There's a progress tracker link too. Paste a Google Drive or Dropbox folder if that's how you keep their work, or leave it blank.",
+    body: "Tap a student, then Edit, to add their school year, the parent's number and any notes. Add the parent number if you want TutorTally to prepare WhatsApp messages. Everything else can wait until you need it.",
   },
   {
     key: 'money',
     title: 'Getting paid',
-    body: "Student → More tools → Log a payment. Payments always settle the oldest unpaid lesson first, so the figure on each card is simply what they still owe you. Cash payments offer to send a WhatsApp receipt.",
+    body: "Open a student, then More tools, then Log a payment. Payments settle the oldest unpaid lesson first, so the figure on each card is what that family still owes. Cash payments can send a WhatsApp receipt.",
   },
   {
     key: 'links',
     title: 'Give parents their own page',
-    body: "Every student has a private page showing their upcoming lessons and what's been paid. Student → More tools → Copy link. Parents don't need a login, and they only ever see that one child.",
+    body: "Every student has a private page showing upcoming lessons and what has been paid. Open a student, then More tools, then Copy link. Parents do not need a login and only see their own child.",
   },
   {
     key: 'newstudent',
@@ -5149,7 +5193,7 @@ const WT_STEPS = [
   {
     key: 'done',
     title: "That's everything",
-    body: "Replay this any time from Tools → Replay walkthrough. Your calendar re-syncs itself every couple of hours, so from here it mostly runs itself.",
+    body: "You are set. Replay this any time from Tools, then Replay walkthrough. Keep booking lessons in Google Calendar and TutorTally keeps your records up to date.",
   },
 ];
 
