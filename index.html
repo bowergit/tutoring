@@ -338,16 +338,41 @@
     padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 0.9rem; color: var(--ink-dim);
   }
   .session-pick-row input { width: 18px; height: 18px; accent-color: var(--accent); }
-  .tools-menu { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
-  .tools-menu button {
-    text-align: left; padding: 14px 15px; border-radius: var(--r-md);
-    border: 1px solid var(--line); background: var(--card-2); font-size: 0.88rem;
-    cursor: pointer; color: var(--ink); font-family: inherit; font-weight: 550;
-    transition: background .16s var(--ease), transform .16s var(--ease), border-color .16s var(--ease);
-    -webkit-tap-highlight-color: transparent;
+  .tools-menu { display: flex; flex-direction: column; gap: 18px; margin-top: 12px; }
+  .tools-section-title {
+    margin: 0 2px 8px; font-size: 0.72rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em; font-weight: 750;
   }
-  .tools-menu button:active { transform: scale(.985); background: var(--card-3); }
-  @media (hover:hover) { .tools-menu button:hover { border-color: var(--accent); background: var(--card-3); } }
+  .tools-group {
+    overflow: hidden; border: 1px solid var(--line); border-radius: var(--r-md);
+    background: var(--card-2); box-shadow: var(--sh-1);
+  }
+  .tools-row {
+    width: 100%; min-height: 58px; display: flex; align-items: center;
+    justify-content: space-between; gap: 14px; padding: 13px 14px;
+    border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+    background: transparent; color: var(--ink); text-align: left;
+    cursor: pointer; font-family: inherit; -webkit-tap-highlight-color: transparent;
+    transition: background .16s var(--ease), transform .16s var(--ease);
+  }
+  .tools-group .tools-row:last-child { border-bottom: 0; }
+  .tools-row-main { min-width: 0; }
+  .tools-row-title {
+    display: block; color: var(--ink); font-size: 0.92rem;
+    line-height: 1.22; font-weight: 650;
+  }
+  .tools-row-sub {
+    display: block; color: var(--muted); font-size: 0.76rem;
+    line-height: 1.35; margin-top: 3px;
+  }
+  .tools-chevron { color: var(--muted); font-size: 1.45rem; line-height: 1; flex: 0 0 auto; }
+  .tools-row.muted .tools-row-title, .tools-row.muted .tools-chevron { color: var(--muted); }
+  .tools-row.danger .tools-row-title { color: var(--warn); }
+  .tools-row:active { transform: scale(.992); background: var(--card-3); }
+  @media (hover:hover) { .tools-row:hover { background: var(--card-3); } }
+  .tools-split-row { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); }
+  .tools-split-row .tools-row { border-bottom: 0; }
+  .tools-split-row .tools-row:first-child { border-right: 1px solid var(--line); }
 
   /* ── Global tools button ── */
   /* Centred with auto margins rather than translateX(-50%): a transform on a
@@ -3110,6 +3135,27 @@ function SlideToConfirm({ onConfirm }) {
   );
 }
 
+function ToolsSection({ title, children }) {
+  return (
+    <section className="tools-section">
+      <h3 className="tools-section-title">{title}</h3>
+      <div className="tools-group">{children}</div>
+    </section>
+  );
+}
+
+function ToolsRow({ title, subtitle, onClick, tone = '', end = '›' }) {
+  return (
+    <button className={`tools-row ${tone}`} onClick={onClick}>
+      <span className="tools-row-main">
+        <span className="tools-row-title">{title}</span>
+        {subtitle && <span className="tools-row-sub">{subtitle}</span>}
+      </span>
+      {end && <span className="tools-chevron">{end}</span>}
+    </button>
+  );
+}
+
 // ---------- Global Tools Sheet ----------
 function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], userEmail, session, entitlement, initialTool = null, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onReplayWalkthrough, onDataChanged, onAddStudent }) {
   const N = useNameDisplay();
@@ -3207,22 +3253,70 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               onAddStudent={() => { close(); setTimeout(() => onAddStudent?.(), 220); }}
             />
             <div className="tools-menu">
-              <button onClick={() => setTool('gcal')}>📅 Google Calendar</button>
-              {danielOnly && <button onClick={() => setTool('monzo')}>🏦 Monzo payments</button>}
-              <button onClick={() => setTool('revenue')}>{danielOnly ? '💹 Money: revenue trend and growth calculator' : '💹 Money: revenue trend'}</button>
-              <button onClick={() => setTool('archived')}>
-                🗄 Archive: students and payments{archived.length > 0 ? ` (${archived.length})` : ''}
-              </button>
-              <button onClick={() => setTool('privacy')}>
-                🕶 Privacy mode{privacyOn ? ' - on' : ''}
-              </button>
-              <button onClick={() => setTool('info')}>ℹ️ About &amp; data sources</button>
-              <button onClick={() => setTool('yourname')}>👤 Your account: details and password</button>
-              <button onClick={() => setTool('billing')}>💳 Billing &amp; subscription: manage Stripe</button>
-              <button onClick={onReplayWalkthrough}>🧭 Replay walkthrough</button>
-              <button onClick={() => supabase.auth.signOut()} style={{color:'var(--muted)'}}>
-                ⏻ Sign out{userEmail ? ` - ${userEmail}` : ''}
-              </button>
+              <ToolsSection title="Setup">
+                <ToolsRow
+                  title="Google Calendar"
+                  subtitle="Choose the calendar TutorTally reads for lessons"
+                  onClick={() => setTool('gcal')}
+                />
+                {danielOnly && (
+                  <ToolsRow
+                    title="Monzo payments"
+                    subtitle="Match incoming bank transfers to students"
+                    onClick={() => setTool('monzo')}
+                  />
+                )}
+              </ToolsSection>
+
+              <ToolsSection title="Money">
+                <ToolsRow
+                  title="Billing & subscription"
+                  subtitle="Manage Stripe and your TutorTally plan"
+                  onClick={() => setTool('billing')}
+                />
+                <ToolsRow
+                  title={danielOnly ? 'Revenue and growth' : 'Revenue trend'}
+                  subtitle={danielOnly ? 'Track income and model extra students' : 'See what has been paid over time'}
+                  onClick={() => setTool('revenue')}
+                />
+              </ToolsSection>
+
+              <ToolsSection title="Records">
+                <ToolsRow
+                  title="Archive"
+                  subtitle={`Archived students and deleted payments${archived.length > 0 ? ` (${archived.length} archived)` : ''}`}
+                  onClick={() => setTool('archived')}
+                />
+                <ToolsRow
+                  title="Privacy mode"
+                  subtitle={privacyOn ? 'Currently on' : 'Mask names and money while showing the app'}
+                  onClick={() => setTool('privacy')}
+                />
+                <ToolsRow
+                  title="About & data sources"
+                  subtitle="What TutorTally stores and where it comes from"
+                  onClick={() => setTool('info')}
+                />
+              </ToolsSection>
+
+              <ToolsSection title="Account">
+                <ToolsRow
+                  title="Your account"
+                  subtitle="Your details and password"
+                  onClick={() => setTool('yourname')}
+                />
+                <ToolsRow
+                  title="Replay walkthrough"
+                  subtitle="Show the guided setup again"
+                  onClick={onReplayWalkthrough}
+                />
+                <ToolsRow
+                  title="Sign out"
+                  subtitle={userEmail || 'Leave this account'}
+                  tone="muted"
+                  onClick={() => supabase.auth.signOut()}
+                />
+              </ToolsSection>
             </div>
           </>
         )}
@@ -4397,27 +4491,58 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
       <div className={`sheet${cls}`}>
         <h2>More tools - {N(student.name, student.id)}</h2>
         <div className="tools-menu">
-          <button onClick={onTrackCash}>💷 Log a payment</button>
-          <button onClick={onStatement}>🧾 Lessons &amp; payments - send to a parent</button>
-          <div style={{display:'flex', gap:7}}>
-            <button style={{flex:1, textAlign:'center'}} onClick={copyStudentLink}>
-              {linkCopied ? '✓ Copied' : '🔗 Copy link'}
-            </button>
-            <button style={{flex:1, textAlign:'center'}}
-              onClick={() => window.open(studentLink, '_blank', 'noopener')}>
-              ↗ Open
-            </button>
-          </div>
-          {student.active && (
-            <button onClick={onArchive} style={{color:'var(--warn)'}}>🗂 Archive student</button>
-          )}
-          {confirmingDelete ? (
-            <div style={{padding:'2px 0 4px'}}>
-              <SlideToConfirm onConfirm={onDelete} />
+          <ToolsSection title="Payments">
+            <ToolsRow
+              title="Log a payment"
+              subtitle="Record cash, transfer or another payment"
+              onClick={onTrackCash}
+            />
+            <ToolsRow
+              title="Lessons & payments"
+              subtitle="Prepare a parent-friendly statement"
+              onClick={onStatement}
+            />
+          </ToolsSection>
+
+          <ToolsSection title="Parent page">
+            <div className="tools-split-row">
+              <ToolsRow
+                title={linkCopied ? 'Copied' : 'Copy link'}
+                subtitle="Private page for this student"
+                onClick={copyStudentLink}
+                end={linkCopied ? '✓' : null}
+              />
+              <ToolsRow
+                title="Open"
+                subtitle="Preview the parent page"
+                onClick={() => window.open(studentLink, '_blank', 'noopener')}
+                end="↗"
+              />
             </div>
-          ) : (
-            <button onClick={() => setConfirmingDelete(true)} style={{color:'var(--warn)'}}>🗑 Delete student</button>
-          )}
+          </ToolsSection>
+
+          <ToolsSection title="Student">
+            {student.active && (
+              <ToolsRow
+                title="Archive student"
+                subtitle="Hide them without deleting their history"
+                tone="danger"
+                onClick={onArchive}
+              />
+            )}
+            {confirmingDelete ? (
+              <div style={{padding:'12px 14px'}}>
+                <SlideToConfirm onConfirm={onDelete} />
+              </div>
+            ) : (
+              <ToolsRow
+                title="Delete student"
+                subtitle="Permanent once confirmed"
+                tone="danger"
+                onClick={() => setConfirmingDelete(true)}
+              />
+            )}
+          </ToolsSection>
         </div>
         <div className="btn-row">
           <button className="btn cancel" onClick={close}>Close</button>
