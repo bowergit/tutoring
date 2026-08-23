@@ -57,6 +57,7 @@ Deno.serve(async (req) => {
     const activeExternalStudents = externalStudents.filter((s: any) => s.active === true)
     const studentIds = activeExternalStudents.map((s: any) => s.id)
     const activeTutorIds = new Set(activeExternalStudents.map((s: any) => s.owner_id))
+    const currentRates = new Map<string, number>()
 
     let weeklyGross = 0
     if (studentIds.length > 0) {
@@ -70,12 +71,27 @@ Deno.serve(async (req) => {
         .order('effective_from_date', { ascending: false })
       if (ratesErr) throw ratesErr
 
-      const currentRates = new Map<string, number>()
       for (const row of rates ?? []) {
         if (!currentRates.has(row.student_id)) currentRates.set(row.student_id, Number(row.rate) || 0)
       }
       weeklyGross = studentIds.reduce((sum: number, id: string) => sum + (currentRates.get(id) ?? 0), 0)
     }
+
+    const tutors = tutorUsers
+      .filter(u => activeTutorIds.has(u.id))
+      .map(u => {
+        const imported = externalStudents.filter((s: any) => s.owner_id === u.id)
+        const active = imported.filter((s: any) => s.active === true)
+        const displayName = String((u.user_metadata as any)?.display_name ?? '').trim()
+        return {
+          id: u.id,
+          name: displayName || 'Tutor',
+          imported_students: imported.length,
+          active_students: active.length,
+          weekly_gross: Math.round(active.reduce((sum: number, s: any) => sum + (currentRates.get(s.id) ?? 0), 0)),
+        }
+      })
+      .sort((a, b) => b.weekly_gross - a.weekly_gross || a.name.localeCompare(b.name))
 
     return json({
       ok: true,
@@ -83,6 +99,7 @@ Deno.serve(async (req) => {
       students_total: externalStudents.length,
       active_students: activeExternalStudents.length,
       annualised_gross: Math.round(weeklyGross * 40),
+      tutors,
       calculated_at: new Date().toISOString(),
     })
   } catch (e) {

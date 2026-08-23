@@ -2871,6 +2871,7 @@ function SetupChecklist({ session, students, onOpenTool, onAddStudent }) {
 function PlatformStats({ session }) {
   const [stats, setStats] = useState(null);
   const [state, setState] = useState('idle');
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (!isDanielAccount(session) || !session?.access_token) return;
@@ -2905,18 +2906,44 @@ function PlatformStats({ session }) {
       {state === 'loading' && <div style={{fontSize:'0.84rem', color:'var(--muted)'}}>Loading platform stats...</div>}
       {state === 'error' && <div style={{fontSize:'0.84rem', color:'var(--warn)'}}>Could not load platform stats.</div>}
       {state === 'ready' && stats && (
-        <div style={{display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10}}>
-          {[
-            ['Tutors using it', stats.tutors_using_it],
-            ['Students total', stats.students_total],
-            ['Annualised gross', fmtMoney(stats.annualised_gross)],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <div style={{fontSize:'1.35rem', lineHeight:1, fontWeight:800, color:'var(--ink)'}}>{value}</div>
-              <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginTop:5}}>{label}</div>
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            style={{display:'block', width:'100%', padding:0, border:0, background:'none', color:'inherit', font:'inherit', textAlign:'left', cursor:'pointer'}}
+          >
+            <div style={{display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10}}>
+              {[
+                ['Tutors using it', stats.tutors_using_it],
+                ['Students total', stats.students_total],
+                ['Annualised gross', fmtMoney(stats.annualised_gross)],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <div style={{fontSize:'1.35rem', lineHeight:1, fontWeight:800, color:'var(--ink)'}}>{value}</div>
+                  <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginTop:5}}>{label}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </button>
+          {open && (
+            <div style={{marginTop:14, paddingTop:12, borderTop:'1px solid var(--line)'}}>
+              <div style={{fontSize:'0.68rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.07em', fontWeight:700, marginBottom:7}}>Tutor usage</div>
+              {(stats.tutors || []).map(tutor => (
+                <div key={tutor.id} style={{display:'grid', gridTemplateColumns:'minmax(0, 1fr) auto', gap:12, alignItems:'center', padding:'10px 0', borderTop:'1px solid var(--line)'}}>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontWeight:700, fontSize:'0.88rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{tutor.name}</div>
+                    <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:2}}>{tutor.imported_students} imported student{tutor.imported_students === 1 ? '' : 's'}</div>
+                  </div>
+                  <div style={{textAlign:'right'}}>
+                    <div style={{fontWeight:750, fontSize:'0.9rem'}}>{fmtMoney(tutor.weekly_gross)}</div>
+                    <div style={{fontSize:'0.7rem', color:'var(--muted)', marginTop:2}}>weekly gross</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
