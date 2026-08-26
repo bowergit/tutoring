@@ -118,6 +118,21 @@
   .ptable tr:last-child td { border-bottom: none; }
   .ptable .num { text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
 
+  /* ── Account balance ── */
+  .acct { padding: 15px; display: flex; align-items: center; gap: 14px; }
+  .acct-fig { font-size: 1.6rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1.1; }
+  .acct.settled .acct-fig, .acct.credit .acct-fig { color: var(--accent); }
+  .acct.owing  .acct-fig { color: var(--warn); }
+  .acct-say { flex: 1; min-width: 0; }
+  .acct-say b { display: block; font-size: 0.88rem; font-weight: 700; }
+  .acct-say span { display: block; font-size: 0.78rem; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+  .acct-mark {
+    flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 1.25rem;
+  }
+  .acct.settled .acct-mark, .acct.credit .acct-mark { background: var(--accent-light); }
+  .acct.owing  .acct-mark { background: var(--warn-light); }
+
   /* ── Grade estimate ── */
   .grade { padding: 16px 15px 12px; }
   .grade-top { display: flex; align-items: center; gap: 12px; }
@@ -318,8 +333,10 @@
     const trendTxt = t == null
       ? 'First paper recorded'
       : `${t > 0 ? '▲' : t < 0 ? '▼' : '■'} ${t > 0 ? '+' : ''}${t} points <small>${esc(pr.trend_basis)}</small>`;
+    // Separator normalised here rather than trusted from the API, where it has
+    // been a hyphen in some deploys. A dash is not house style.
     const tier = pr.exam_label
-      ? esc(pr.exam_label.replace(/\b\w/g, c => c.toUpperCase()))
+      ? esc(pr.exam_label.replace(/\s[-–—]\s/g, ' · ').replace(/\b\w/g, c => c.toUpperCase()))
       : '';
 
     return `
@@ -415,6 +432,41 @@
         <td>${esc(b.label)}</td>
         ${cols.map(k => `<td>${mode === 'pct' ? b.pcts[k] + '%' : b.grades[k]}</td>`).join('')}
       </tr>`).join('');
+  }
+
+  // Money in one line. Nothing owing is the normal state and should look like
+  // good news rather than an absence, so it gets the same weight as a balance.
+  function renderAccount(a) {
+    if (!a) return '';
+    const money = n => '£' + (Math.round(n * 100) % 100 === 0 ? Math.round(n) : n.toFixed(2));
+
+    let cls, mark, fig, head, sub;
+    if (a.owed > 0) {
+      cls = 'owing'; mark = '•'; fig = money(a.owed);
+      head = 'Outstanding';
+      sub = `${a.unpaid_lessons} lesson${a.unpaid_lessons === 1 ? '' : 's'} not yet paid for.`;
+    } else if (a.credit > 0) {
+      cls = 'credit'; mark = '✓'; fig = money(a.credit);
+      head = 'In credit';
+      sub = a.credit_covers > 0
+        ? `Paid ahead. That covers the next ${a.credit_covers} lesson${a.credit_covers === 1 ? '' : 's'}, and comes down as each one happens.`
+        : 'Paid ahead. This comes down as lessons happen.';
+    } else {
+      cls = 'settled'; mark = '✓'; fig = '£0';
+      head = 'All settled';
+      sub = 'Nothing outstanding. Anything paid ahead shows here and comes down as lessons happen.';
+    }
+
+    return `
+      <div class="section-label">Account</div>
+      <div class="card acct ${cls}">
+        <div class="acct-mark">${mark}</div>
+        <div class="acct-say">
+          <div class="acct-fig">${fig}</div>
+          <b>${head}</b>
+          <span>${esc(sub)}</span>
+        </div>
+      </div>`;
   }
 
   function renderGrade(g) {
@@ -629,6 +681,7 @@
   app.innerHTML = `
     <h1>${esc(data.name)}</h1>
     <div class="sub">Progress, lessons and payment status</div>
+    ${renderAccount(data.account)}
     ${renderProgress(data.progress)}
     ${renderGrade(data.grade)}
     ${actions ? `<div class="actions" style="margin-top:18px">${actions}</div>` : ''}

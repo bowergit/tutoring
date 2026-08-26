@@ -368,10 +368,10 @@ Deno.serve(async (req) => {
     ? await supabase.from('tutoring_payment_allocations').select('lesson_id,amount,payment_id').in('lesson_id', lessonIds)
     : { data: [] as any[] }
 
-  const paymentIds = [...new Set((allocations ?? []).map((a: any) => a.payment_id))]
-  const { data: payments } = paymentIds.length
-    ? await supabase.from('tutoring_payments').select('id,date_paid').in('id', paymentIds)
-    : { data: [] as any[] }
+  const { data: payments } = await supabase.from('tutoring_payments')
+    .select('id,date_paid,amount')
+    .eq('student_id', student.id)
+    .is('deleted_at', null)
   const dateByPaymentId = new Map((payments ?? []).map((p: any) => [p.id, p.date_paid]))
 
   const paidByLesson = new Map<string, number>()
@@ -412,6 +412,31 @@ Deno.serve(async (req) => {
     .slice(0, 8)
     .map(shape)
 
+  // Deliberately the same sum the tutor sees on the student card: lessons
+  // actually taught, minus everything ever paid. Lessons before the July 2026
+  // reset are declared settled and free lessons were never chargeable, so
+  // neither counts. A negative balance is money paid ahead, which is why the
+  // page can say "in credit" rather than only ever nagging.
+  const charged = (lessons ?? [])
+    .filter((l: any) => l.status === 'completed' && !l.is_complimentary && !l.pre_settled)
+    .reduce((sum: number, l: any) => sum + rateForLesson(l, rateHistory), 0)
+  const paidTotal = (payments ?? []).reduce((sum: number, p: any) => sum + Number(p.amount), 0)
+  const balance = Math.round((charged - paidTotal) * 100) / 100
+
+  const nextRate = rateForLesson(
+    { lesson_date: todayStr, rate_charged: null }, rateHistory,
+  )
+  const account = {
+    balance,
+    owed: balance > 0.005 ? balance : 0,
+    credit: balance < -0.005 ? -balance : 0,
+    // Only meaningful while they are ahead, and only as a rough count.
+    credit_covers: balance < -0.005 && nextRate > 0 ? Math.floor(-balance / nextRate) : 0,
+    unpaid_lessons: (lessons ?? []).filter((l: any) =>
+      l.status === 'completed' && !l.is_complimentary && !l.pre_settled &&
+      (paidByLesson.get(l.id) ?? 0) < rateForLesson(l, rateHistory) - 0.005).length,
+  }
+
   const tutor = ownerUser?.user
   const tutorMeta = tutor?.user_metadata ?? {}
 
@@ -422,6 +447,7 @@ Deno.serve(async (req) => {
     recent,
     progress,
     grade,
+    account,
     // Still sent when there is no progress view, so those students keep the
     // plain link to their tracker rather than losing it.
     spreadsheet_url: progress ? null : (student.spreadsheet_url || null),
