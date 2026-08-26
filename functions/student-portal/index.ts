@@ -27,6 +27,9 @@ function rateForLesson(lesson: any, rateHistory: any[]): number {
   return rate
 }
 
+// Below this, a tracker link tells the parent more than the chart would.
+const MIN_PAPERS_FOR_CHART = 3
+
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
 const round1 = (n: number) => Math.round(n * 10) / 10
 
@@ -338,7 +341,7 @@ Deno.serve(async (req) => {
   let progress = null
   let grade = null
   if (student.show_progress) {
-    const { data: papers } = await supabase.from('tutoring_past_papers')
+    const { data: papersRaw } = await supabase.from('tutoring_past_papers')
       .select('paper_set,paper_code,percentage,score_raw,max_score,date_taken,sheet_tab')
       .eq('student_id', student.id)
       // Two papers sat on the same day are common, and a tie with no defined
@@ -347,9 +350,9 @@ Deno.serve(async (req) => {
       .order('date_taken')
       .order('paper_set')
       .order('paper_code')
-    progress = buildProgress(papers ?? [], student)
+    const papers = papersRaw ?? []
 
-    const identity = examIdentity(student, papers ?? [])
+    const identity = examIdentity(student, papers)
     if (identity) {
       const { data: rows } = await supabase.from('exam_grade_boundaries')
         .select('qualification,board,spec_code,tier,series_year,series_month,max_mark,papers_in_set,boundaries')
@@ -357,8 +360,17 @@ Deno.serve(async (req) => {
         .eq('board', identity.board)
         .eq('tier', identity.tier)
         .order('series_year')
-      grade = buildGrade(papers ?? [], student, rows ?? [])
+      grade = buildGrade(papers, student, rows ?? [])
     }
+
+    // One paper is not a chart, it is a dot, and swapping a working tracker
+    // link for it leaves the parent with less than they started with. The view
+    // only takes over once there is either enough of a line to read or a whole
+    // sitting to put a grade on, and it starts doing that on its own as soon
+    // as the papers are there. Nothing to remember, nothing to switch on.
+    const worthShowing = papers.length >= MIN_PAPERS_FOR_CHART || !!(grade && grade.latest)
+    if (worthShowing) progress = buildProgress(papers, student)
+    else grade = null
   }
 
   const rateHistory = rateHistoryRaw ?? []
