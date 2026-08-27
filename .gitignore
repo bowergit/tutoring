@@ -1,0 +1,6 @@
+# Edge function source, kept locally for editing but deliberately NOT in the
+# repo. Cloudflare publishes whatever git tracks, so anything committed here is
+# served as a static file on the live site: this was reachable at
+# /functions/student-portal/index.ts until it was removed. Supabase holds the
+# deployed copy of each function, and git history still has the earlier ones.
+.edge-functions/
