@@ -31,6 +31,10 @@
 
 const PAPER_HEADER_PATTERN = /date\s*taken/i;
 
+// How long one sync suppresses the next for the same sheet. Edits inside the
+// window are queued, never discarded.
+const COOLDOWN_SECONDS = 45;
+
 /** The only function the trigger needs to call. */
 function syncPastPapers() {
   const config = getSupabaseConfig_();
@@ -94,8 +98,10 @@ function installSheetTriggers() {
   }
 
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'onSheetChanged') ScriptApp.deleteTrigger(t);
+    const fn = t.getHandlerFunction();
+    if (fn === 'onSheetChanged' || fn === 'runPendingSheetSyncs') ScriptApp.deleteTrigger(t);
   });
+  PropertiesService.getScriptProperties().deleteProperty('followup_booked');
 
   const seen = {};
   fetchStudentsWithSheets_(config).forEach(function (s) {
@@ -120,8 +126,12 @@ function installSheetTriggers() {
 function removeSheetTriggers() {
   let gone = 0;
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'onSheetChanged') { ScriptApp.deleteTrigger(t); gone++; }
+    const fn = t.getHandlerFunction();
+    if (fn === 'onSheetChanged' || fn === 'runPendingSheetSyncs') {
+      ScriptApp.deleteTrigger(t); gone++;
+    }
   });
+  PropertiesService.getScriptProperties().deleteProperty('followup_booked');
   Logger.log('Removed ' + gone + ' change triggers.');
 }
 
@@ -133,13 +143,24 @@ function onSheetChanged(e) {
   const id = e && e.source ? e.source.getId() : null;
   if (!id) return;
 
-  // Google fires this more than once for what feels like one edit, and a
-  // person entering marks types several in a row. Collapsing anything inside
-  // the window turns a burst into a single round trip.
+  // Google fires this more than once for what feels like one edit, and someone
+  // entering marks types several in a row, so a burst is collapsed into one
+  // round trip. Anything arriving inside that window is REMEMBERED rather than
+  // dropped: dropping it meant a score deleted seconds after being added was
+  // never synced at all, and the stale figure sat on the parent's page until
+  // the next nightly run.
   const cache = CacheService.getScriptCache();
-  if (cache.get('synced:' + id)) return;
-  cache.put('synced:' + id, '1', 45);
+  if (cache.get('cooling:' + id)) {
+    cache.put('pending:' + id, '1', 21600);
+    scheduleFollowUp_();
+    return;
+  }
+  cache.put('cooling:' + id, '1', COOLDOWN_SECONDS);
+  syncSheetById_(id);
+}
 
+/** Syncs whichever student owns this spreadsheet. */
+function syncSheetById_(id) {
   const config = getSupabaseConfig_();
   if (!config.url || !config.key || !config.ownerId) return;
 
@@ -148,6 +169,52 @@ function onSheetChanged(e) {
     try { sheetId = sheetIdFromUrl_(s.spreadsheet_url); } catch (err) { return; }
     if (sheetId === id) syncOneStudent_(config, s);
   });
+}
+
+/**
+ * Books a single catch-up run shortly after the cooldown expires. Only one is
+ * ever outstanding, so a flurry of edits books one follow-up rather than fifty.
+ */
+function scheduleFollowUp_() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('followup_booked') === '1') return;
+  props.setProperty('followup_booked', '1');
+  try {
+    ScriptApp.newTrigger('runPendingSheetSyncs').timeBased()
+      .after((COOLDOWN_SECONDS + 15) * 1000).create();
+  } catch (err) {
+    // Out of trigger slots. The nightly run still catches it.
+    props.deleteProperty('followup_booked');
+    Logger.log('Could not book a follow-up sync: ' + err);
+  }
+}
+
+/** Picks up whatever was edited while a sync was already cooling down. */
+function runPendingSheetSyncs() {
+  const props = PropertiesService.getScriptProperties();
+  props.deleteProperty('followup_booked');
+
+  // A spent one-off trigger is not removed by Google and still counts against
+  // the twenty a script is allowed, so they are cleared as they fire.
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'runPendingSheetSyncs') ScriptApp.deleteTrigger(t);
+  });
+
+  const config = getSupabaseConfig_();
+  if (!config.url || !config.key || !config.ownerId) return;
+
+  const cache = CacheService.getScriptCache();
+  let done = 0;
+  fetchStudentsWithSheets_(config).forEach(function (s) {
+    let id = null;
+    try { id = sheetIdFromUrl_(s.spreadsheet_url); } catch (err) { return; }
+    if (!cache.get('pending:' + id)) return;
+    cache.remove('pending:' + id);
+    cache.remove('cooling:' + id);
+    syncOneStudent_(config, s);
+    done++;
+  });
+  Logger.log('Caught up ' + done + ' tracker(s) edited during a cooldown.');
 }
 
 // ─── Supabase ────────────────────────────────────────────────────────────
