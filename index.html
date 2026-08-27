@@ -241,6 +241,13 @@
   /* ── Walkthrough spotlight ── */
   @keyframes wt-nudge { 0%,100% { transform: translateY(0); } 50% { transform: translateY(5px); } }
   .wt-ring {
+    /* Above the sticky header and the billing bar, below sheets and the
+       walkthrough itself. Left on auto, page chrome painted straight over the
+       ring and the arrow, so the box around + Add was invisible and the arrow
+       was tucked behind the bar. The dim is the ring's own shadow and the ring
+       is a hole in it, so whatever is being pointed at still shows through
+       undimmed however it is stacked. */
+    z-index: 95;
     position: fixed; border-radius: 12px; border: 2px solid var(--accent);
     /* The dim is this element's own shadow, so the ring is a hole in it and
        the highlighted control stays fully lit and tappable. */
@@ -249,6 +256,7 @@
     pointer-events: none;
   }
   .wt-arrow {
+    z-index: 96;
     position: fixed; font-size: 1.5rem; line-height: 1; color: var(--accent);
     animation: wt-nudge 1.1s ease-in-out infinite; pointer-events: none;
     text-shadow: 0 2px 6px rgba(0,0,0,.35);
@@ -5352,9 +5360,12 @@ function Spotlight({ anchor }) {
 
   if (!rect) return null;
 
-  // Above the target when there is room, otherwise below, so the arrow never
-  // sits off screen or under the walkthrough sheet.
-  const above = rect.top > 70;
+  // Above the target when there is genuinely room for it, otherwise below and
+  // flipped. The old threshold of 70 counted the arrow as fitting above a
+  // button sitting at 71, which put it in the header rather than clear of it.
+  // It needs its own height plus the offset, so anything near the top of the
+  // screen gets pointed at from underneath instead.
+  const above = rect.top > 110;
   return ReactDOM.createPortal(
     <>
       <div className="wt-ring" style={{
@@ -5432,7 +5443,20 @@ const WT_STEPS = [
 
 function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPausedChange }) {
   const meta = session?.user?.user_metadata || {};
-  const startAt = typeof meta.wt_step === 'number' && meta.wt_step > 0 ? meta.wt_step : 0;
+
+  // Someone who already told us their name and number does not need to be
+  // asked again on their way through, so that step is dropped rather than
+  // shown pre-filled. Fixed at mount: the list must not shorten underneath
+  // them the moment they type into it.
+  const [steps] = useState(() => WT_STEPS.filter(st => (
+    st.key !== 'you' || !(meta.display_name && meta.contact_phone)
+  )));
+
+  const startAt = typeof meta.wt_step === 'number' && meta.wt_step > 0
+    // The stored position is an index, and the list is a different length
+    // depending on what they had already filled in, so it is clamped.
+    ? Math.min(meta.wt_step, steps.length - 1)
+    : 0;
   const [step, setStep] = useState(startAt);
   const [paused, setPausedState] = useState(false);
   // Told to the app as well, so the Tools button can come back while they
@@ -5484,8 +5508,8 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
   const [phone, setPhone] = useState(meta.contact_phone || '');
   const [rate, setRate]   = useState(meta.default_rate != null ? String(meta.default_rate) : '');
 
-  const s = WT_STEPS[step];
-  const isLast = step === WT_STEPS.length - 1;
+  const s = steps[step];
+  const isLast = step === steps.length - 1;
   // Archived students would otherwise be counted, which reads as wrong to
   // someone checking the number against what's on their screen.
   const activeCount = students.filter(x => x.active).length;
@@ -5542,7 +5566,7 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
         background:'var(--card)', color:'var(--accent)', fontFamily:'inherit',
         fontSize:'0.82rem', fontWeight:650, boxShadow:'var(--sh-3)', cursor:'pointer',
       }}>
-        ▶ Back to setup · {step + 1}/{WT_STEPS.length}
+        ▶ Back to setup · {step + 1}/{steps.length}
       </button>, document.body
     );
   }
@@ -5564,7 +5588,7 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
           <span style={{
             fontSize:'0.66rem', fontWeight:700, letterSpacing:'0.06em',
             color:'var(--muted)', flexShrink:0,
-          }}>{step + 1}/{WT_STEPS.length}</span>
+          }}>{step + 1}/{steps.length}</span>
           <span style={{
             flex:1, minWidth:0, fontSize:'0.84rem', fontWeight:650,
             overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
@@ -5598,10 +5622,10 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
           <span style={{
             fontSize:'0.66rem', fontWeight:700, letterSpacing:'0.07em',
             textTransform:'uppercase', color:'var(--muted)',
-          }}>Setup · {step + 1} of {WT_STEPS.length}</span>
+          }}>Setup · {step + 1} of {steps.length}</span>
           <div style={{flex:1, height:3, background:'var(--card-3)', borderRadius:2}}>
             <div style={{
-              width:`${((step + 1) / WT_STEPS.length) * 100}%`, height:'100%',
+              width:`${((step + 1) / steps.length) * 100}%`, height:'100%',
               background:'var(--accent)', borderRadius:2, transition:'width .25s',
             }} />
           </div>
