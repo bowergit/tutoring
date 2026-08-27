@@ -7,7 +7,7 @@
 <meta name="description" content="TutorTally turns your teaching calendar into accurate lesson records, clear balances and ready-to-send payment messages. Free forever for up to 3 active students, then £5 a month.">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
-<meta name="theme-color" content="#0f766e">
+<meta name="theme-color" content="#ffa500">
 <meta property="og:title" content="TutorTally - the tiny finance desk for solo tutors">
 <meta property="og:description" content="Your calendar already knows what you taught. TutorTally tells you exactly who owes what and writes the message to ask for it.">
 <meta property="og:type" content="website">
@@ -17,7 +17,7 @@
   :root {
     --bg: #f7f8f4; --bg-tint: #ecf4f1; --card: #ffffff; --card-2: #f5f7f6; --card-3: #edf1ef;
     --line: #dfe7e3; --ink: #15211f; --ink-dim: #596965; --muted: #87938f;
-    --accent: #0f766e; --accent-2: #2563eb; --accent-light: #e0f3ef;
+    --accent: #a15c00; --accent-fill: #ffa500; --on-accent: #15211f; --accent-2: #ffa500; --accent-light: #fff1d9;
     --warn: #d05b39; --warn-light: #fff0e9; --gold: #b7791f; --gold-light: #fff4d8;
     --r-md: 13px; --r-lg: 17px; --r-xl: 24px;
     --sh-1: 0 1px 2px rgba(22,21,15,.06);
@@ -29,7 +29,7 @@
     :root {
       --bg: #101716; --bg-tint: #14211f; --card: #182321; --card-2: #1e2a27; --card-3: #26332f;
       --line: #30413d; --ink: #eef8f5; --ink-dim: #a5b7b1; --muted: #7f918c;
-      --accent: #35c2b0; --accent-2: #7ba7ff; --accent-light: #12332f;
+      --accent: #ffa500; --accent-fill: #ffa500; --on-accent: #15211f; --accent-2: #ffa500; --accent-light: #3a2604;
       --warn: #ff8a63; --warn-light: #351d15; --gold: #e6bd62; --gold-light: #302612;
       --sh-1: 0 1px 2px rgba(0,0,0,.4);
       --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
@@ -80,7 +80,7 @@
     font-family: inherit; transition: transform .16s cubic-bezier(.2,.8,.2,1), filter .16s, box-shadow .16s;
     white-space: nowrap;
   }
-  .btn-primary { background: var(--accent); color: #fff; box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--accent) 70%, transparent); }
+  .btn-primary { background: var(--accent-fill); color: var(--on-accent); box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--accent-fill) 70%, transparent); }
   .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.07); }
   .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
   .btn-ghost:hover { border-color: var(--accent); }
@@ -106,7 +106,7 @@
   .hero { padding: 58px 0 30px; position: relative; overflow: hidden; }
   .hero::before {
     content: ''; position: absolute; inset: -20% -30% auto -30%; height: 620px; z-index: -1;
-    background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--accent) 15%, transparent), transparent 70%);
+    background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--accent-fill) 22%, transparent), transparent 70%);
     pointer-events: none;
   }
   .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 46px; align-items: center; }
@@ -125,14 +125,14 @@
   .mock-bar { display: flex; align-items: center; gap: 9px; margin-bottom: 13px; }
   .mock-title { font-weight: 720; letter-spacing: -0.02em; font-size: 1rem; }
   .mock-sub { font-size: 0.72rem; color: var(--muted); }
-  .pill-btn { margin-left: auto; background: var(--accent); color: #fff; border-radius: 100px; padding: 6px 13px; font-size: 0.76rem; font-weight: 650; }
+  .pill-btn { margin-left: auto; background: var(--accent-fill); color: var(--on-accent); border-radius: 100px; padding: 6px 13px; font-size: 0.76rem; font-weight: 650; }
 
   .srow {
     display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: var(--r-md);
     background: var(--card-2); border: 1px solid var(--line); margin-bottom: 8px;
   }
   .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .dot.ok { background: var(--accent); } .dot.warn { background: var(--warn); }
+  .dot.ok { background: var(--accent-fill); } .dot.warn { background: var(--warn); }
   .sname { font-weight: 640; font-size: 0.92rem; }
   .chip {
     font-size: 0.68rem; font-weight: 650; padding: 3px 9px; border-radius: 100px;
@@ -246,7 +246,7 @@
   }
   .ref-step:last-child { border-bottom: none; }
   .ref-n {
-    flex: 0 0 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff;
+    flex: 0 0 32px; height: 32px; border-radius: 50%; background: var(--accent-fill); color: var(--on-accent);
     display: grid; place-items: center; font-weight: 700; font-size: 0.9rem;
   }
 

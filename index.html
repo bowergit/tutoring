@@ -9,7 +9,7 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json"> 
-<meta name="theme-color" content="#0f766e">
+<meta name="theme-color" content="#ffa500">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -27,9 +27,16 @@
     --line-soft: #edf1ef;
     --ink: #15211f;
     --ink-dim: #596965;
-    --accent: #0f766e;
-    --accent-2: #2563eb;
-    --accent-light: #e0f3ef;
+    /* Orange is the brand colour, but it only behaves as a FILL. #ffa500 as
+       text on paper is 1.85:1 and under white text 1.97:1, both unreadable,
+       while ink on top of it is 8.4:1. So --accent is the readable orange used
+       for text and borders, --accent-fill is the brand orange used for blocks,
+       and --on-accent is what goes on top of a fill. */
+    --accent: #a15c00;
+    --accent-fill: #ffa500;
+    --on-accent: #15211f;
+    --accent-2: #ffa500;
+    --accent-light: #fff1d9;
     --warn: #d05b39;
     --warn-light: #fff0e9;
     --muted: #87938f;
@@ -40,7 +47,7 @@
     --sh-1: 0 1px 2px rgba(22,21,15,.06);
     --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
     --sh-3: 0 2px 6px rgba(22,21,15,.06), 0 16px 40px -12px rgba(22,21,15,.22);
-    --ring: 0 0 0 3px rgba(15,118,110,.16);
+    --ring: 0 0 0 3px rgba(255,165,0,.28);
   }
 
   /* ── Dark mode ── */
@@ -55,9 +62,13 @@
       --line-soft: #26332f;
       --ink: #eef8f5;
       --ink-dim: #a5b7b1;
-      --accent: #35c2b0;
-      --accent-2: #7ba7ff;
-      --accent-light: #12332f;
+      /* On a dark ground the brand orange is 9.2:1, so text and fill are the
+         same colour here and nothing has to be darkened. */
+      --accent: #ffa500;
+      --accent-fill: #ffa500;
+      --on-accent: #15211f;
+      --accent-2: #ffa500;
+      --accent-light: #3a2604;
       --warn: #ff8a63;
       --warn-light: #351d15;
       --muted: #7f918c;
@@ -67,7 +78,7 @@
       --sh-1: 0 1px 2px rgba(0,0,0,.4);
       --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
       --sh-3: 0 2px 8px rgba(0,0,0,.5), 0 20px 48px -14px rgba(0,0,0,.75);
-      --ring: 0 0 0 3px rgba(53,194,176,.22);
+      --ring: 0 0 0 3px rgba(255,165,0,.30);
     }
   }
 
@@ -119,7 +130,7 @@
   }
   .refresh-btn:active { transform: scale(.92); background: var(--card-3); }
   .add-btn {
-    background: var(--accent); color: white; border: none;
+    background: var(--accent-fill); color: var(--on-accent); border: none;
     border-radius: var(--r-sm); padding: 9px 15px; font-size: 0.82rem;
     font-weight: 650; cursor: pointer; font-family: inherit;
     box-shadow: var(--sh-1), inset 0 1px 0 rgba(255,255,255,.14);
@@ -289,7 +300,7 @@
   .rev-track { flex: 1; height: 22px; background: var(--card-2); border-radius: 6px; overflow: hidden; }
   .rev-fill {
     height: 100%; border-radius: 6px;
-    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    background: linear-gradient(90deg, var(--accent-fill), var(--accent-2));
     transition: width .5s var(--ease);
   }
   .rev-val { font-size: 0.78rem; font-weight: 650; width: 62px; text-align: right; flex-shrink: 0; }
@@ -356,7 +367,7 @@
   .checkbox-row input { width: 18px; height: 18px; accent-color: var(--accent); }
   .btn-row { display: flex; gap: 10px; margin-top: 18px; }
   .btn.cancel { background: var(--card-2); color: var(--ink); border: 1px solid var(--line); flex: 0 0 auto; padding: 10px 18px; }
-  .btn.save   { background: var(--accent); color: white; }
+  .btn.save   { background: var(--accent-fill); color: var(--on-accent); }
   .session-list { margin: 10px 0; }
   .session-pick-row {
     display: flex; align-items: center; gap: 10px;
@@ -473,7 +484,7 @@
     padding:2px 7px; border-radius:5px; background:var(--card-2); border:1px solid var(--line); color:var(--muted);
   }
   .pay-method.cash { color:var(--gold); border-color:var(--gold); }
-  .pay-method.bank_transfer { color:#2D8CFF; border-color:#2D8CFF; }
+  .pay-method.bank_transfer { color:var(--accent); border-color:var(--accent); }
   .pay-method.monzo_auto { color:#FF4F64; border-color:#FF4F64; }
   .seg { display:flex; gap:6px; }
   .seg button {
@@ -481,7 +492,7 @@
     border:1px solid var(--line); background:var(--card-2); color:var(--muted);
     cursor:pointer; font-family:inherit; transition: all 0.15s;
   }
-  .seg button.sel { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .seg button.sel { background:var(--accent-fill); border-color:var(--accent-fill); color:var(--on-accent); }
   /* A second switch inside a panel that already has group tabs above it. Kept
      quieter than the tabs so the two rows read as different levels rather than
      as two equal choices stacked on top of each other. */
@@ -575,7 +586,7 @@
     width:44px; height:26px; border-radius:13px; position:relative; flex-shrink:0;
     transition: background 0.22s cubic-bezier(0.4,0,0.2,1);
   }
-  .toggle-track.on  { background: var(--accent); }
+  .toggle-track.on  { background: var(--accent-fill); }
   .toggle-track.off { background: var(--card-2); border: 1.5px solid var(--line); }
   .toggle-thumb {
     position:absolute; top:3px; width:18px; height:18px; border-radius:9px;
@@ -596,12 +607,12 @@
     background:var(--card-2); border-bottom:1px solid var(--line); color:var(--ink);
   }
   .billing-bar.warn { background:var(--warn-light); border-bottom-color:var(--warn); color:var(--warn); }
-  .billing-bar.demo { background:var(--accent); border-bottom-color:var(--accent); color:#fff; }
+  .billing-bar.demo { background:var(--accent-fill); border-bottom-color:var(--accent-fill); color:var(--on-accent); }
   .billing-bar > span { flex:1 1 240px; }
   .billing-btn {
     border:none; border-radius:100px; padding:7px 15px; cursor:pointer;
     font-family:inherit; font-size:0.8rem; font-weight:650; white-space:nowrap;
-    background:var(--accent); color:#fff; text-decoration:none; display:inline-block;
+    background:var(--accent-fill); color:var(--on-accent); text-decoration:none; display:inline-block;
   }
   .billing-bar.demo .billing-btn { background:#fff; color:var(--accent); }
   .billing-bar.warn .billing-btn { background:var(--warn); color:#fff; }
@@ -2144,7 +2155,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
       }}>
         <span style={{
           width:9, height:9, borderRadius:5, flexShrink:0,
-          background: status === null ? 'var(--muted)' : status.connected ? 'var(--accent)' : 'var(--warn)'
+          background: status === null ? 'var(--muted)' : status.connected ? 'var(--accent-fill)' : 'var(--warn)'
         }} />
         <span style={{flex:1}}>
           {status === null ? 'Checking…'
@@ -2349,7 +2360,7 @@ function MonzoPanel({ students, onDataChanged }) {
       }}>
         <span style={{
           width:9, height:9, borderRadius:5, flexShrink:0,
-          background: status === null ? 'var(--muted)' : connected ? 'var(--accent)' : 'var(--warn)'
+          background: status === null ? 'var(--muted)' : connected ? 'var(--accent-fill)' : 'var(--warn)'
         }} />
         <span style={{flex:1}}>
           {status === null ? 'Checking…'
@@ -5149,7 +5160,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               className="btn"
               data-wt="parentlink"
               title="Copy the parent's private page link"
-              style={{background:'#5b56d6', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}
+              style={{background:'var(--accent-fill)', color:'var(--on-accent)', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}
               onClick={() => {
                 navigator.clipboard.writeText(cardParentLink).then(() => {
                   setParentLinkCopied(true);
@@ -5161,7 +5172,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener" style={{background:'#1a7f4b', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}>📈</a>
             )}
             {student.is_zoom && student.zoom_link && (
-              <a className="btn" href={student.zoom_link} target="_blank" rel="noopener" style={{background:'#2D8CFF', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}>🎥</a>
+              <a className="btn" href={student.zoom_link} target="_blank" rel="noopener" style={{background:'var(--accent-fill)', color:'var(--on-accent)', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}>🎥</a>
             )}
             <button className="btn edit" data-wt="edit" onClick={() => onEdit(student)}>Edit</button>
             <button className="btn more" data-wt="moretools" onClick={() => setShowMoreTools(true)}>More tools</button>
@@ -5410,7 +5421,7 @@ const WT_STEPS = [
     title: 'Fill in the gaps',
     body: "Tap a student to open them, then tap Edit.",
     points: [
-      ['Important', "The parent's mobile number, which turns on every WhatsApp button in the app. School year and exam board, which drive the progress page their parent sees."],
+      ['Important', "**The parent's mobile number**, which turns on every WhatsApp button in the app. **School year** and **exam board**, which drive the progress page their parent sees."],
       ['Less important', 'Address and notes. Nothing depends on them, so add them only if you want them for yourself.'],
     ],
     anchor: ['[data-wt="edit"]', '[data-wt="card"]'],
@@ -5626,7 +5637,7 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
           <div style={{flex:1, height:3, background:'var(--card-3)', borderRadius:2}}>
             <div style={{
               width:`${((step + 1) / steps.length) * 100}%`, height:'100%',
-              background:'var(--accent)', borderRadius:2, transition:'width .25s',
+              background:'var(--accent-fill)', borderRadius:2, transition:'width .25s',
             }} />
           </div>
           {sheetOpen && (
@@ -5653,7 +5664,15 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
                   fontWeight:700, color:'var(--ink)', flexShrink:0,
                   minWidth:96, whiteSpace:'nowrap',
                 }}>{label}</span>
-                <span style={{color:'var(--ink-dim)'}}>{text}</span>
+                <span style={{color:'var(--ink-dim)'}}>
+                  {/* **like this** comes out bold, so the field they actually
+                      have to type into is findable without reading a sentence. */}
+                  {text.split(/\*\*/).map((part, i) => (
+                    i % 2
+                      ? <b key={i} style={{color:'var(--ink)', fontWeight:700}}>{part}</b>
+                      : <React.Fragment key={i}>{part}</React.Fragment>
+                  ))}
+                </span>
               </div>
             ))}
           </div>
@@ -5996,7 +6015,7 @@ function App() {
         <div style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600, maxWidth:'92vw',
-          background: billingNotice === 'done' && !billingNeedsAttention ? 'var(--accent)' : 'var(--warn)',
+          background: billingNotice === 'done' && !billingNeedsAttention ? 'var(--accent-fill)' : 'var(--warn)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {billingNotice === 'done'
@@ -6012,7 +6031,7 @@ function App() {
         <div style={{
           position:'fixed', top:12, left:'50%', transform:'translateX(-50%)', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600,
-          background: monzoStatus === 'connected' ? 'var(--accent)' : 'var(--warn)',
+          background: monzoStatus === 'connected' ? 'var(--accent-fill)' : 'var(--warn)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {monzoStatus === 'connected' ? '🏦 Monzo connected successfully' : 'Monzo connection was cancelled or denied'}
@@ -6022,7 +6041,7 @@ function App() {
         <div style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600,
-          background: googleStatus === 'connected' ? 'var(--accent)' : 'var(--warn)',
+          background: googleStatus === 'connected' ? 'var(--accent-fill)' : 'var(--warn)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {googleStatus === 'connected' ? '📅 Google Calendar connected - pick a calendar in Settings to finish' : 'Google Calendar connection was cancelled or denied'}
@@ -6136,7 +6155,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v5.9</div>}
+        {!loading && <div className="version-tag">v6.0</div>}
       </div>
 
       {showAddModal && (

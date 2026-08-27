@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Connecting your calendar…</title>
+<meta name="theme-color" content="#ffa500">
+<style>
+  :root { --bg:#f7f8f4; --ink:#15211f; --muted:#87938f; --accent:#a15c00; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#101716; --ink:#eef8f5; --muted:#7f918c; --accent:#ffa500; }
+  }
+  body {
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:var(--bg); color:var(--ink); text-align:center; padding:24px;
+    font-family:'General Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  h1 { font-size:1.05rem; font-weight:700; margin:0 0 8px; }
+  p { font-size:0.88rem; color:var(--muted); line-height:1.55; margin:0 0 16px; max-width:32ch; }
+  a { color:var(--accent); font-weight:650; }
+</style>
+</head>
+<body>
+<div>
+  <h1>Connecting your calendar…</h1>
+  <p id="msg">One moment. You will be taken back to TutorTally automatically.</p>
+  <a id="manual" href="#" hidden>Continue</a>
+</div>
+<!--
+  Google will only send people back to an address on a domain the app owner has
+  verified, and nobody can verify supabase.co. So the registered redirect URI is
+  this page, on our own domain, and it hands the code straight to the function
+  that does the token exchange. Nothing is read or kept here: the code is
+  single use, and the client secret never leaves the server.
+-->
+<script>
+(function () {
+  var TARGET = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1/google-calendar-auth';
+  var qs = window.location.search;
+  // Nothing to forward means someone opened this page directly.
+  if (!qs || (qs.indexOf('code=') === -1 && qs.indexOf('error=') === -1)) {
+    document.getElementById('msg').textContent =
+      'Nothing to connect. Open TutorTally and start from Google Calendar.';
+    var back = document.getElementById('manual');
+    back.href = '/'; back.textContent = 'Go to TutorTally'; back.hidden = false;
+    return;
+  }
+  var next = TARGET + qs;
+  var manual = document.getElementById('manual');
+  manual.href = next;
+  // Shown only if the redirect has not happened, so a blocked script still
+  // leaves a way through rather than a dead page.
+  setTimeout(function () {
+    document.getElementById('msg').textContent = 'Nearly there. Tap continue if nothing happens.';
+    manual.hidden = false;
+  }, 2500);
+  window.location.replace(next);
+})();
+</script>
+</body>
+</html>

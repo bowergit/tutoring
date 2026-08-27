@@ -10,12 +10,12 @@
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
-<meta name="theme-color" content="#0f766e">
+<meta name="theme-color" content="#ffa500">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #f7f8f4; --card: #ffffff; --card-2: #f5f7f6; --line: #dfe7e3;
-    --ink: #15211f; --ink-dim: #596965; --accent: #0f766e; --accent-light: #e0f3ef;
+    --ink: #15211f; --ink-dim: #596965; --accent: #a15c00; --accent-fill: #ffa500; --on-accent: #15211f; --accent-light: #fff1d9;
     --warn: #d05b39; --warn-light: #fff0e9; --muted: #87938f; --gold: #b7791f; --gold-light: #fff4d8;
     --r-sm: 9px; --r-md: 13px; --r-lg: 17px; --r-xl: 24px;
     --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
@@ -23,7 +23,7 @@
   @media (prefers-color-scheme: dark) {
     :root {
       --bg: #101716; --card: #182321; --card-2: #1e2a27; --line: #30413d;
-      --ink: #eef8f5; --ink-dim: #a5b7b1; --accent: #35c2b0; --accent-light: #12332f;
+      --ink: #eef8f5; --ink-dim: #a5b7b1; --accent: #ffa500; --accent-fill: #ffa500; --on-accent: #15211f; --accent-light: #3a2604;
       --warn: #ff8a63; --warn-light: #351d15; --muted: #7f918c; --gold: #e6bd62; --gold-light: #302612;
       --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
     }
@@ -168,7 +168,7 @@
     border: none; background: none; font-family: inherit; font-size: 0.68rem; font-weight: 650;
     color: var(--muted); padding: 4px 11px; cursor: pointer;
   }
-  .gb-switch button[aria-pressed="true"] { background: var(--accent); color: var(--bg); }
+  .gb-switch button[aria-pressed="true"] { background: var(--accent-fill); color: var(--on-accent); }
   /* The boundary grid is wider than a phone. It scrolls inside its own box so
      the page itself never gets a sideways scrollbar. */
   .gb-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }

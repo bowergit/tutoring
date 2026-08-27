@@ -81,8 +81,9 @@ Palette:
 - Ink: `#15211f`
 - Paper: `#f7f8f4`
 - Soft mint: `#ecf4f1`
-- Teal: `#0f766e`
-- Clear blue: `#2563eb`
+- Brand orange: `#ffa500` (fills and blocks only)
+- Orange ink: `#a15c00` (orange text on light backgrounds; #ffa500 is 1.85:1 on paper and unreadable)
+- On orange: `#15211f` (never white, which is 1.97:1 on #ffa500)
 - Chase coral: `#d05b39`
 - Receipt gold: `#b7791f`
 
