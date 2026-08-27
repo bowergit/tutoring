@@ -314,6 +314,13 @@
     animation: sheetUp 0.28s cubic-bezier(0.4,0,0.2,1) forwards;
   }
   .sheet.closing { animation: sheetDown 0.2s cubic-bezier(0.4,0,1,1) forwards; }
+  /* The walkthrough sits above sheets on purpose, so that whatever it is
+     pointing at stays visible. The cost is that a sheet opened FROM the
+     walkthrough lands underneath it, which hid the calendar list, Sync now,
+     every Add button and most Save buttons. Rather than fight over z-index,
+     the walkthrough shrinks to a bar and the sheet is lifted clear of it. */
+  body[data-wt-bar="1"] .overlay { padding-bottom: var(--wt-bar-h, 96px); }
+  body[data-wt-bar="1"] .sheet { max-height: calc(94vh - var(--wt-bar-h, 96px)); }
   .sheet h2 { font-size: 1.05rem; margin: 0 0 16px; color: var(--ink); font-weight: 700; }
   .field { margin-bottom: 14px; }
   .field label {
@@ -5378,6 +5385,43 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
   const setPaused = v => { setPausedState(v); onPausedChange?.(v); };
   const [saving, setSaving] = useState(false);
   const [calStatus, setCalStatus] = useState(null);
+  // True whenever a sheet is on screen, which for most steps is the thing the
+  // step just told them to open.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  // Lets them pull the full instructions back up over a sheet if they need to
+  // re-read them, at the cost of the room the sheet had.
+  const [expanded, setExpanded] = useState(false);
+  const barRef = React.useRef(null);
+
+  useEffect(() => {
+    const check = () => setSheetOpen(!!document.querySelector('.overlay:not(.closing)'));
+    check();
+    const mo = new MutationObserver(check);
+    mo.observe(document.body, {
+      childList: true, subtree: true, attributes: true, attributeFilter: ['class'],
+    });
+    return () => mo.disconnect();
+  }, []);
+
+  // Closing the sheet drops the expanded state, so the next one opens compact.
+  useEffect(() => { if (!sheetOpen) setExpanded(false); }, [sheetOpen]);
+
+  // Measured rather than assumed: the bar is a different height compact,
+  // expanded, and on a phone with a home indicator.
+  React.useLayoutEffect(() => {
+    if (sheetOpen && barRef.current) {
+      document.body.dataset.wtBar = '1';
+      document.body.style.setProperty('--wt-bar-h', barRef.current.offsetHeight + 'px');
+    } else {
+      delete document.body.dataset.wtBar;
+      document.body.style.removeProperty('--wt-bar-h');
+    }
+  });
+
+  useEffect(() => () => {
+    delete document.body.dataset.wtBar;
+    document.body.style.removeProperty('--wt-bar-h');
+  }, []);
 
   const [name, setName]   = useState(meta.display_name || '');
   const [email, setEmail] = useState(meta.contact_email || '');
@@ -5441,14 +5485,51 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
     );
   }
 
+  // A sheet is open and they have not asked to re-read the step, so the
+  // walkthrough gets out of the way. It stays on screen, because the step it
+  // is on is usually the instruction for the sheet they are looking at.
+  if (sheetOpen && !expanded) {
+    return ReactDOM.createPortal(
+      <div ref={barRef} style={{
+        position:'fixed', left:0, right:0, bottom:0, zIndex:150,
+        background:'var(--card)', borderTop:'1px solid var(--line)',
+        boxShadow:'var(--sh-3)',
+        padding:'10px 14px calc(10px + env(safe-area-inset-bottom))',
+      }}>
+        <div style={{
+          maxWidth:680, margin:'0 auto', display:'flex', alignItems:'center', gap:10,
+        }}>
+          <span style={{
+            fontSize:'0.66rem', fontWeight:700, letterSpacing:'0.06em',
+            color:'var(--muted)', flexShrink:0,
+          }}>{step + 1}/{WT_STEPS.length}</span>
+          <span style={{
+            flex:1, minWidth:0, fontSize:'0.84rem', fontWeight:650,
+            overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+          }}>{s.title}</span>
+          <button onClick={() => setExpanded(true)} style={{
+            flexShrink:0, padding:'8px 12px', borderRadius:'var(--r-md)',
+            border:'1px solid var(--line)', background:'var(--card-2)',
+            color:'var(--ink)', fontFamily:'inherit', fontSize:'0.78rem',
+            fontWeight:600, cursor:'pointer',
+          }}>Steps</button>
+          <button className="btn save" onClick={next} disabled={saving}
+            style={{flexShrink:0, minWidth:0, padding:'9px 16px'}}>
+            {saving ? '…' : isLast ? 'Finish' : 'Next'}
+          </button>
+        </div>
+      </div>, document.body
+    );
+  }
+
   return ReactDOM.createPortal(
     <>
     {s.anchor && <Spotlight selector={s.anchor} />}
-    <div style={{
+    <div ref={barRef} style={{
       position:'fixed', left:0, right:0, bottom:0, zIndex:150,
       background:'var(--card)', borderTop:'1px solid var(--line)',
       boxShadow:'var(--sh-3)', padding:'16px 16px calc(16px + env(safe-area-inset-bottom))',
-      maxHeight:'72vh', overflowY:'auto', overflowX:'hidden',
+      maxHeight: sheetOpen ? '46vh' : '72vh', overflowY:'auto', overflowX:'hidden',
     }}>
       <div style={{maxWidth:680, margin:'0 auto'}}>
         <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:7}}>
@@ -5462,6 +5543,12 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
               background:'var(--accent)', borderRadius:2, transition:'width .25s',
             }} />
           </div>
+          {sheetOpen && (
+            <button onClick={() => setExpanded(false)} title="Shrink out of the way" style={{
+              background:'none', border:'none', color:'var(--muted)', cursor:'pointer',
+              fontFamily:'inherit', fontSize:'0.9rem', padding:'0 2px', flexShrink:0,
+            }}>▾</button>
+          )}
         </div>
 
         <div style={{fontSize:'1.02rem', fontWeight:700, marginBottom:5}}>{s.title}</div>
