@@ -1241,7 +1241,7 @@ function BillingBar({ entitlement, activeStudents, blockedOnce, suppressFreeProm
     return (
       <div className="billing-bar">
         <span>
-          Checking Stripe before changing your plan banner. Billing lives in Tools: Billing &amp; subscription.
+          Checking Stripe before changing your plan banner. Billing lives in Settings: Billing &amp; subscription.
         </span>
       </div>
     );
@@ -2070,13 +2070,25 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
 
   async function pick(cal) {
     setBusy(true);
+    setMsg(null);
     await authedFetch('google-calendar-select', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ calendar_id: cal.id, calendar_summary: cal.summary }),
     });
+    // Picking the calendar IS the request to use it, so pulling the lessons in
+    // is the obvious next thing. Making someone find Sync now afterwards left
+    // the app looking empty at the exact moment it was supposed to prove it
+    // worked.
+    const r = await authedFetch('google-calendar-sync').catch(e => ({ ok: false, problem: String(e) }));
+    const mine = r.results?.[0];
+    setMsg(r.ok && mine?.ok
+      ? `Synced ${mine.synced} lesson${mine.synced === 1 ? '' : 's'}, matched against ${mine.students_matched} student${mine.students_matched === 1 ? '' : 's'}.`
+      : `Connected. Tap Sync now to pull your lessons in.`);
+    setUnmatched(mine?.unmatched_titles || []);
     setBusy(false);
     refresh();
+    onDataChanged?.();
   }
 
   async function syncNow() {
@@ -2565,7 +2577,7 @@ function LoginGate() {
 
         {state === 'reset-sent' && notice(
           <>Reset link sent to <b>{email}</b>. Opening it signs you straight in, then
-          set a new password from Tools.</>,
+          set a new password from Settings.</>,
           'Back to sign in'
         )}
 
@@ -3351,7 +3363,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
       <div className={`sheet${cls}`}>
         {!tool && (
           <>
-            <h2>Tools</h2>
+            <h2>Settings</h2>
             <SetupChecklist
               session={session}
               students={students}
@@ -3597,7 +3609,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               { icon: '📅', title: 'Lessons', body: 'Each lesson row has a date, start time, status (scheduled / completed / missed) and the rate charged. Past "scheduled" lessons are auto-corrected to "completed" on each app load. History is grouped by month - tap a month to expand it, then tap a lesson for its detail, where you can also mark it free.' },
               { icon: '🔄', title: 'Fresh start - 27 July 2026', body: 'Everything taught before 27 July 2026 is marked as already paid for. Those lessons still show in history (tagged "settled") but never count towards a balance, and all payments predating that date were cleared out. The old records were archived inside the database rather than destroyed, so they can be recovered if ever needed.' },
               { icon: '💷', title: 'Payments', body: 'Open a student and expand Payments to see every payment, or log a new one (cash or bank transfer). Tap a payment to see which lessons it covers, edit it, or delete it. Balance = completed lessons since the reset − total paid.' },
-              danielOnly && { icon: '🏦', title: 'Monzo', body: 'Tools → Monzo payments pulls incoming bank transfers and logs them against the right student automatically. Set "Expect bank transfers from" on a student to teach it a parent\'s name; after the first match it remembers their account, so it keeps working even when the bank formats the name differently. Only money coming IN from real people is ever looked at - card spending, pot transfers and declines are filtered out, and unrecognised transfers are read live and never stored. Nothing before 27 July 2026 is considered.' },
+              danielOnly && { icon: '🏦', title: 'Monzo', body: 'Settings → Monzo payments pulls incoming bank transfers and logs them against the right student automatically. Set "Expect bank transfers from" on a student to teach it a parent\'s name; after the first match it remembers their account, so it keeps working even when the bank formats the name differently. Only money coming IN from real people is ever looked at - card spending, pot transfers and declines are filtered out, and unrecognised transfers are read live and never stored. Nothing before 27 July 2026 is considered.' },
               { icon: '📆', title: 'Calendar sync', body: 'A Google Apps Script runs nightly. It reads your tutoring calendar, matches events to students by their "calendar name" field, and writes lesson rows into Supabase with their start times - marking sessions complete once the date passes. Delete an event from the calendar and the lesson is removed too, unless a payment is attached to it, in which case it is kept and flagged in the log. Lessons you add by hand in the app are never touched by the sync.' },
               { icon: '📈', title: 'Spreadsheet links', body: 'Each student can have a Google Sheets link (set via Edit). Tap the 📈 button on a card to open it. Links are stored in Supabase and can also be set directly in the database.' },
               { icon: '💰', title: 'Rate history', body: 'Every rate change is recorded with a date. The app always uses the rate that was in effect on a given day - so historical balances stay accurate when you put prices up.' },
@@ -3818,7 +3830,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
             padding:'8px 11px', borderRadius:8, marginBottom:14, lineHeight:1.4
           }}>
             Privacy mode is on, so this form shows masked values and is read-only.
-            Turn it off in Tools to make changes.
+            Turn it off in Settings to make changes.
           </div>
         )}
 
@@ -4156,7 +4168,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
             padding:'8px 11px', borderRadius:8, marginBottom:14, lineHeight:1.4
           }}>
             Privacy mode is on, so this form is masked and read-only. Turn it off
-            in Tools to log or edit a payment.
+            in Settings to log or edit a payment.
           </div>
         )}
         <div style={demo ? { pointerEvents: 'none', opacity: 0.9 } : undefined}>
@@ -4311,7 +4323,7 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
         {confirming ? (
           <>
             <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:10, lineHeight:1.45}}>
-              This is kept in Tools → Deleted payments and can be put back
+              This is kept in Settings → Archive → Payments and can be put back
               exactly as it is, so nothing is lost if you change your mind.
             </div>
             <div className="btn-row">
@@ -4483,7 +4495,7 @@ function StatementSheet({ student, lessons, payments, allocations, payState, sca
             fontSize:'0.76rem', fontWeight:600, color:'#fff', background:'var(--warn)',
             padding:'8px 11px', borderRadius:8, marginBottom:14, lineHeight:1.4
           }}>
-            Privacy mode is on, so this screen is masked. Turn it off in Tools
+            Privacy mode is on, so this screen is masked. Turn it off in Settings
             before screenshotting this for a parent. "Copy as text" is unaffected
             and always gives the real figures.
           </div>
@@ -4945,7 +4957,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
       id={'student-' + student.id}
       style={focused ? { borderColor: 'var(--accent)', boxShadow: 'var(--sh-3), var(--ring)' } : undefined}
     >
-      <div className="card-header" onClick={() => setOpen(!open)}>
+      <div className="card-header" data-wt="card" onClick={() => setOpen(!open)}>
         <div style={{minWidth:0}}>
           <div className="student-name">
             <span className={`dot ${balance > 0.005 ? 'warn' : nextLesson ? 'ok' : 'idle'}`} />
@@ -5257,21 +5269,59 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
 // A ring cut out of a dimmed page, glued to whatever the current step is
 // talking about. Describing a button in prose was not enough: two tutors read
 // the whole walkthrough and still could not find More tools.
-function Spotlight({ selector }) {
+/**
+ * Is this element actually on screen, as opposed to merely present?
+ *
+ * A collapsed student card keeps its buttons in the DOM and clips them with a
+ * zero-height, overflow-hidden wrapper. Those buttons still report a real width
+ * and height, still have an offsetParent, and even satisfy checkVisibility(),
+ * so the ring was being drawn over a card on a button nobody could see. The
+ * only reliable tell is whether an ancestor that clips has any overlap left.
+ */
+function isReallyVisible(el) {
+  if (!el || !el.offsetParent) return false;
+  const r = el.getBoundingClientRect();
+  if (!r.width || !r.height) return false;
+  for (let p = el.parentElement; p; p = p.parentElement) {
+    const cs = getComputedStyle(p);
+    if (cs.overflow === 'visible' && cs.overflowX === 'visible' && cs.overflowY === 'visible') continue;
+    const pr = p.getBoundingClientRect();
+    if (r.bottom <= pr.top + 0.5 || r.top >= pr.bottom - 0.5 ||
+        r.right <= pr.left + 0.5 || r.left >= pr.right - 0.5) return false;
+  }
+  return true;
+}
+
+/**
+ * First visible match, trying each selector in turn. Steps that point at a
+ * control living inside a student card name the card as a fallback, so before
+ * anything is opened the ring lands on the card they need to tap rather than
+ * on a button hidden inside it.
+ */
+function resolveAnchor(anchor) {
+  const list = Array.isArray(anchor) ? anchor : [anchor];
+  for (const sel of list) {
+    const found = [...document.querySelectorAll(sel)].find(isReallyVisible);
+    if (found) return found;
+  }
+  return null;
+}
+
+function Spotlight({ anchor }) {
   const [rect, setRect] = useState(null);
+  const key = Array.isArray(anchor) ? anchor.join('|') : String(anchor || '');
 
   // A layout effect, not a passive one: this measures the DOM, and passive
   // effects get deferred by React's scheduler, which left the ring stranded on
   // the previous step's button. Layout effects run synchronously after commit,
   // so the ring moves in the same frame the step does.
   React.useLayoutEffect(() => {
-    if (!selector) { setRect(null); return; }
+    if (!key) { setRect(null); return; }
 
     const measure = () => {
-      const el = document.querySelector(selector);
+      const el = resolveAnchor(anchor);
       if (!el) { setRect(null); return; }
       const r = el.getBoundingClientRect();
-      if (!r.width && !r.height) { setRect(null); return; }
       // Only an actual move re-renders, so re-measuring costs nothing while
       // the page sits still.
       setRect(prev => (
@@ -5281,22 +5331,24 @@ function Spotlight({ selector }) {
       ) ? prev : { top: r.top, left: r.left, width: r.width, height: r.height });
     };
 
-    const el = document.querySelector(selector);
+    const el = resolveAnchor(anchor);
     if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' });
     measure();
 
-    // Scroll and resize cover everything a user does. The staggered re-measures
-    // catch the smooth scroll landing and any sheet still animating, which a
-    // single measurement at mount would miss.
-    const timers = [60, 200, 450, 800, 1200].map(ms => setTimeout(measure, ms));
+    // Deliberately not requestAnimationFrame. A backgrounded tab stops being
+    // handed frames entirely, so an rAF loop runs once and then freezes with
+    // the ring stranded over whatever it highlighted first. The interval also
+    // means opening a card mid-step moves the ring onto the button that just
+    // appeared inside it.
+    const id = setInterval(measure, 400);
     window.addEventListener('scroll', measure, { passive: true, capture: true });
     window.addEventListener('resize', measure);
     return () => {
-      timers.forEach(clearTimeout);
+      clearInterval(id);
       window.removeEventListener('scroll', measure, { capture: true });
       window.removeEventListener('resize', measure);
     };
-  }, [selector]);
+  }, [key]);
 
   if (!rect) return null;
 
@@ -5345,20 +5397,24 @@ const WT_STEPS = [
   {
     key: 'details',
     title: 'Fill in the gaps',
-    body: "Tap Edit on a student to add the parent's mobile number. That one field turns on every WhatsApp button in the app. School year and exam board are worth doing too. Address and notes can wait, and honestly most people never fill them in.",
-    anchor: '[data-wt="edit"]',
+    body: "Tap a student to open them, then tap Edit.",
+    points: [
+      ['Important', "The parent's mobile number, which turns on every WhatsApp button in the app. School year and exam board, which drive the progress page their parent sees."],
+      ['Less important', 'Address and notes. Nothing depends on them, so add them only if you want them for yourself.'],
+    ],
+    anchor: ['[data-wt="edit"]', '[data-wt="card"]'],
   },
   {
     key: 'money',
     title: 'Getting paid',
     body: "More tools is where you log what someone has paid. Payments settle the oldest unpaid lesson first, so the figure on each card is always what that family still owes. Cash payments can fire off a WhatsApp receipt.",
-    anchor: '[data-wt="moretools"]',
+    anchor: ['[data-wt="moretools"]', '[data-wt="card"]'],
   },
   {
     key: 'links',
     title: 'Give parents their own page',
     body: "This copies a private page showing that child's upcoming lessons, what has been paid and what is outstanding. Send it once and the parent can check it whenever they like. No login, and they only ever see their own child.",
-    anchor: '[data-wt="parentlink"]',
+    anchor: ['[data-wt="parentlink"]', '[data-wt="card"]'],
   },
   {
     key: 'newstudent',
@@ -5370,7 +5426,7 @@ const WT_STEPS = [
   {
     key: 'done',
     title: "That's everything",
-    body: "You are set. Replay this any time from Tools, then Replay walkthrough. Keep booking lessons in Google Calendar and TutorTally keeps your records up to date.",
+    body: "You are set. Replay this any time from Settings, then Replay walkthrough. Keep booking lessons in Google Calendar and TutorTally keeps your records up to date.",
   },
 ];
 
@@ -5439,11 +5495,17 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
   useEffect(() => {
     if (s.key !== 'calendar' && s.key !== 'students') { setCalStatus(null); return; }
     let cancelled = false;
-    fetch(`${FN_BASE}/google-calendar-status`, {
+    const load = () => fetch(`${FN_BASE}/google-calendar-status`, {
       headers: { Authorization: `Bearer ${session?.access_token}` },
     }).then(r => r.json()).then(d => { if (!cancelled) setCalStatus(d); }).catch(() => {});
-    return () => { cancelled = true; };
-  }, [step]);
+    load();
+    // The calendar gets picked in a sheet this component knows nothing about,
+    // so fetching once left the banner insisting they still had to choose one
+    // long after they had. Re-checked while the step is open, and again the
+    // moment the sheet closes.
+    const id = setInterval(load, 4000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [step, sheetOpen]);
 
   async function persist(nextStep) {
     const data = { wt_step: nextStep };
@@ -5524,7 +5586,7 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
 
   return ReactDOM.createPortal(
     <>
-    {s.anchor && <Spotlight selector={s.anchor} />}
+    {s.anchor && <Spotlight anchor={s.anchor} />}
     <div ref={barRef} style={{
       position:'fixed', left:0, right:0, bottom:0, zIndex:150,
       background:'var(--card)', borderTop:'1px solid var(--line)',
@@ -5555,6 +5617,23 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
         <div style={{fontSize:'0.86rem', color:'var(--ink-dim)', lineHeight:1.5, marginBottom:12}}>
           {s.body}
         </div>
+
+        {s.points && (
+          <div style={{marginBottom:12}}>
+            {s.points.map(([label, text]) => (
+              <div key={label} style={{
+                display:'flex', gap:9, marginBottom:7,
+                fontSize:'0.82rem', lineHeight:1.45,
+              }}>
+                <span style={{
+                  fontWeight:700, color:'var(--ink)', flexShrink:0,
+                  minWidth:96, whiteSpace:'nowrap',
+                }}>{label}</span>
+                <span style={{color:'var(--ink-dim)'}}>{text}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {s.form && (
           <div style={{marginBottom:12}}>
@@ -5922,7 +6001,7 @@ function App() {
           background: googleStatus === 'connected' ? 'var(--accent)' : 'var(--warn)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
-          {googleStatus === 'connected' ? '📅 Google Calendar connected - pick a calendar in Tools to finish' : 'Google Calendar connection was cancelled or denied'}
+          {googleStatus === 'connected' ? '📅 Google Calendar connected - pick a calendar in Settings to finish' : 'Google Calendar connection was cancelled or denied'}
         </div>
       )}
       <div className="app-header">
@@ -6051,7 +6130,7 @@ function App() {
           they occupy the same space and the card offers its own way in. It
           comes straight back when they pause to look around. */}
       {(!walkthroughOpen || walkthroughPaused) && (
-        <button className="global-tools-btn" data-wt="tools" onClick={() => setShowGlobalTools(true)}>⚙ Tools</button>
+        <button className="global-tools-btn" data-wt="tools" onClick={() => setShowGlobalTools(true)}>⚙ Settings</button>
       )}
 
       {showGlobalTools && (
