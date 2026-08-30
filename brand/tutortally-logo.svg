@@ -10,13 +10,13 @@
     <rect x="0" y="0" width="136" height="136" rx="31" fill="#ffffff" filter="url(#soft-shadow)"/>
     <rect x="3" y="3" width="130" height="130" rx="28" fill="#f7f8f4"/>
     <rect x="8" y="8" width="120" height="120" rx="25" fill="none" stroke="#dfe7e3" stroke-width="1.5"/>
-    <path d="M31 82L105 60" fill="none" stroke="#0f766e" stroke-width="11" stroke-linecap="round"/>
+    <path d="M31 82L105 60" fill="none" stroke="#ffa500" stroke-width="11" stroke-linecap="round"/>
     <rect x="49" y="37" width="12" height="69" rx="2" fill="#0c1214"/>
     <rect x="75" y="37" width="12" height="69" rx="2" fill="#0c1214"/>
   </g>
   <g font-family="General Sans, Inter, Avenir Next, Segoe UI, Arial, sans-serif">
     <text x="184" y="102" fill="#15211f" font-size="72" font-weight="760" letter-spacing="-3.6">Tutor</text>
-    <text x="366" y="102" fill="#0f766e" font-size="72" font-weight="760" letter-spacing="-3.6">tally</text>
+    <text x="366" y="102" fill="#ffa500" font-size="72" font-weight="760" letter-spacing="-3.6">tally</text>
     <text x="188" y="139" fill="#596965" font-size="20" font-weight="560" letter-spacing="0.2">tutoring admin, finally totalled</text>
   </g>
 </svg>

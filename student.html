@@ -16,7 +16,7 @@
   :root {
     --bg: #f7f8f4; --card: #ffffff; --card-2: #f5f7f6; --line: #dfe7e3;
     --ink: #15211f; --ink-dim: #596965; --accent: #a15c00; --accent-fill: #ffa500; --on-accent: #15211f; --accent-light: #fff1d9;
-    --warn: #d05b39; --warn-light: #fff0e9; --muted: #87938f; --gold: #b7791f; --gold-light: #fff4d8;
+    --good: #0f7a35; --good-light: #e3f7e9; --warn: #c0362c; --warn-light: #fdecea; --muted: #87938f; --gold: #b7791f; --gold-light: #fff4d8;
     --r-sm: 9px; --r-md: 13px; --r-lg: 17px; --r-xl: 24px;
     --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
   }
@@ -24,7 +24,7 @@
     :root {
       --bg: #101716; --card: #182321; --card-2: #1e2a27; --line: #30413d;
       --ink: #eef8f5; --ink-dim: #a5b7b1; --accent: #ffa500; --accent-fill: #ffa500; --on-accent: #15211f; --accent-light: #3a2604;
-      --warn: #ff8a63; --warn-light: #351d15; --muted: #7f918c; --gold: #e6bd62; --gold-light: #302612;
+      --good: #4ade80; --good-light: #0f2e1a; --warn: #ff8a63; --warn-light: #351d15; --muted: #7f918c; --gold: #e6bd62; --gold-light: #302612;
       --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
     }
   }
@@ -62,7 +62,7 @@
   .pill {
     font-size: 0.72rem; font-weight: 650; padding: 4px 10px; border-radius: 100px; flex-shrink: 0;
   }
-  .pill.paid      { background: var(--accent-light); color: var(--accent); }
+  .pill.paid      { background: var(--good-light); color: var(--good); }
   .pill.partial   { background: var(--gold-light); color: var(--gold); }
   .pill.unpaid    { background: var(--warn-light); color: var(--warn); }
   .pill.scheduled { background: var(--card-2); color: var(--ink-dim); border: 1px solid var(--line); }
@@ -94,7 +94,7 @@
     display: inline-flex; align-items: center; gap: 5px; margin: 12px 0 2px;
     font-size: 0.78rem; font-weight: 600; padding: 5px 10px; border-radius: 100px;
   }
-  .trend.up   { background: var(--accent-light); color: var(--accent); }
+  .trend.up   { background: var(--good-light); color: var(--good); }
   .trend.down { background: var(--warn-light); color: var(--warn); }
   .trend.flat { background: var(--card-2); color: var(--ink-dim); }
   .trend small { font-weight: 500; opacity: .8; }
@@ -121,7 +121,7 @@
   /* ── Account balance ── */
   .acct { padding: 15px; display: flex; align-items: center; gap: 14px; }
   .acct-fig { font-size: 1.6rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1.1; }
-  .acct.settled .acct-fig, .acct.credit .acct-fig { color: var(--accent); }
+  .acct.settled .acct-fig, .acct.credit .acct-fig { color: var(--good); }
   .acct.owing  .acct-fig { color: var(--warn); }
   .acct-say { flex: 1; min-width: 0; }
   .acct-say b { display: block; font-size: 0.88rem; font-weight: 700; }
@@ -130,7 +130,7 @@
     flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center; font-size: 1.25rem;
   }
-  .acct.settled .acct-mark, .acct.credit .acct-mark { background: var(--accent-light); }
+  .acct.settled .acct-mark, .acct.credit .acct-mark { background: var(--good-light); }
   .acct.owing  .acct-mark { background: var(--warn-light); }
 
   /* ── Grade estimate ── */

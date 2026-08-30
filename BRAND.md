@@ -81,9 +81,30 @@ Palette:
 - Ink: `#15211f`
 - Paper: `#f7f8f4`
 - Soft mint: `#ecf4f1`
+### How colour is used
+
+Brand and status are separate jobs. Orange says "this is TutorTally" and marks
+the thing to tap. Green and red say whether something is good or bad. Neither
+ever stands in for the other, so a green tick means paid or connected and
+nothing else, and orange never implies approval.
+
+- Primary: brand orange, for actions and identity
+- Secondary: ink and paper, for everything structural
+- Good: green, for paid up, in credit, connected
+- Bad: red, for owing, overdue, disconnected
+- Waiting: gold, for part paid
+
+### Values
+
 - Brand orange: `#ffa500` (fills and blocks only)
 - Orange ink: `#a15c00` (orange text on light backgrounds; #ffa500 is 1.85:1 on paper and unreadable)
 - On orange: `#15211f` (never white, which is 1.97:1 on #ffa500)
+- Good: `#0f7a35` on light, `#4ade80` on dark
+- Bad: `#c0362c` on light, `#ff8a63` on dark (the old coral was 3.61:1 and failed)
+- Waiting: `#b7791f` on light, `#e6bd62` on dark
+
+Every pairing above clears 4.5:1 against the surface it sits on. Check any new
+one before using it rather than after.
 - Chase coral: `#d05b39`
 - Receipt gold: `#b7791f`
 

@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 700" role="img" aria-labelledby="title desc">
   <title id="title">TutorTally transparent mark</title>
   <desc id="desc">Two ink tally strokes crossed by a rising teal tally stroke.</desc>
-  <path d="M86 440L812 220" fill="none" stroke="#0f766e" stroke-width="94" stroke-linecap="round"/>
+  <path d="M86 440L812 220" fill="none" stroke="#ffa500" stroke-width="94" stroke-linecap="round"/>
   <rect x="292" y="48" width="100" height="604" rx="14" fill="#0c1214"/>
   <rect x="512" y="48" width="100" height="604" rx="14" fill="#0c1214"/>
 </svg>

@@ -37,8 +37,13 @@
     --on-accent: #15211f;
     --accent-2: #ffa500;
     --accent-light: #fff1d9;
-    --warn: #d05b39;
-    --warn-light: #fff0e9;
+    /* Status is not brand. Orange says "this is TutorTally"; green and red
+       say whether a thing is good or bad, and never stand in for each other. */
+    --good: #0f7a35;
+    --good-light: #e3f7e9;
+    /* The old coral was 3.61:1 on its own tint, under the 4.5 needed. */
+    --warn: #c0362c;
+    --warn-light: #fdecea;
     --muted: #87938f;
     --gold: #b7791f;
     --gold-light: #fff4d8;
@@ -69,6 +74,8 @@
       --on-accent: #15211f;
       --accent-2: #ffa500;
       --accent-light: #3a2604;
+      --good: #4ade80;
+      --good-light: #0f2e1a;
       --warn: #ff8a63;
       --warn-light: #351d15;
       --muted: #7f918c;
@@ -116,6 +123,10 @@
   }
   @supports not (backdrop-filter: blur(1px)) { .app-header { background: var(--card); } }
   .header-row { display: flex; justify-content: space-between; align-items: center; }
+  .header-left { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  /* Drawn rather than loaded so the tally strokes take the current ink and
+     flip with the theme; a flat asset is invisible on one of the two. */
+  .brand-mark { flex-shrink: 0; width: 34px; height: 26px; display: block; }
   .header-title {
     font-size: 1.32rem; font-weight: 700; color: var(--ink);
     letter-spacing: -0.028em; line-height: 1;
@@ -194,7 +205,7 @@
     font-size: 0.665rem; padding: 3px 9px; border-radius: 20px; font-weight: 650;
     letter-spacing: 0.015em; line-height: 1.45; white-space: nowrap;
   }
-  .pill.ok { background: var(--accent-light); color: var(--accent); }
+  .pill.ok { background: var(--good-light); color: var(--good); }
   .pill.warn { background: var(--warn-light); color: var(--warn); }
   .pill.neutral { background: var(--card-2); color: var(--ink-dim); border: 1px solid var(--line); }
   .pill.gold { background: var(--gold-light); color: var(--gold); }
@@ -2155,7 +2166,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
       }}>
         <span style={{
           width:9, height:9, borderRadius:5, flexShrink:0,
-          background: status === null ? 'var(--muted)' : status.connected ? 'var(--accent-fill)' : 'var(--warn)'
+          background: status === null ? 'var(--muted)' : status.connected ? 'var(--good)' : 'var(--warn)'
         }} />
         <span style={{flex:1}}>
           {status === null ? 'Checking…'
@@ -2360,7 +2371,7 @@ function MonzoPanel({ students, onDataChanged }) {
       }}>
         <span style={{
           width:9, height:9, borderRadius:5, flexShrink:0,
-          background: status === null ? 'var(--muted)' : connected ? 'var(--accent-fill)' : 'var(--warn)'
+          background: status === null ? 'var(--muted)' : connected ? 'var(--good)' : 'var(--warn)'
         }} />
         <span style={{flex:1}}>
           {status === null ? 'Checking…'
@@ -4988,10 +4999,18 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                 {isOverdue ? `Overdue ${M(balance, student.id + ':balance')}` : `Owes ${M(balance, student.id + ':balance')}`}
               </span>
             )}
-            {balance <= 0 && <span className="pill ok">Paid up</span>}
-            {creditInHand > 0.005 && (
-              <span className="pill ok">{M(creditInHand, student.id + ':credit')} credit</span>
+            {/* One line about money, not two. The old pair showed a credit
+                pill only when a payment happened to be sitting unallocated,
+                so Rose read "£5 credit" for having 80 paid against 75
+                allocated while Shimmy, equally paid ahead but allocated to
+                the penny, showed nothing at all. That difference is internal
+                bookkeeping and meant nothing to anyone reading the card.
+                Being ahead is a kind of being paid up, so it is the same
+                pill in the same green, carrying the amount. */}
+            {balance < -0.005 && (
+              <span className="pill ok">In credit {M(-balance, student.id + ':credit')}</span>
             )}
+            {balance >= -0.005 && balance <= 0.005 && <span className="pill ok">Paid up</span>}
             {nextLesson && (
               <span className="pill neutral">Next: {new Date(nextLesson.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
             )}
@@ -6015,7 +6034,7 @@ function App() {
         <div style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600, maxWidth:'92vw',
-          background: billingNotice === 'done' && !billingNeedsAttention ? 'var(--accent-fill)' : 'var(--warn)',
+          background: billingNotice === 'done' && !billingNeedsAttention ? 'var(--good)' : 'var(--warn)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {billingNotice === 'done'
@@ -6031,7 +6050,7 @@ function App() {
         <div style={{
           position:'fixed', top:12, left:'50%', transform:'translateX(-50%)', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600,
-          background: monzoStatus === 'connected' ? 'var(--accent-fill)' : 'var(--warn)',
+          background: monzoStatus === 'connected' ? 'var(--good)' : 'var(--warn)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {monzoStatus === 'connected' ? '🏦 Monzo connected successfully' : 'Monzo connection was cancelled or denied'}
@@ -6041,7 +6060,7 @@ function App() {
         <div style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600,
-          background: googleStatus === 'connected' ? 'var(--accent-fill)' : 'var(--warn)',
+          background: googleStatus === 'connected' ? 'var(--good)' : 'var(--warn)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {googleStatus === 'connected' ? '📅 Google Calendar connected - pick a calendar in Settings to finish' : 'Google Calendar connection was cancelled or denied'}
@@ -6049,13 +6068,21 @@ function App() {
       )}
       <div className="app-header">
         <div className="header-row">
-          <div>
+          <div className="header-left">
+            <svg className="brand-mark" viewBox="0 0 900 700" role="img" aria-label="TutorTally">
+              <path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)"
+                    strokeWidth="94" strokeLinecap="round" />
+              <rect x="292" y="48" width="100" height="604" rx="14" fill="var(--ink)" />
+              <rect x="512" y="48" width="100" height="604" rx="14" fill="var(--ink)" />
+            </svg>
+          <div style={{minWidth:0}}>
             <div className="header-title">
               {headerTitle}
             </div>
             <div className="header-sub">
               {activeStudents.length} active{archivedCount > 0 ? ` · ${archivedCount} archived` : ''}{syncLabel ? ` · ${syncLabel}` : ''}
             </div>
+          </div>
           </div>
           <div className="header-right">
             <button className="refresh-btn" onClick={() => loadAll(true)} disabled={refreshing}>
@@ -6155,7 +6182,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.0.1</div>}
+        {!loading && <div className="version-tag">v6.1</div>}
       </div>
 
       {showAddModal && (
