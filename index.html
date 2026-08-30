@@ -327,6 +327,14 @@
   .rev-month { font-size: 0.75rem; color: var(--muted); width: 62px; flex-shrink: 0; }
   .rev-row.now .rev-month { color: var(--ink); font-weight: 700; }
   .rev-row.now .rev-track { box-shadow: 0 0 0 1px var(--accent-fill); }
+  /* Booked is not earned, so it is not drawn as if it were. Stripes rather
+     than a lighter shade, so it survives being printed or read by someone who
+     cannot separate the two colours. */
+  .rev-fill.booked {
+    background: repeating-linear-gradient(135deg,
+      var(--accent-fill) 0 5px,
+      color-mix(in srgb, var(--accent-fill) 38%, transparent) 5px 10px);
+  }
   .rev-track { flex: 1; height: 22px; background: var(--card-2); border-radius: 6px; overflow: hidden; }
   .rev-fill {
     /* A span is inline, and width and height do not apply to inline elements,
@@ -2927,6 +2935,11 @@ function SetupChecklist({ session, students, onOpenTool, onAddStudent }) {
       .catch(() => setCalendarStatus({ ok: false }));
   }, [session?.access_token]);
 
+  // Nothing is known about the calendar until that request lands, and treating
+  // unknown as "not done" meant a finished checklist appeared for a moment and
+  // then vanished, for everyone who had already done all of it.
+  if (calendarStatus === null) return null;
+
   const items = [
     { key: 'name', done: hasName, text: 'Add your name', tool: 'yourname' },
     { key: 'phone', done: hasPhone, text: 'Add your phone number', tool: 'yourname' },
@@ -3065,14 +3078,19 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
   const M = useMoney();
   const [basis, setBasis] = React.useState('earned');
   const [months, setMonths] = React.useState(12);
+  // Half behind, half ahead, so the month you are in sits in the middle and
+  // what is already booked is as visible as what has been earned. Money that
+  // has actually arrived has no future, so that view stays a plain history.
+  const AHEAD = basis === 'earned' ? 6 : 0;
+  const BEHIND = basis === 'earned' ? 6 : months - 1;
 
   const scaleByStudent = {};
   students.forEach(s => { scaleByStudent[s.id] = moneyScaleFor(s.id, rateHistory); });
 
   const buckets = {};
   const now = new Date();
-  for (let i = months - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+  for (let i = -BEHIND; i <= AHEAD; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() + i, 1);
     // Built from local parts, not toISOString: midnight on the 1st in BST is
     // still the previous month in UTC, which silently merged July into June.
     buckets[`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`] = 0;
@@ -3087,8 +3105,10 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
   } else {
     // A free lesson earned nothing, and a cancelled one never happened. Both
     // would otherwise inflate a month that was quieter than it looks.
+    // Lessons still in the diary count too, which is the whole point of
+    // showing the months ahead: they are what is booked, not yet taught.
     (lessons || [])
-      .filter(l => l.status === 'completed' && !l.is_complimentary)
+      .filter(l => (l.status === 'completed' || l.status === 'scheduled') && !l.is_complimentary)
       .forEach(l => {
         const key = String(l.lesson_date || '').slice(0, 7);
         if (!(key in buckets)) return;
@@ -3105,6 +3125,9 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
     return {
       key, total,
       isNow: key === nowKey,
+      // Anything after this month is in the diary rather than in the bank, and
+      // is drawn differently so the two are never read as the same thing.
+      isFuture: key > nowKey,
       label: `${d.toLocaleDateString('en-GB', { month: 'short' })} ${String(d.getFullYear()).slice(2)}`,
     };
   });
@@ -3113,12 +3136,16 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
   const received = rows.reduce((s, r) => s + r.total, 0);
   const monthsWithMoney = rows.filter(r => r.total > 0).length;
   const average = monthsWithMoney > 0 ? received / monthsWithMoney : 0;
+  // Kept apart on purpose. Adding a booked month to an earned one gives a
+  // number that is neither, and reads as income that has not happened.
+  const earnedToDate = rows.filter(r => !r.isFuture).reduce((s, r) => s + r.total, 0);
+  const bookedAhead  = rows.filter(r => r.isFuture).reduce((s, r) => s + r.total, 0);
 
   // Compare the two most recent complete months, ignoring the current partial
   // one - otherwise every month looks like a collapse until it's over.
-  const prior = rows.slice(0, -1);
-  const lastFull = prior[prior.length - 1];
-  const prevFull = prior[prior.length - 2];
+  const past = rows.filter(r => !r.isFuture && !r.isNow);
+  const lastFull = past[past.length - 1];
+  const prevFull = past[past.length - 2];
   const change = lastFull && prevFull && prevFull.total > 0
     ? Math.round(((lastFull.total - prevFull.total) / prevFull.total) * 100)
     : null;
@@ -3138,7 +3165,7 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
 
       <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:14, lineHeight:1.45}}>
         {basis === 'earned'
-          ? 'What the lessons you taught each month were worth, free lessons aside. The current month is still filling up, so the change below compares the last two complete months.'
+          ? 'Six months behind and six ahead, with this month in the middle. Solid bars are lessons taught, striped ones are still in the diary. Free lessons aside, and the change below compares the last two complete months.'
           : 'Money that actually arrived each month, dated by when it was paid. This only goes back as far as you have been logging payments.'}
       </div>
 
@@ -3148,20 +3175,23 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
           fontSize:'0.84rem', lineHeight:1.5, background:'var(--card-2)',
           border:'1px solid var(--line)', borderRadius:'var(--r-md)'
         }}>
-          Nothing recorded in the last {months} months.
+          Nothing recorded in this window.
           {basis === 'received' && ' Try Earned, which is built from the lessons themselves.'}
         </div>
       ) : rows.map(r => (
         <div className={`rev-row${r.isNow ? ' now' : ''}`} key={r.key}>
           <span className="rev-month">{r.label}</span>
           <span className="rev-track">
-            <span className="rev-fill" style={{width: `${Math.max(2, (r.total / peak) * 100)}%`}} />
+            <span className={`rev-fill${r.isFuture ? ' booked' : ''}`}
+                  style={{width: `${Math.max(2, (r.total / peak) * 100)}%`}} />
           </span>
           <span className="rev-val" style={{color: r.total > 0 ? 'var(--ink)' : 'var(--muted)'}}>
             {r.total > 0 ? M(r.total) : '-'}
-            {r.isNow && (
+            {/* Only worth saying when there is something to say it about: an
+                empty month ahead read "- booked", which is not a fact. */}
+            {(r.isNow || (r.isFuture && r.total > 0)) && (
               <span style={{display:'block', fontSize:'0.62rem', color:'var(--muted)', fontWeight:500}}>
-                so far
+                {r.isNow ? 'so far' : 'booked'}
               </span>
             )}
           </span>
@@ -3173,15 +3203,19 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
         borderTop:'1px solid var(--line)', flexWrap:'wrap'
       }}>
         <div style={{flex:'1 1 90px'}}>
-          <div style={{fontSize:'1.15rem', fontWeight:750, letterSpacing:'-0.02em'}}>{M(received)}</div>
+          <div style={{fontSize:'1.15rem', fontWeight:750, letterSpacing:'-0.02em'}}>
+            {M(basis === 'earned' ? earnedToDate : received)}
+          </div>
           <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.07em', marginTop:2}}>
-            last {months} months
+            {basis === 'earned' ? 'earned, 6 months to date' : `last ${months} months`}
           </div>
         </div>
         <div style={{flex:'1 1 90px'}}>
-          <div style={{fontSize:'1.15rem', fontWeight:750, letterSpacing:'-0.02em'}}>{M(average)}</div>
+          <div style={{fontSize:'1.15rem', fontWeight:750, letterSpacing:'-0.02em'}}>
+            {M(basis === 'earned' ? bookedAhead : average)}
+          </div>
           <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.07em', marginTop:2}}>
-            monthly average
+            {basis === 'earned' ? 'booked, 6 months ahead' : 'monthly average'}
           </div>
         </div>
         {change !== null && (
@@ -3197,14 +3231,14 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
         )}
       </div>
 
-      <button
+      {basis === 'received' && <button
         onClick={() => setMonths(months === 12 ? 24 : 12)}
         style={{
           display:'block', width:'100%', marginTop:14, padding:'10px 0',
           background:'none', border:'none', color:'var(--muted)',
           fontFamily:'inherit', fontSize:'0.8rem', cursor:'pointer'
         }}
-      >{months === 12 ? 'Show two years' : 'Show one year'}</button>
+      >{months === 12 ? 'Show two years' : 'Show one year'}</button>}
     </div>
   );
 }
@@ -6247,7 +6281,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.3</div>}
+        {!loading && <div className="version-tag">v6.4</div>}
       </div>
 
       {showAddModal && (
