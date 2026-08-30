@@ -3516,11 +3516,15 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
                   subtitle={privacyOn ? 'Currently on' : 'Mask names and money while showing the app'}
                   onClick={() => setTool('privacy')}
                 />
-                <ToolsRow
-                  title="About & data sources"
-                  subtitle="What TutorTally stores and where it comes from"
-                  onClick={() => setTool('info')}
-                />
+                {/* An inventory of tables and where each field comes from.
+                    Useful to whoever maintains this, noise to a tutor. */}
+                {danielOnly && (
+                  <ToolsRow
+                    title="About & data sources"
+                    subtitle="What TutorTally stores and where it comes from"
+                    onClick={() => setTool('info')}
+                  />
+                )}
               </ToolsSection>
 
               <ToolsSection title="Account">
@@ -5805,21 +5809,32 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
           </div>
         )}
 
-        {calStatus && (
-          <div style={{
-            fontSize:'0.8rem', fontWeight:600, marginBottom:11, padding:'9px 12px',
-            borderRadius:'var(--r-md)',
-            background: calStatus.connected ? 'var(--accent-light)' : 'var(--card-2)',
-            color: calStatus.connected ? 'var(--accent)' : 'var(--muted)',
-            border:'1px solid var(--line)',
-          }}>
-            {calStatus.connected && calStatus.calendar_chosen
-              ? `✓ Connected to “${calStatus.calendar_summary}” - ${activeCount} student${activeCount === 1 ? '' : 's'} so far`
-              : calStatus.connected
-                ? 'Connected - now pick which calendar has your lessons'
-                : 'Not connected yet'}
-          </div>
-        )}
+        {calStatus && (() => {
+          // Fully connected is the only good state here. Half connected still
+          // needs something doing, so it stays neutral rather than claiming a
+          // green tick for a job that is not finished.
+          const good = calStatus.connected && calStatus.calendar_chosen;
+          return (
+            <div style={{
+              display:'inline-flex', alignItems:'center', gap:8,
+              fontSize:'0.8rem', fontWeight:600, marginBottom:11, padding:'8px 13px',
+              borderRadius:100,
+              background: good ? 'var(--good-light)' : 'var(--card-2)',
+              color: good ? 'var(--good)' : 'var(--muted)',
+              border: `1px solid ${good ? 'transparent' : 'var(--line)'}`,
+            }}>
+              <span style={{
+                width:8, height:8, borderRadius:'50%', flexShrink:0,
+                background: good ? 'var(--good)' : 'var(--muted)',
+              }} />
+              {good
+                ? `Connected to “${calStatus.calendar_summary}” · ${activeCount} student${activeCount === 1 ? '' : 's'} so far`
+                : calStatus.connected
+                  ? 'Connected. Now pick which calendar has your lessons'
+                  : 'Not connected yet'}
+            </div>
+          );
+        })()}
 
         {s.action && (
           <button className="btn save" style={{width:'100%', marginBottom:10}}
@@ -6281,7 +6296,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.4</div>}
+        {!loading && <div className="version-tag">v6.5</div>}
       </div>
 
       {showAddModal && (
