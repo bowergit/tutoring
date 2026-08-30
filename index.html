@@ -148,6 +148,23 @@
     transition: transform .18s var(--ease), filter .18s var(--ease);
   }
   .add-btn:active { transform: scale(.95); filter: brightness(1.08); }
+  /* On a phone this lives as a floating pill within thumb reach. On a desktop
+     there is no thumb and the bottom of the window is a long way from where
+     the eye is, so it joins the other controls in the header instead. Only
+     ever one of the two is on screen. */
+  .header-settings-btn { display: none; }
+  @media (min-width: 760px) {
+    .header-settings-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--card-2); border: 1px solid var(--line); color: var(--ink);
+      border-radius: var(--r-sm); padding: 0 13px; height: 34px;
+      font-size: 0.82rem; font-weight: 650; cursor: pointer; font-family: inherit;
+      transition: background .18s var(--ease), transform .18s var(--ease);
+    }
+    .header-settings-btn:active { transform: scale(.95); background: var(--card-3); }
+    @media (hover:hover) { .header-settings-btn:hover { background: var(--card-3); } }
+    .global-tools-btn { display: none; }
+  }
 
   /* ── Content ── */
   .content { padding: 14px 16px; }
@@ -2137,6 +2154,12 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
       : `Problem: ${mine?.problem || r.problem || 'unknown'}`);
     setUnmatched(mine?.unmatched_titles || []);
     refresh();
+    // A sync writes lessons, and everything on the dashboard is derived from
+    // those: who needs chasing, who has nothing booked, the upcoming lists.
+    // Without this the app kept showing pre-sync figures until the page was
+    // reloaded by hand, so someone whose lessons had just landed stayed in
+    // Needs attention for having nothing booked.
+    onDataChanged?.();
   }
 
   // Quick path for onboarding: turn a recurring calendar event nobody's
@@ -5336,7 +5359,13 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
  * only reliable tell is whether an ancestor that clips has any overlap left.
  */
 function isReallyVisible(el) {
-  if (!el || !el.offsetParent) return false;
+  if (!el) return false;
+  const cs = getComputedStyle(el);
+  if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+  // offsetParent is null for anything positioned fixed, which is how the
+  // floating Settings pill is drawn, so that test alone called a perfectly
+  // visible button hidden.
+  if (cs.position !== 'fixed' && !el.offsetParent) return false;
   const r = el.getBoundingClientRect();
   if (!r.width || !r.height) return false;
   for (let p = el.parentElement; p; p = p.parentElement) {
@@ -6120,6 +6149,10 @@ function App() {
             <button className="refresh-btn" onClick={() => loadAll(true)} disabled={refreshing}>
               <span style={{display:'inline-block', animation: refreshing ? 'spin 0.8s linear infinite' : 'none'}}>↻</span>
             </button>
+            {(!walkthroughOpen || walkthroughPaused) && (
+              <button className="header-settings-btn" data-wt="tools"
+                      onClick={() => setShowGlobalTools(true)}>⚙ Settings</button>
+            )}
             <button className="add-btn" onClick={() =>
               NEW_STUDENT_BLOCKED ? setLimitPrompt(true) : setShowAddModal(true)
             } data-wt="add">+ Add</button>
@@ -6214,7 +6247,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.2</div>}
+        {!loading && <div className="version-tag">v6.3</div>}
       </div>
 
       {showAddModal && (
