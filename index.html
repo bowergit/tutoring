@@ -307,10 +307,16 @@
 
   /* ── Revenue trend ── */
   .rev-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
-  .rev-month { font-size: 0.75rem; color: var(--muted); width: 54px; flex-shrink: 0; }
+  .rev-month { font-size: 0.75rem; color: var(--muted); width: 62px; flex-shrink: 0; }
+  .rev-row.now .rev-month { color: var(--ink); font-weight: 700; }
+  .rev-row.now .rev-track { box-shadow: 0 0 0 1px var(--accent-fill); }
   .rev-track { flex: 1; height: 22px; background: var(--card-2); border-radius: 6px; overflow: hidden; }
   .rev-fill {
-    height: 100%; border-radius: 6px;
+    /* A span is inline, and width and height do not apply to inline elements,
+       so every bar collapsed to nothing and all that showed was the empty
+       grey track behind it. */
+    display: block;
+    height: 100%; border-radius: 6px; min-width: 3px;
     background: linear-gradient(90deg, var(--accent-fill), var(--accent-2));
     transition: width .5s var(--ease);
   }
@@ -3067,10 +3073,18 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
       });
   }
 
-  const rows = Object.entries(buckets).map(([key, total]) => ({
-    key, total,
-    label: new Date(key + '-01T12:00:00').toLocaleDateString('en-GB', { month: 'short' }),
-  }));
+  // Twelve bare month names is ambiguous as soon as the window crosses a new
+  // year, and nothing marked which month is still being earned. Both on the
+  // row now.
+  const nowKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const rows = Object.entries(buckets).map(([key, total]) => {
+    const d = new Date(key + '-01T12:00:00');
+    return {
+      key, total,
+      isNow: key === nowKey,
+      label: `${d.toLocaleDateString('en-GB', { month: 'short' })} ${String(d.getFullYear()).slice(2)}`,
+    };
+  });
 
   const peak = Math.max(...rows.map(r => r.total), 1);
   const received = rows.reduce((s, r) => s + r.total, 0);
@@ -3115,13 +3129,18 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
           {basis === 'received' && ' Try Earned, which is built from the lessons themselves.'}
         </div>
       ) : rows.map(r => (
-        <div className="rev-row" key={r.key}>
+        <div className={`rev-row${r.isNow ? ' now' : ''}`} key={r.key}>
           <span className="rev-month">{r.label}</span>
           <span className="rev-track">
             <span className="rev-fill" style={{width: `${Math.max(2, (r.total / peak) * 100)}%`}} />
           </span>
           <span className="rev-val" style={{color: r.total > 0 ? 'var(--ink)' : 'var(--muted)'}}>
             {r.total > 0 ? M(r.total) : '-'}
+            {r.isNow && (
+              <span style={{display:'block', fontSize:'0.62rem', color:'var(--muted)', fontWeight:500}}>
+                so far
+              </span>
+            )}
           </span>
         </div>
       ))}
@@ -5873,15 +5892,28 @@ function App() {
     };
   }, [billingNotice]);
 
-  // -1 means finished or skipped. Anything else - including never having had
-  // the field at all, which is every account that predates this - means show
-  // it. Saving a step writes to user metadata and so bounces back through the
-  // auth listener above; the walkthrough keeps its own step in local state so
-  // that round trip can't reset it mid-flow.
+  // Decided once per sign-in and then left alone. This used to re-evaluate on
+  // anything that produced a new session object, so a token refresh or a save
+  // from inside Settings could hand back a session whose metadata had not
+  // caught up and re-open a walkthrough finished long ago. That is the setup
+  // panel appearing over Settings and then vanishing again.
+  const walkthroughDecidedFor = React.useRef(null);
   useEffect(() => {
-    if (!session) return;
-    setWalkthroughOpen(session.user?.user_metadata?.wt_step !== -1);
-  }, [session?.user?.id]);
+    const uid = session?.user?.id;
+    // Waits for the first load, so the student count below is real rather than
+    // an empty array that simply has not arrived yet.
+    if (!uid || loading) return;
+    if (walkthroughDecidedFor.current === uid) return;
+    walkthroughDecidedFor.current = uid;
+
+    // -1 means finished or skipped. Having students is the other way of
+    // knowing: whatever the flag says, someone with a register full of people
+    // clearly got through setup, and accounts predating the flag have no -1
+    // to find. Only a genuinely empty account gets walked through it.
+    const finished = session.user?.user_metadata?.wt_step === -1;
+    const alreadyRunning = students.some(x => x.active);
+    setWalkthroughOpen(!finished && !alreadyRunning);
+  }, [session?.user?.id, loading, students.length]);
 
   async function replayWalkthrough() {
     await supabase.auth.updateUser({ data: { wt_step: 0 } });
@@ -6182,7 +6214,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.1</div>}
+        {!loading && <div className="version-tag">v6.2</div>}
       </div>
 
       {showAddModal && (
