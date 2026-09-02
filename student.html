@@ -661,6 +661,15 @@
     return;
   }
 
+  // A pupil's own token on the parent address. It carries no payments or
+  // progress to show, so rather than half render a page full of holes, send
+  // them to the one built for them. No loop: that page is happy with either
+  // shape of payload.
+  if (data.view === 'student') {
+    window.location.replace('lessons.html' + window.location.search);
+    return;
+  }
+
   const tutor = data.tutor || {};
   const tutorName = tutor.name || 'your tutor';
   const firstName = data.name.trim().split(/\s+/)[0];

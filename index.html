@@ -827,6 +827,7 @@ function makeDemoData() {
       spreadsheet_url: null,
       referred_by_student_id: null,
       public_token: 'demo-' + firstName,
+      student_token: 'demo-pupil-' + firstName,
       active: true,
       last_paper_date: null,
       last_paper_score: null,
@@ -4708,15 +4709,27 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
   const [cls, close] = useAnimatedClose(onClose);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [pupilCopied, setPupilCopied] = useState(false);
   // Built from wherever the app is actually being served, so moving domain
   // needs no code change and links always point at the site the tutor is
   // looking at rather than a hardcoded one.
   const studentLink = new URL(`student.html?t=${student.public_token}`, window.location.href).toString();
+  // A different token, not a different path on the same one. The pupil's link
+  // has to be safe to hand to the pupil, and a shared token would let anyone
+  // holding it edit the URL and read the balance.
+  const pupilLink = new URL(`lessons.html?t=${student.student_token}`, window.location.href).toString();
 
   function copyStudentLink() {
     navigator.clipboard.writeText(studentLink).then(() => {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
+    });
+  }
+
+  function copyPupilLink() {
+    navigator.clipboard.writeText(pupilLink).then(() => {
+      setPupilCopied(true);
+      setTimeout(() => setPupilCopied(false), 2000);
     });
   }
 
@@ -4742,7 +4755,7 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
             <div className="tools-split-row">
               <ToolsRow
                 title={linkCopied ? 'Copied' : 'Copy link'}
-                subtitle="Private page for this student"
+                subtitle="Lessons, payments and progress"
                 onClick={copyStudentLink}
                 end={linkCopied ? '✓' : null}
               />
@@ -4750,6 +4763,23 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
                 title="Open"
                 subtitle="Preview the parent page"
                 onClick={() => window.open(studentLink, '_blank', 'noopener')}
+                end="↗"
+              />
+            </div>
+          </ToolsSection>
+
+          <ToolsSection title="Student page">
+            <div className="tools-split-row">
+              <ToolsRow
+                title={pupilCopied ? 'Copied' : 'Copy link'}
+                subtitle="Upcoming lessons only, no money"
+                onClick={copyPupilLink}
+                end={pupilCopied ? '✓' : null}
+              />
+              <ToolsRow
+                title="Open"
+                subtitle="Preview what they see"
+                onClick={() => window.open(pupilLink, '_blank', 'noopener')}
                 end="↗"
               />
             </div>
@@ -5055,7 +5085,9 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
   const bundleWaLink = null;
   const cardParentLink = new URL(`student.html?t=${student.public_token}`, window.location.href).toString();
+  const cardPupilLink = new URL(`lessons.html?t=${student.student_token}`, window.location.href).toString();
   const [parentLinkCopied, setParentLinkCopied] = useState(false);
+  const [cardPupilCopied, setCardPupilCopied] = useState(false);
   // Which "you haven't filled this in yet" explainer is open, if any.
   const [setupHint, setSetupHint] = useState(null);
 
@@ -5267,6 +5299,20 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                 });
               }}
             >{parentLinkCopied ? '✓' : '🔗'}</button>
+            {/* The pupil's own link. Same one tap, different audience: this one
+                is safe to give the child, since it carries no money at all. */}
+            <button
+              className="btn"
+              title="Copy the student's link, upcoming lessons only"
+              style={{background:'var(--card-2)', color:'var(--ink)', border:'1px solid var(--line)',
+                      flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}
+              onClick={() => {
+                navigator.clipboard.writeText(cardPupilLink).then(() => {
+                  setCardPupilCopied(true);
+                  setTimeout(() => setCardPupilCopied(false), 1800);
+                });
+              }}
+            >{cardPupilCopied ? '✓' : '🎓'}</button>
             {student.spreadsheet_url && (
               <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener" style={{background:'#1a7f4b', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}>📈</a>
             )}
@@ -6296,7 +6342,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.5</div>}
+        {!loading && <div className="version-tag">v6.6</div>}
       </div>
 
       {showAddModal && (
