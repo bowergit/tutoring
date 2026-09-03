@@ -214,6 +214,10 @@
   }
   function pillHTML(l, scheduled) {
     if (scheduled) return '<span class="pill scheduled">Scheduled</span>';
+    // A pupil is told the lesson happened, not whether it was paid for.
+    if (window.__pupilView) {
+      return `<span class="pill scheduled">${l.status === 'missed' ? 'Missed' : 'Done'}</span>`;
+    }
     const label = l.pay_status === 'paid' ? 'Paid' : l.pay_status === 'partial' ? 'Partly paid' : 'Not yet paid';
     return `<span class="pill ${l.pay_status}">${label}</span>`;
   }
@@ -227,13 +231,16 @@
     if (!lessons.length) return '<div class="empty">Nothing here.</div>';
     return '<div class="card">' + lessons.map((l, i) => {
       const key = prefix + i;
+      // Nothing to expand on a pupil's row: the detail is only ever which
+      // payment covered it.
+      const expandable = !window.__pupilView;
       return `
         <div class="lesson">
-          <div class="row" data-detail="${key}">
+          <div class="row"${expandable ? ` data-detail="${key}"` : ' style="cursor:default"'}>
             <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}</span>
             ${pillHTML(l, scheduled)}
           </div>
-          <div class="detail" id="detail-${key}" hidden>${esc(detailText(l))}</div>
+          ${expandable ? `<div class="detail" id="detail-${key}" hidden>${esc(detailText(l))}</div>` : ''}
         </div>
       `;
     }).join('') + '</div>';
@@ -661,14 +668,13 @@
     return;
   }
 
-  // A pupil's own token on the parent address. It carries no payments or
-  // progress to show, so rather than half render a page full of holes, send
-  // them to the one built for them. No loop: that page is happy with either
-  // shape of payload.
-  if (data.view === 'student') {
-    window.location.replace('lessons.html' + window.location.search);
-    return;
-  }
+  // The pupil's link renders this same page with the money left out, rather
+  // than a second copy of the chart and the boundary table quietly drifting
+  // away from this one. The server has already withheld the balance and the
+  // payment states, so this only decides what to draw, never what is safe to
+  // show.
+  const pupilView = data.view === 'student';
+  window.__pupilView = pupilView;
 
   const tutor = data.tutor || {};
   const tutorName = tutor.name || 'your tutor';
@@ -689,15 +695,17 @@
   portalData = data;
   app.innerHTML = `
     <h1>${esc(data.name)}</h1>
-    <div class="sub">Progress, lessons and payment status</div>
-    ${renderAccount(data.account)}
+    <div class="sub">${pupilView
+      ? (data.progress ? 'Your lessons and how your papers are going' : 'Your lessons')
+      : 'Progress, lessons and payment status'}</div>
+    ${pupilView ? '' : renderAccount(data.account)}
     ${renderProgress(data.progress)}
     ${renderGrade(data.grade)}
-    ${actions ? `<div class="actions" style="margin-top:18px">${actions}</div>` : ''}
+    ${pupilView || !actions ? '' : `<div class="actions" style="margin-top:18px">${actions}</div>`}
     <div class="section-label">Upcoming</div>
     <div id="upcoming-section"></div>
-    <div class="section-label">Recent</div>
-    ${renderList(data.recent, 'rec-', false)}
+    <div class="section-label">${pupilView ? 'Lessons so far' : 'Recent'}</div>
+    ${renderList(data.recent || [], 'rec-', false)}
   `;
   renderUpcoming();
   wireChart(data.progress);
