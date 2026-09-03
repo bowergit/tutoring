@@ -1508,9 +1508,35 @@ function daysBetween(dateStr) {
   return Math.floor((now - d) / (1000 * 60 * 60 * 24));
 }
 
+// Which school year a date falls in, named by the September it began. The
+// 2026/27 year starts on 1 September 2026, so anything before that in 2026
+// still belongs to 2025.
+function schoolYearStarting(d) {
+  return d.getMonth() >= 8 ? d.getFullYear() : d.getFullYear() - 1;
+}
+
+/**
+ * The year a student is in TODAY, worked out from the year that was recorded
+ * and the date it was recorded on.
+ *
+ * This used to return the stored number untouched while still accepting the
+ * date, so nothing ever moved: the app promised in August that a student would
+ * be a year older in September and then quietly never did it. The number now
+ * moves on its own, once, at each 1 September.
+ */
 function currentSchoolYear(baseYear, asOfDate) {
-  if (baseYear == null) return null;
-  return baseYear;
+  const base = parseInt(baseYear, 10);
+  if (!Number.isFinite(base)) return null;
+  if (!asOfDate) return base;
+
+  const then = new Date(asOfDate + 'T12:00:00');
+  if (isNaN(then)) return base;
+  const crossed = schoolYearStarting(new Date()) - schoolYearStarting(then);
+  if (crossed <= 0) return base;
+
+  const rolled = base + crossed;
+  // Past Year 13 there is no school year left to show.
+  return rolled > 13 ? null : rolled;
 }
 
 const DANIEL_ACCOUNT_EMAILS = new Set([
@@ -1522,13 +1548,37 @@ function isDanielAccount(session) {
   return DANIEL_ACCOUNT_EMAILS.has((session?.user?.email || '').toLowerCase());
 }
 
+/**
+ * Says out loud what the number means and when it will change. August and
+ * September are the weeks when "what year are they in" has two defensible
+ * answers, so the wording is at its most explicit then rather than absent.
+ */
 function septemberSchoolYearLabel(value) {
-  const today = new Date();
-  if (today.getMonth() !== 7) return null;
   const year = parseInt(value, 10);
   if (!Number.isFinite(year) || year < 7 || year > 13) return null;
-  if (year >= 13) return 'From September: finished Year 13.';
-  return `From September: Year ${year + 1}.`;
+
+  const today = new Date();
+  const month = today.getMonth();
+  const nextSept = month >= 8 ? today.getFullYear() + 1 : today.getFullYear();
+
+  // Term has not started yet, and the summer is exactly when people disagree
+  // about which year a child is in.
+  if (month === 6 || month === 7) {
+    return year >= 13
+      ? `Year ${year} for the year just finished. They leave school this September, so no year will be shown after that.`
+      : `Year ${year} for the year just finished. On 1 September they become Year ${year + 1} here, on their own.`;
+  }
+
+  // The first weeks of the new year, when the change has just happened.
+  if (month === 8 || month === 9) {
+    return year >= 13
+      ? `Year ${year} for this school year. It moved up on 1 September, and they leave school next summer, so no year is shown after that.`
+      : `Year ${year} for this school year. It moved up on 1 September and moves again on 1 September ${nextSept}.`;
+  }
+
+  return year >= 13
+    ? `Year ${year}. They leave school in the summer, so no year will be shown after 1 September ${nextSept}.`
+    : `Year ${year} now, becoming Year ${year + 1} on 1 September ${nextSept}.`;
 }
 
 function studentLessonLocation(student) {
@@ -3777,7 +3827,10 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
     parent_phone: student?.parent_phone || '',
     address: student?.address || '',
     school: student?.school || '',
-    school_year: student?.school_year || '',
+    // The rolled value, not the stored one. Editing a student whose year had
+    // moved up since it was last set would otherwise show the old number in
+    // the box while the card showed the new one.
+    school_year: currentSchoolYear(student?.school_year, student?.school_year_as_of_date) || '',
     exam_board_preset: initPreset,
     exam_board_custom: initPreset === 'other' ? existingBoard : '',
     exam_tier: student?.exam_tier || '',
@@ -4003,11 +4056,16 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
           })()}
         </div>
         <div className="field">
-          <label>School year (7-13, as of today)</label>
+          <label>School year they are in right now</label>
           <input type="number" min="7" max="13" value={form.school_year} onChange={e => setForm({...form, school_year: e.target.value})} />
           {septemberLabel && (
             <div style={{fontSize:'0.76rem', color:'var(--gold)', marginTop:5, lineHeight:1.45}}>
               {septemberLabel}
+            </div>
+          )}
+          {!septemberLabel && (
+            <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:5, lineHeight:1.45}}>
+              Moves up by one on 1 September without being asked.
             </div>
           )}
         </div>
@@ -6342,7 +6400,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.7</div>}
+        {!loading && <div className="version-tag">v6.8</div>}
       </div>
 
       {showAddModal && (
