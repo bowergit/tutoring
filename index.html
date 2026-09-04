@@ -2143,6 +2143,10 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [unmatched, setUnmatched] = useState([]);
+  // A subscribed calendar link, for tutors with no Google account.
+  const [feed, setFeed] = useState(null);
+  const [feedUrl, setFeedUrl] = useState('');
+  const [showFeed, setShowFeed] = useState(false);
   const [confirmingTitles, setConfirmingTitles] = useState({});
   const [editingTitles, setEditingTitles] = useState({});
   const [editedNames, setEditedNames] = useState({});
@@ -2155,7 +2159,42 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
     }).then(r => r.json());
   }
 
-  useEffect(() => { refresh(); }, []);
+  useEffect(() => { refresh(); loadFeed(); }, []);
+
+  async function loadFeed() {
+    const { data } = await supabase.from('tutoring_calendar_feeds').select('*').maybeSingle();
+    setFeed(data || null);
+    if (data?.url) setFeedUrl(data.url);
+  }
+
+  async function saveFeed() {
+    const url = feedUrl.trim();
+    if (!url) return;
+    setBusy(true); setMsg(null);
+    const ownerId = (await supabase.auth.getUser()).data.user?.id;
+    const { error } = await supabase.from('tutoring_calendar_feeds')
+      .upsert({ owner_id: ownerId, url, label: 'Calendar link' }, { onConflict: 'owner_id' });
+    if (error) { setBusy(false); setMsg('Could not save that link: ' + error.message); return; }
+    await loadFeed();
+    // Pulling the lessons in straight away is the whole point: pasting the
+    // link IS the request, and being told to press something else afterwards
+    // leaves the app looking empty at the moment it should be proving itself.
+    const r = await authedFetch('google-calendar-sync').catch(e => ({ ok: false, problem: String(e) }));
+    const mine = (r.results || []).find(x => x.source === 'feed') || r.results?.[0];
+    setMsg(r.ok && mine?.ok
+      ? `Synced ${mine.synced} lesson${mine.synced === 1 ? '' : 's'}, matched against ${mine.students_matched} student${mine.students_matched === 1 ? '' : 's'}.`
+      : `Saved, but that calendar could not be read: ${mine?.problem || r.problem || 'unknown'}`);
+    setUnmatched(mine?.unmatched_titles || []);
+    setBusy(false);
+    loadFeed();
+    onDataChanged?.();
+  }
+
+  async function removeFeed() {
+    setBusy(true);
+    await supabase.from('tutoring_calendar_feeds').delete().eq('owner_id', feed?.owner_id);
+    setFeed(null); setFeedUrl(''); setBusy(false); setMsg(null);
+  }
 
   async function refresh() {
     setStatus(null);
@@ -2274,7 +2313,87 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
             Nothing is shared with anyone else - this connects only your own account.
           </div>
           <GoogleUnverifiedNote />
+
+          <div style={{marginTop:18, paddingTop:16, borderTop:'1px solid var(--line)'}}>
+            <div style={{fontSize:'0.86rem', fontWeight:650, marginBottom:6}}>
+              Not on Google Calendar?
+            </div>
+            <div style={{fontSize:'0.78rem', color:'var(--muted)', lineHeight:1.5, marginBottom:10}}>
+              If your lessons live in the Calendar app on an iPhone, iPad or Mac,
+              or in Outlook, share a link to that calendar instead. It works the
+              same way afterwards, and TutorTally can only ever read it.
+            </div>
+            <button
+              onClick={() => setShowFeed(true)}
+              style={{
+                width:'100%', padding:'12px 14px', borderRadius:'var(--r-md)',
+                border:'1px solid var(--line)', background:'var(--card-2)',
+                color:'var(--ink)', fontFamily:'inherit', fontSize:'0.86rem',
+                fontWeight:650, cursor:'pointer',
+              }}
+            >Use an Apple or Outlook calendar</button>
+          </div>
         </>
+      )}
+
+      {(showFeed || feed) && !status?.connected && (
+        <div style={{marginTop:16}}>
+          <div className="section-label">Your calendar link</div>
+
+          {feed ? (
+            <div style={{
+              fontSize:'0.8rem', padding:'10px 12px', borderRadius:'var(--r-md)',
+              background:'var(--good-light)', color:'var(--good)', marginBottom:10,
+              display:'flex', alignItems:'center', gap:8, fontWeight:600,
+            }}>
+              <span style={{width:8, height:8, borderRadius:'50%', background:'var(--good)', flexShrink:0}} />
+              Connected{feed.last_synced_at
+                ? ` \u00b7 last checked ${new Date(feed.last_synced_at).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}`
+                : ''}
+            </div>
+          ) : (
+            <ol style={{
+              fontSize:'0.8rem', color:'var(--ink-dim)', lineHeight:1.6,
+              paddingLeft:20, margin:'0 0 12px',
+            }}>
+              <li>On your iPhone, open the <b>Calendar</b> app and tap <b>Calendars</b> at the bottom.</li>
+              <li>Tap the <b>i</b> in a circle next to the calendar your lessons are in.</li>
+              <li>Turn on <b>Public Calendar</b>.</li>
+              <li>Tap <b>Share Link</b>, then <b>Copy</b>.</li>
+              <li>Paste it in the box below.</li>
+            </ol>
+          )}
+
+          <input
+            type="url"
+            value={feedUrl}
+            onChange={e => setFeedUrl(e.target.value)}
+            placeholder="webcal://p01-calendars.icloud.com/published/..."
+            style={{width:'100%', marginBottom:8}}
+          />
+          <div style={{display:'flex', gap:8}}>
+            <button className="btn save" style={{flex:1}} disabled={busy || !feedUrl.trim()} onClick={saveFeed}>
+              {busy ? 'Checking...' : feed ? 'Update and sync' : 'Connect and sync'}
+            </button>
+            {feed && (
+              <button className="btn cancel" style={{flex:'0 0 auto'}} disabled={busy} onClick={removeFeed}>
+                Remove
+              </button>
+            )}
+          </div>
+
+          {feed?.last_sync_error && (
+            <div style={{fontSize:'0.78rem', color:'var(--warn)', marginTop:10, lineHeight:1.45}}>
+              {feed.last_sync_error}
+            </div>
+          )}
+
+          <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:12, lineHeight:1.5}}>
+            A shared calendar link can be read by anyone who has it, so share a
+            calendar holding only your lessons rather than your whole diary.
+            TutorTally checks it every couple of hours and can never change it.
+          </div>
+        </div>
       )}
 
       {status?.connected && !status.calendar_chosen && (
@@ -6400,7 +6519,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.8</div>}
+        {!loading && <div className="version-tag">v6.9</div>}
       </div>
 
       {showAddModal && (
