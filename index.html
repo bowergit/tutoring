@@ -2392,6 +2392,8 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
             A shared calendar link can be read by anyone who has it, so share a
             calendar holding only your lessons rather than your whole diary.
             TutorTally checks it every couple of hours and can never change it.
+            One diary at a time: if you also connect Google Calendar, that takes
+            over and this link is left alone.
           </div>
         </div>
       )}
@@ -6519,7 +6521,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.9</div>}
+        {!loading && <div className="version-tag">v6.9.1</div>}
       </div>
 
       {showAddModal && (
