@@ -2093,7 +2093,19 @@ function PerspectiveCalculator({ addNetW }) {
   );
 }
 
-// ---------- Google Calendar ----------
+// ---------- Calendar ----------
+
+// Asked first, so a tutor only ever reads the instructions for the calendar
+// they actually own.
+const CALENDAR_PROVIDERS = [
+  { key: 'google', icon: '📅', label: 'Google Calendar',
+    hint: 'A Google or Gmail account' },
+  { key: 'apple', icon: '', label: 'Apple Calendar',
+    hint: 'The Calendar app on an iPhone, iPad or Mac' },
+  { key: 'other', icon: '🗓️', label: 'Outlook or something else',
+    hint: 'Any calendar that can share a link' },
+];
+
 // Self-serve, per-account: unlike the old Apps Script (Daniel's own Google
 // login, manually edited to add each new tutor), any signed-in user connects
 // their own calendar here with no one else's involvement. All calls carry
@@ -2146,7 +2158,11 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
   // A subscribed calendar link, for tutors with no Google account.
   const [feed, setFeed] = useState(null);
   const [feedUrl, setFeedUrl] = useState('');
-  const [showFeed, setShowFeed] = useState(false);
+  // Which calendar this tutor says they use. Asked before anything else is
+  // shown, because the Google instructions, the Apple instructions and the
+  // Outlook instructions are each irrelevant to most of the people reading
+  // them, and a page of irrelevant setup reads as difficulty.
+  const [provider, setProvider] = useState(null);
   const [confirmingTitles, setConfirmingTitles] = useState({});
   const [editingTitles, setEditingTitles] = useState({});
   const [editedNames, setEditedNames] = useState({});
@@ -2191,9 +2207,38 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
   }
 
   async function removeFeed() {
+    // Lessons that came from a link have no other source. Leaving them behind
+    // strands them: nothing will ever update or remove them again, and a
+    // Google connection made later deliberately ignores anything with an ics:
+    // key, so they would sit in the diary for good. Money already taken is the
+    // exception - a paid lesson is a record of something that really happened
+    // and is kept whatever the calendar now says.
+    const { data: mine } = await supabase.from('tutoring_lessons')
+      .select('id, bundle_id')
+      .like('google_event_id', 'ics:%');
+    const ids = (mine || []).map(l => l.id);
+    let removable = [];
+    if (ids.length) {
+      const { data: allocs } = await supabase.from('tutoring_payment_allocations')
+        .select('lesson_id').in('lesson_id', ids);
+      const paid = new Set((allocs || []).map(a => a.lesson_id));
+      removable = (mine || []).filter(l => !l.bundle_id && !paid.has(l.id)).map(l => l.id);
+    }
+    const kept = ids.length - removable.length;
+    const ok = window.confirm(
+      'Remove this calendar link?\n\n'
+      + `${removable.length} lesson${removable.length === 1 ? '' : 's'} that came from it will be removed.`
+      + (kept ? ` ${kept} with payments against ${kept === 1 ? 'it' : 'them'} will be kept.` : '')
+    );
+    if (!ok) return;
+
     setBusy(true);
+    for (let i = 0; i < removable.length; i += 50) {
+      await supabase.from('tutoring_lessons').delete().in('id', removable.slice(i, i + 50));
+    }
     await supabase.from('tutoring_calendar_feeds').delete().eq('owner_id', feed?.owner_id);
-    setFeed(null); setFeedUrl(''); setBusy(false); setMsg(null);
+    setFeed(null); setFeedUrl(''); setProvider(null); setBusy(false); setMsg(null);
+    onDataChanged?.();
   }
 
   async function refresh() {
@@ -2289,6 +2334,16 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
     refresh();
   }
 
+  const changeProviderLink = (
+    <button
+      onClick={() => { setProvider(null); setMsg(null); }}
+      style={{
+        background:'none', border:'none', padding:'0 0 10px', margin:0,
+        color:'var(--muted)', fontFamily:'inherit', fontSize:'0.78rem', cursor:'pointer',
+      }}
+    >← A different calendar</button>
+  );
+
   // Whichever calendar is actually feeding this tutor, or null while nothing
   // is. Google wins if both exist, matching what the sync itself does.
   const liveSource = (status?.connected && status.calendar_chosen) ? status
@@ -2314,8 +2369,37 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
         </span>
       </div>
 
-      {!status?.connected && (
+      {!status?.connected && !feed && !provider && status !== null && (
         <>
+          <div className="section-label">Which calendar do you use?</div>
+          {CALENDAR_PROVIDERS.map(c => (
+            <button
+              key={c.key}
+              onClick={() => setProvider(c.key)}
+              style={{
+                display:'flex', alignItems:'center', gap:11, width:'100%', textAlign:'left',
+                padding:'13px 14px', marginBottom:7, borderRadius:'var(--r-md)',
+                border:'1px solid var(--line)', background:'var(--card-2)',
+                color:'var(--ink)', fontFamily:'inherit', cursor:'pointer',
+              }}
+            >
+              <span style={{fontSize:'1.15rem', flexShrink:0}}>{c.icon}</span>
+              <span style={{flex:1}}>
+                <span style={{display:'block', fontSize:'0.9rem', fontWeight:650}}>{c.label}</span>
+                <span style={{display:'block', fontSize:'0.76rem', color:'var(--muted)', marginTop:2}}>{c.hint}</span>
+              </span>
+            </button>
+          ))}
+          <div style={{fontSize:'0.78rem', color:'var(--muted)', marginTop:10, lineHeight:1.5}}>
+            TutorTally only ever reads your calendar. It can never add, change
+            or delete anything in it.
+          </div>
+        </>
+      )}
+
+      {!status?.connected && provider === 'google' && (
+        <>
+          {changeProviderLink}
           <button className="btn save" style={{width:'100%'}} onClick={connect} disabled={busy || status === null}>
             {busy ? 'Opening Google…' : '📅 Connect Google Calendar'}
           </button>
@@ -2324,32 +2408,17 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
             Nothing is shared with anyone else - this connects only your own account.
           </div>
           <GoogleUnverifiedNote />
-
-          <div style={{marginTop:18, paddingTop:16, borderTop:'1px solid var(--line)'}}>
-            <div style={{fontSize:'0.86rem', fontWeight:650, marginBottom:6}}>
-              Not on Google Calendar?
-            </div>
-            <div style={{fontSize:'0.78rem', color:'var(--muted)', lineHeight:1.5, marginBottom:10}}>
-              If your lessons live in the Calendar app on an iPhone, iPad or Mac,
-              or in Outlook, share a link to that calendar instead. It works the
-              same way afterwards, and TutorTally can only ever read it.
-            </div>
-            <button
-              onClick={() => setShowFeed(true)}
-              style={{
-                width:'100%', padding:'12px 14px', borderRadius:'var(--r-md)',
-                border:'1px solid var(--line)', background:'var(--card-2)',
-                color:'var(--ink)', fontFamily:'inherit', fontSize:'0.86rem',
-                fontWeight:650, cursor:'pointer',
-              }}
-            >Use an Apple or Outlook calendar</button>
-          </div>
         </>
       )}
 
-      {(showFeed || feed) && !status?.connected && (
-        <div style={{marginTop:16}}>
-          <div className="section-label">Your calendar link</div>
+      {!status?.connected && (feed || provider === 'apple' || provider === 'other') && (
+        <div>
+          {!feed && changeProviderLink}
+          <div className="section-label">
+            {feed ? 'Your calendar link'
+              : provider === 'apple' ? 'Share your Apple calendar'
+              : 'Share your calendar'}
+          </div>
 
           {feed ? (
             <div style={{
@@ -2362,7 +2431,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
                 ? ` \u00b7 last checked ${new Date(feed.last_synced_at).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}`
                 : ''}
             </div>
-          ) : (
+          ) : provider === 'apple' ? (
             <ol style={{
               fontSize:'0.8rem', color:'var(--ink-dim)', lineHeight:1.6,
               paddingLeft:20, margin:'0 0 12px',
@@ -2373,13 +2442,26 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
               <li>Tap <b>Share Link</b>, then <b>Copy</b>.</li>
               <li>Paste it in the box below.</li>
             </ol>
+          ) : (
+            <ol style={{
+              fontSize:'0.8rem', color:'var(--ink-dim)', lineHeight:1.6,
+              paddingLeft:20, margin:'0 0 12px',
+            }}>
+              <li>In <b>Outlook</b> on the web, open <b>Settings → Calendar → Shared calendars</b>.</li>
+              <li>Under <b>Publish a calendar</b>, pick the calendar your lessons are in.</li>
+              <li>Choose <b>Can view all details</b>, then <b>Publish</b>.</li>
+              <li>Copy the <b>ICS</b> link, not the HTML one.</li>
+              <li>Paste it in the box below.</li>
+            </ol>
           )}
 
           <input
             type="url"
             value={feedUrl}
             onChange={e => setFeedUrl(e.target.value)}
-            placeholder="webcal://p01-calendars.icloud.com/published/..."
+            placeholder={provider === 'other'
+              ? 'https://outlook.office365.com/owa/calendar/.../calendar.ics'
+              : 'webcal://p01-calendars.icloud.com/published/...'}
             style={{width:'100%', marginBottom:8}}
           />
           <div style={{display:'flex', gap:8}}>
@@ -3108,16 +3190,26 @@ function SetupChecklist({ session, students, onOpenTool, onAddStudent }) {
   const hasName = !!String(meta.display_name || '').trim();
   const hasPhone = !!normaliseUKPhone(meta.contact_phone || '');
   const hasStudent = students.some(s => s.active);
-  const calendarDone = calendarStatus?.connected && calendarStatus?.calendar_chosen;
+  // A tutor on an Apple or Outlook link has a perfectly good calendar
+  // connection. Checking only the Google row told them to go and connect the
+  // calendar they had already connected, and the step could never be ticked.
+  const calendarDone = (calendarStatus?.connected && calendarStatus?.calendar_chosen)
+    || calendarStatus?.feed_connected;
 
   useEffect(() => {
     if (!session?.access_token) return;
-    fetch(`${FN_BASE}/google-calendar-status`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
-      .then(r => r.json())
-      .then(setCalendarStatus)
-      .catch(() => setCalendarStatus({ ok: false }));
+    let cancelled = false;
+    (async () => {
+      const [g, f] = await Promise.all([
+        fetch(`${FN_BASE}/google-calendar-status`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        }).then(r => r.json()).catch(() => ({ ok: false })),
+        supabase.from('tutoring_calendar_feeds').select('owner_id').maybeSingle()
+          .then(r => r.data).catch(() => null),
+      ]);
+      if (!cancelled) setCalendarStatus({ ...(g || {}), feed_connected: !!f });
+    })();
+    return () => { cancelled = true; };
   }, [session?.access_token]);
 
   // Nothing is known about the calendar until that request lands, and treating
@@ -3131,7 +3223,7 @@ function SetupChecklist({ session, students, onOpenTool, onAddStudent }) {
     {
       key: 'calendar',
       done: calendarDone,
-      text: calendarStatus?.connected ? 'Pick your lesson calendar' : 'Connect Google Calendar',
+      text: calendarStatus?.connected ? 'Pick your lesson calendar' : 'Connect your calendar',
       tool: 'gcal',
     },
     { key: 'student', done: hasStudent, text: 'Add your first student', addStudent: true },
@@ -4305,7 +4397,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
             onChange={e => setForm({...form, calendar_title_pattern: e.target.value})}
             placeholder="e.g. Saskia" />
           <div style={{fontSize: '0.78rem', color: 'var(--muted)', marginTop: 4}}>
-            The word that appears in your Google Calendar event titles for this
+            The word that appears in your calendar event titles for this
             student's lessons. Leave blank to just use their name - only worth
             filling in if your calendar calls them something else.
           </div>
@@ -5749,7 +5841,7 @@ const WT_STEPS = [
   },
   {
     key: 'calendar',
-    title: 'Connect your Google Calendar',
+    title: 'Connect your calendar',
     body: "Your lessons come from this calendar, so you never type a timetable twice. Google may show a page saying \"Google hasn't verified this app\". Tap Advanced at the bottom left, then tap \"Go to TutorTally (unsafe)\". Google uses that scary word because TutorTally is new. The access is read only: it can see lesson names and times, but cannot change or delete anything.",
     action: { label: '📅 Open calendar settings', tool: 'gcal' },
   },
@@ -5791,7 +5883,7 @@ const WT_STEPS = [
   {
     key: 'done',
     title: "That's everything",
-    body: "You are set. Replay this any time from Settings, then Replay walkthrough. Keep booking lessons in Google Calendar and TutorTally keeps your records up to date.",
+    body: "You are set. Replay this any time from Settings, then Replay walkthrough. Keep booking lessons in your own calendar and TutorTally keeps your records up to date.",
   },
 ];
 
@@ -6534,7 +6626,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.9.2</div>}
+        {!loading && <div className="version-tag">v6.10</div>}
       </div>
 
       {showAddModal && (
