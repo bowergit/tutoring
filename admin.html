@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>TutorTally admin</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<meta name="theme-color" content="#ffa500">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f8f4; --card: #ffffff; --card-2: #f5f7f6; --line: #dfe7e3;
+    --ink: #15211f; --ink-dim: #596965; --accent: #a15c00; --accent-fill: #ffa500; --on-accent: #15211f; --accent-light: #fff1d9;
+    --good: #0f7a35; --good-light: #e3f7e9; --warn: #c0362c; --warn-light: #fdecea; --muted: #87938f;
+    --r-sm: 9px; --r-md: 13px; --r-lg: 17px;
+    --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101716; --card: #182321; --card-2: #1e2a27; --line: #30413d;
+      --ink: #eef8f5; --ink-dim: #a5b7b1; --accent: #ffa500; --accent-light: #3a2604;
+      --good: #4ade80; --good-light: #0f2e1a; --warn: #ff8a63; --warn-light: #351d15; --muted: #7f918c;
+      --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 24px 16px 60px;
+    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 1.3rem; font-weight: 750; letter-spacing: -0.02em; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); margin: 24px 0 8px;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+    box-shadow: var(--sh-2); margin-bottom: 11px; overflow: hidden;
+  }
+  .head {
+    display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
+    padding: 13px 15px 10px;
+  }
+  .who { font-weight: 650; font-size: 0.95rem; }
+  .mail { color: var(--muted); font-size: 0.8rem; word-break: break-all; }
+  .pill {
+    font-size: 0.7rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .pill.comp   { background: var(--good-light); color: var(--good); }
+  .pill.free   { background: var(--card-2); color: var(--muted); }
+  .pill.lapsed { background: var(--warn-light); color: var(--warn); }
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+    gap: 1px; background: var(--line); border-top: 1px solid var(--line);
+  }
+  .stat { background: var(--card); padding: 9px 12px; }
+  .stat b { display: block; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat span { display: block; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
+  .stat.quiet b { color: var(--muted); }
+  .foot { padding: 11px 15px 13px; border-top: 1px solid var(--line); }
+  .meta { font-size: 0.78rem; color: var(--muted); line-height: 1.5; margin-bottom: 9px; }
+  .btn {
+    font-family: inherit; font-size: 0.8rem; font-weight: 650; cursor: pointer;
+    padding: 8px 13px; border-radius: var(--r-sm); border: 1px solid var(--line);
+    background: var(--card-2); color: var(--ink);
+  }
+  .btn.primary { background: var(--accent-fill); border-color: transparent; color: #15211f; }
+  .btn.danger { color: var(--warn); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn-row { display: flex; gap: 7px; flex-wrap: wrap; }
+  textarea, input[type=email], input[type=password] {
+    width: 100%; font-family: inherit; font-size: 0.85rem; padding: 9px 11px;
+    border-radius: var(--r-sm); border: 1px solid var(--line);
+    background: var(--card-2); color: var(--ink); resize: vertical;
+  }
+  .notes { margin-top: 10px; }
+  .note {
+    font-size: 0.8rem; line-height: 1.5; padding: 8px 0;
+    border-top: 1px dashed var(--line); white-space: pre-wrap; word-break: break-word;
+  }
+  .note time { display: block; color: var(--muted); font-size: 0.72rem; margin-bottom: 2px; }
+  .empty { color: var(--muted); font-size: 0.85rem; padding: 18px 0; text-align: center; }
+  .gate { max-width: 340px; margin: 60px auto; }
+  .gate .field { margin-bottom: 11px; }
+  .gate label { display: block; font-size: 0.78rem; font-weight: 650; margin-bottom: 4px; }
+  .msg { font-size: 0.82rem; margin: 10px 0; }
+  .msg.bad { color: var(--warn); }
+  .msg.ok { color: var(--good); }
+  .totals {
+    display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.82rem;
+    color: var(--muted); margin-bottom: 4px;
+  }
+  .totals b { color: var(--ink); font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="empty">Loading…</div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+// The admin panel for whoever is looking after the testers.
+//
+// Everything on this page comes from one endpoint that holds the service key
+// and checks the caller against the admins table before it reads anything. The
+// page itself has no privileges: signing in here as an ordinary tutor loads a
+// "not an admin" message, because the endpoint answers 404 to anyone who is not
+// on that table. Nothing is gated in the browser, where gating means nothing.
+const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
+const FN_BASE = SUPABASE_URL + '/functions/v1';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { persistSession: true, autoRefreshToken: true },
+});
+
+const app = document.getElementById('app');
+let accounts = [];
+let openNotes = new Set();
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function fmtDate(iso) {
+  if (!iso) return null;
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function daysSince(iso) {
+  if (!iso) return null;
+  return Math.floor((Date.now() - Date.parse(iso)) / 86400000);
+}
+
+function agoLabel(iso) {
+  const d = daysSince(iso);
+  if (d == null) return 'never signed in';
+  if (d === 0) return 'today';
+  if (d === 1) return 'yesterday';
+  if (d < 30) return d + ' days ago';
+  return fmtDate(iso);
+}
+
+async function call(action, extra = {}) {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return { ok: false, problem: 'signed_out' };
+  const res = await fetch(FN_BASE + '/admin-portal', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+    body: JSON.stringify({ action, ...extra }),
+  });
+  return res.json().catch(() => ({ ok: false, problem: 'bad_response' }));
+}
+
+// ---- Sign in ------------------------------------------------------------
+
+function renderGate(message) {
+  app.innerHTML = `
+    <div class="gate">
+      <h1>TutorTally admin</h1>
+      <div class="sub">Sign in with your admin account.</div>
+      <form id="gateForm">
+        <div class="field">
+          <label>Email</label>
+          <input type="email" id="gEmail" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input type="password" id="gPassword" autocomplete="current-password" required>
+        </div>
+        ${message ? `<div class="msg bad">${esc(message)}</div>` : ''}
+        <button class="btn primary" type="submit" style="width:100%">Sign in</button>
+      </form>
+    </div>`;
+  document.getElementById('gateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('gEmail').value.trim();
+    const password = document.getElementById('gPassword').value;
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) return renderGate(error.message);
+    load();
+  });
+}
+
+// ---- The list -----------------------------------------------------------
+
+function statusPill(a) {
+  if (a.free_days_left != null && a.free_days_left >= 0) {
+    return `<span class="pill comp">Free · ${a.free_days_left}d left</span>`;
+  }
+  if (a.free_days_left != null) return '<span class="pill lapsed">Free ended</span>';
+  return '<span class="pill free">No free access</span>';
+}
+
+function accountCard(a) {
+  const notesOpen = openNotes.has(a.owner_id);
+  const calLabel = a.calendar === 'google' ? 'Google Calendar'
+    : a.calendar === 'link' ? 'Calendar link' : 'No calendar connected';
+
+  return `
+    <div class="card" data-owner="${esc(a.owner_id)}">
+      <div class="head">
+        <span class="who">${esc(a.name || a.email || 'Unnamed')}</span>
+        ${statusPill(a)}
+        <span class="mail">${esc(a.email || '')}</span>
+      </div>
+      <div class="stats">
+        <div class="stat${a.active_students ? '' : ' quiet'}"><b>${a.active_students}</b><span>Students</span></div>
+        <div class="stat${a.total_lessons ? '' : ' quiet'}"><b>${a.total_lessons}</b><span>Lessons</span></div>
+        <div class="stat${a.lessons_last_30 ? '' : ' quiet'}"><b>${a.lessons_last_30}</b><span>Last 30d</span></div>
+        <div class="stat${a.payments_logged ? '' : ' quiet'}"><b>${a.payments_logged}</b><span>Payments</span></div>
+      </div>
+      <div class="foot">
+        <div class="meta">
+          Joined ${esc(fmtDate(a.joined) || '?')} · last seen ${esc(agoLabel(a.last_sign_in_at))}<br>
+          ${esc(calLabel)}${a.calendar_synced_at ? ', last synced ' + esc(agoLabel(a.calendar_synced_at)) : ''}
+          ${a.pro_free_until ? `<br>Free access runs to <b>${esc(a.pro_free_until)}</b>` : ''}
+        </div>
+        <div class="btn-row">
+          <button class="btn primary" data-act="grant" data-months="3">+3 months free</button>
+          <button class="btn" data-act="grant" data-months="1">+1 month</button>
+          ${a.pro_free_until ? '<button class="btn danger" data-act="revoke">End free access</button>' : ''}
+          <button class="btn" data-act="notes">${notesOpen ? 'Hide' : 'Notes'} (${a.notes.length})</button>
+        </div>
+        ${notesOpen ? `
+          <div class="notes">
+            <textarea rows="3" data-note-box placeholder="What did they say? Where did it come from?"></textarea>
+            <div class="btn-row" style="margin-top:7px">
+              <button class="btn primary" data-act="save-note">Add note</button>
+            </div>
+            ${a.notes.length
+              ? a.notes.map(nt => `<div class="note"><time>${esc(fmtDate(nt.created_at))}</time>${esc(nt.body)}</div>`).join('')
+              : '<div class="note" style="color:var(--muted)">Nothing recorded yet.</div>'}
+          </div>` : ''}
+      </div>
+    </div>`;
+}
+
+function render() {
+  const active7 = accounts.filter(a => daysSince(a.last_sign_in_at) !== null && daysSince(a.last_sign_in_at) <= 7).length;
+  const withStudents = accounts.filter(a => a.active_students > 0).length;
+  const comped = accounts.filter(a => a.free_days_left != null && a.free_days_left >= 0).length;
+
+  app.innerHTML = `
+    <h1>TutorTally admin</h1>
+    <div class="sub">Testers, how much they are using it, and who has free access.</div>
+    <div class="totals">
+      <span><b>${accounts.length}</b> accounts</span>
+      <span><b>${active7}</b> signed in this week</span>
+      <span><b>${withStudents}</b> with students</span>
+      <span><b>${comped}</b> on free access</span>
+    </div>
+    <div class="section-label">Accounts · newest first</div>
+    ${accounts.length ? accounts.map(accountCard).join('') : '<div class="empty">No accounts.</div>'}
+    <div class="btn-row" style="margin-top:20px">
+      <button class="btn" id="signOut">Sign out</button>
+    </div>`;
+
+  document.getElementById('signOut').addEventListener('click', async () => {
+    await sb.auth.signOut();
+    renderGate(null);
+  });
+}
+
+// One listener for the whole list rather than per button, so re-rendering a card
+// never leaves a dead handler behind.
+app.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const card = btn.closest('[data-owner]');
+  if (!card) return;
+  const ownerId = card.dataset.owner;
+  const act = btn.dataset.act;
+
+  if (act === 'notes') {
+    if (openNotes.has(ownerId)) openNotes.delete(ownerId);
+    else openNotes.add(ownerId);
+    return render();
+  }
+
+  if (act === 'grant') {
+    const months = Number(btn.dataset.months);
+    const who = accounts.find(a => a.owner_id === ownerId);
+    if (!confirm(`Give ${who?.email || 'this account'} ${months} month${months === 1 ? '' : 's'} of free access?`)) return;
+    btn.disabled = true;
+    const r = await call('grant', { owner_id: ownerId, months });
+    if (!r.ok) { alert('Could not do that: ' + (r.problem || 'unknown')); btn.disabled = false; return; }
+    return load();
+  }
+
+  if (act === 'revoke') {
+    const who = accounts.find(a => a.owner_id === ownerId);
+    if (!confirm(`End free access for ${who?.email || 'this account'}?`)) return;
+    btn.disabled = true;
+    const r = await call('revoke', { owner_id: ownerId });
+    if (!r.ok) { alert('Could not do that: ' + (r.problem || 'unknown')); btn.disabled = false; return; }
+    return load();
+  }
+
+  if (act === 'save-note') {
+    const box = card.querySelector('[data-note-box]');
+    const body = (box?.value || '').trim();
+    if (!body) return;
+    btn.disabled = true;
+    const r = await call('note', { owner_id: ownerId, body });
+    if (!r.ok) { alert('Could not save that note: ' + (r.problem || 'unknown')); btn.disabled = false; return; }
+    return load();
+  }
+});
+
+// ---- Boot ---------------------------------------------------------------
+
+async function load() {
+  app.innerHTML = '<div class="empty">Loading…</div>';
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return renderGate(null);
+
+  const r = await call('list');
+  if (r.problem === 'signed_out' || r.problem === 'unauthorized') return renderGate(null);
+  if (r.problem === 'not_found') {
+    app.innerHTML = `
+      <div class="gate">
+        <h1>Not an admin</h1>
+        <div class="sub">
+          This account cannot see the admin panel. If it should be able to, ask
+          Daniel to add it.
+        </div>
+        <button class="btn" id="so">Sign out</button>
+      </div>`;
+    document.getElementById('so').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      renderGate(null);
+    });
+    return;
+  }
+  if (!r.ok) {
+    app.innerHTML = `<div class="empty">Could not load: ${esc(r.problem || 'unknown')}</div>`;
+    return;
+  }
+  accounts = r.accounts || [];
+  render();
+}
+
+load();
+</script>
+</body>
+</html>

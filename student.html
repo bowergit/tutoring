@@ -59,6 +59,14 @@
   }
   .row .time { color: var(--muted); font-size: 0.82rem; }
   .detail { padding: 0 15px 13px; color: var(--muted); font-size: 0.82rem; }
+  .paid-line {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px; padding: 3px 0;
+  }
+  .paid-line span:first-child { font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .paid-when { color: var(--muted); }
+  .paid-total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 6px; }
+  .paid-left span:first-child { color: var(--warn); }
   .pill {
     font-size: 0.72rem; font-weight: 650; padding: 4px 10px; border-radius: 100px; flex-shrink: 0;
   }
@@ -208,6 +216,10 @@
     const dt = new Date(d + 'T12:00:00');
     return dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
   }
+  const money = n => '\u00a3' + (Math.round(Number(n) * 100) % 100 === 0
+    ? Math.round(Number(n))
+    : Number(n).toFixed(2));
+
   function fmtPaidDate(d) {
     if (!d) return null;
     return new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -221,11 +233,39 @@
     const label = l.pay_status === 'paid' ? 'Paid' : l.pay_status === 'partial' ? 'Partly paid' : 'Not yet paid';
     return `<span class="pill ${l.pay_status}">${label}</span>`;
   }
-  function detailText(l) {
-    const dates = (l.paid_dates || []).filter(p => p.date);
-    if (!dates.length) return 'Not paid yet.';
-    if (dates.length === 1) return `Paid on ${fmtPaidDate(dates[0].date)}.`;
-    return 'Paid across: ' + dates.map(p => fmtPaidDate(p.date)).join(', ') + '.';
+  // A lesson is often settled by more than one payment: a few pounds left over
+  // from last time, then the rest on the day. Naming only the dates left the
+  // parent unable to tell which of their payments went where, which is exactly
+  // the question they open this for.
+  function detailHTML(l) {
+    const parts = (l.paid_dates || []).filter(p => Number(p.amount) > 0.005);
+
+    if (l.free) return '<div>Free lesson, nothing to pay.</div>';
+    if (l.pre_settled && !parts.length) return '<div>Already settled.</div>';
+    if (!parts.length) {
+      return `<div>Nothing paid against this one yet${
+        l.rate > 0 ? `. ${esc(money(l.rate))} due` : ''}.</div>`;
+    }
+
+    const lines = parts
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+      .map(p => `<div class="paid-line"><span>${esc(money(p.amount))}</span>`
+        + `<span class="paid-when">${p.date ? esc(fmtPaidDate(p.date)) : 'date not recorded'}</span></div>`);
+
+    const paid = parts.reduce((t, p) => t + Number(p.amount), 0);
+    const left = Math.round((Number(l.rate || 0) - paid) * 100) / 100;
+
+    // Only worth a total when more than one payment went into it, otherwise the
+    // line just repeats itself.
+    if (parts.length > 1) {
+      lines.push(`<div class="paid-line paid-total"><span>${esc(money(paid))}</span>`
+        + `<span class="paid-when">total</span></div>`);
+    }
+    if (left > 0.005) {
+      lines.push(`<div class="paid-line paid-left"><span>${esc(money(left))}</span>`
+        + `<span class="paid-when">still to pay</span></div>`);
+    }
+    return lines.join('');
   }
   function renderList(lessons, prefix, scheduled) {
     if (!lessons.length) return '<div class="empty">Nothing here.</div>';
@@ -240,7 +280,7 @@
             <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}</span>
             ${pillHTML(l, scheduled)}
           </div>
-          ${expandable ? `<div class="detail" id="detail-${key}" hidden>${esc(detailText(l))}</div>` : ''}
+          ${expandable ? `<div class="detail" id="detail-${key}" hidden>${detailHTML(l)}</div>` : ''}
         </div>
       `;
     }).join('') + '</div>';
@@ -445,7 +485,6 @@
   // good news rather than an absence, so it gets the same weight as a balance.
   function renderAccount(a) {
     if (!a) return '';
-    const money = n => '£' + (Math.round(n * 100) % 100 === 0 ? Math.round(n) : n.toFixed(2));
 
     let cls, mark, fig, head, sub;
     if (a.owed > 0) {
@@ -686,6 +725,72 @@
   const mailLink = tutor.email
     ? `mailto:${tutor.email}?subject=${encodeURIComponent(firstName + "'s lessons")}` : null;
 
+  // cal.com's own inline embed, driven by whatever link the tutor saved, so the
+  // calendar appears on the page rather than sending a parent off to another
+  // site. Anything that is not cal.com gets a plain button: there is no generic
+  // way to embed an arbitrary booking page, and a button that works beats an
+  // iframe that might not.
+  function calLinkFrom(url) {
+    try {
+      const u = new URL(url);
+      if (!/(^|\.)cal\.com$/i.test(u.hostname)) return null;
+      const path = u.pathname.replace(/^\/+|\/+$/g, '');
+      // A bare cal.com homepage link has nothing to book.
+      return path ? path : null;
+    } catch { return null; }
+  }
+
+  function renderBooking(url) {
+    if (!url) return '';
+    const calLink = calLinkFrom(url);
+    if (calLink) {
+      return `
+        <div class="section-label">Book an extra session</div>
+        <div class="card" style="padding:6px">
+          <div id="cal-inline" style="width:100%;min-height:560px;overflow:auto"></div>
+        </div>`;
+    }
+    return `
+      <div class="section-label">Book an extra session</div>
+      <div class="actions">
+        <a class="action-btn" href="${esc(url)}" target="_blank" rel="noopener">\ud83d\udcc6 Book an extra session</a>
+      </div>`;
+  }
+
+  function wireBooking(url) {
+    const calLink = calLinkFrom(url);
+    const holder = document.getElementById('cal-inline');
+    if (!calLink || !holder) return;
+    // cal.com's published loader, verbatim apart from being handed our own
+    // element and link.
+    (function (C, A, L) {
+      let p = function (a, ar) { a.q.push(ar); };
+      let d = C.document;
+      C.Cal = C.Cal || function () {
+        let cal = C.Cal; let ar = arguments;
+        if (!cal.loaded) { cal.ns = {}; cal.q = cal.q || []; d.head.appendChild(d.createElement('script')).src = A; cal.loaded = true; }
+        if (ar[0] === L) {
+          const api = function () { p(api, arguments); };
+          const namespace = ar[1];
+          api.q = api.q || [];
+          if (typeof namespace === 'string') { cal.ns[namespace] = cal.ns[namespace] || api; p(cal.ns[namespace], ar); p(cal, ['initNamespace', namespace]); }
+          else p(cal, ar);
+          return;
+        }
+        p(cal, ar);
+      };
+    })(window, 'https://app.cal.com/embed/embed.js', 'init');
+
+    const ns = 'tutortally';
+    Cal('init', ns, { origin: 'https://app.cal.com' });
+    Cal.ns[ns]('inline', {
+      elementOrSelector: '#cal-inline',
+      calLink,
+      config: { layout: 'month_view' },
+    });
+    Cal.ns[ns]('ui', { hideEventTypeDetails: false, layout: 'month_view' });
+  }
+
   const actions = [
     waLink ? `<a class="action-btn" href="${waLink}" target="_blank" rel="noopener">💬 Message ${esc(tutorName)} on WhatsApp</a>` : '',
     mailLink ? `<a class="action-btn" href="${mailLink}">✉️ Email ${esc(tutorName)}</a>` : '',
@@ -706,10 +811,12 @@
     <div id="upcoming-section"></div>
     <div class="section-label">${pupilView ? 'Lessons so far' : 'Recent'}</div>
     ${renderList(data.recent || [], 'rec-', false)}
+    ${pupilView ? '' : renderBooking(data.tutor?.booking_url)}
   `;
   renderUpcoming();
   wireChart(data.progress);
   wireGrade(data.grade);
+  if (!pupilView) wireBooking(data.tutor?.booking_url);
 })();
 </script>
 </body>

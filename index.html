@@ -3123,10 +3123,28 @@ function DeleteAccount({ session }) {
 // person's own copy is visibly theirs. Stored in Supabase Auth's own user
 // metadata (auth.updateUser({ data })), not a new table: it's private to the
 // account by construction, nobody else can read or set another user's copy.
+
+// Typed by hand into a field, so "cal.com/me" arrives without a scheme far more
+// often than not. Assume https rather than saving something the parent's page
+// will then refuse, and keep returning null for an empty box so clearing the
+// field actually removes the section.
+function bookingUrl(raw) {
+  const v = String(raw || '').trim();
+  if (!v) return null;
+  const withScheme = /^https?:\/\//i.test(v) ? v : 'https://' + v;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== 'https:') return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
 function YourName({ session }) {
   const [name, setName] = useState(session?.user?.user_metadata?.display_name || '');
   const [phone, setPhone] = useState(session?.user?.user_metadata?.contact_phone || '');
   const [email, setEmail] = useState(session?.user?.user_metadata?.contact_email || '');
+  const [booking, setBooking] = useState(session?.user?.user_metadata?.booking_url || '');
   const [state, setState] = useState('idle');
 
   const loginEmail = session?.user?.email || '';
@@ -3142,6 +3160,7 @@ function YourName({ session }) {
         display_name: name.trim(),
         contact_phone: normaliseUKPhone(phone),
         contact_email: email.trim(),
+        booking_url: bookingUrl(booking),
       },
     });
     setState(error ? 'error' : 'done');
@@ -3170,6 +3189,16 @@ function YourName({ session }) {
       <div className="field">
         <label>Your phone (for parents' WhatsApp button)</label>
         <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 07787 112345" />
+      </div>
+      <div className="field">
+        <label>Booking link (optional)</label>
+        <input type="url" value={booking} onChange={e => setBooking(e.target.value)}
+               placeholder="e.g. https://cal.com/yourname/extra-lesson" />
+        <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
+          Adds a <b>Book an extra session</b> section to the bottom of every
+          parent's link. A cal.com address shows the calendar on the page itself;
+          anything else becomes a button. Leave blank to hide it.
+        </div>
       </div>
       {state === 'done' && (
         <div style={{fontSize:'0.82rem', color:'var(--accent)', marginBottom:12, fontWeight:600}}>Saved.</div>
@@ -6626,7 +6655,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.10</div>}
+        {!loading && <div className="version-tag">v6.11</div>}
       </div>
 
       {showAddModal && (
