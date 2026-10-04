@@ -701,7 +701,14 @@ const DEMO_MODE = new URLSearchParams(window.location.search).has('demo');
 // stay readable and exportable, so lapsing blocks writing, not looking.
 let WRITES_BLOCKED = false;
 let notifyBlockedWrite = () => {};
-const BLOCKED_MESSAGE = "You are over TutorTally Lite's student limit, so TutorTally is read-only for now. Nothing has been deleted.";
+const BLOCKED_MESSAGE = "You are over TutorTally Lite's student limit, so new students and lessons are paused. You can still record payments. Nothing has been deleted.";
+
+// Over the limit stops the account GROWING, not working. Blocking payments
+// meant a tutor could not record money a parent had actually handed over, so
+// their books drifted further from the truth the longer they left it - and the
+// records they would have to trust once they did pay were the ones we had made
+// unreliable. These are the only two tables that make an account bigger.
+const GROWTH_TABLES = new Set(['tutoring_students', 'tutoring_lessons', 'tutoring_bundles']);
 
 // Set when the account is on TutorTally Lite and already using every slot.
 // Adding one more student is refused on its own, rather than the whole app
@@ -712,7 +719,10 @@ let notifyStudentLimit = () => {};
 
 // Returns null to allow, or {message, notify} to refuse.
 function refuseWrite(table, op, args) {
-  if (WRITES_BLOCKED) {
+  // Mirrors the database triggers exactly. Adding a student, a lesson or a
+  // bundle is refused; editing, cancelling, archiving and recording payments
+  // all still work.
+  if (WRITES_BLOCKED && GROWTH_TABLES.has(table) && (op === 'insert' || op === 'upsert')) {
     return { message: BLOCKED_MESSAGE, notify: () => notifyBlockedWrite() };
   }
   if (NEW_STUDENT_BLOCKED && table === 'tutoring_students') {
@@ -751,9 +761,7 @@ const MUTATIONS = ['insert', 'update', 'delete', 'upsert'];
 function guardedClient(client) {
   return {
     auth: client.auth,
-    rpc: (...args) => WRITES_BLOCKED
-      ? chainableResult({ data: null, error: { message: BLOCKED_MESSAGE } })
-      : client.rpc(...args),
+    rpc: (...args) => client.rpc(...args),
     from: (table) => {
       const q = client.from(table);
       return new Proxy(q, {
@@ -1285,14 +1293,16 @@ function BillingBar({ entitlement, activeStudents, blockedOnce, suppressFreeProm
   const liteName = planCopyName({ ...st, pro: false }, ownerName);
   const proName = planCopyName({ ...st, pro: true }, ownerName);
 
-  // Over the limit with no TutorTally Pro: the whole app is read-only, as the terms say.
+  // Over the limit with no TutorTally Pro: the account stops growing, rather
+  // than stopping. Payments and corrections still go through.
   if (!st.access) {
     return (
       <div className="billing-bar warn">
         <span>
-          <b>Read-only.</b>{blockedOnce ? ' That change was not saved.' : ''} {liteName} covers{' '}
-          {st.limit} active students, and you have {activeStudents}. Archive a few,
-          or switch to {proName}. Nothing has been deleted.
+          <b>New students and lessons are paused.</b>{blockedOnce ? ' That change was not saved.' : ''}{' '}
+          {liteName} covers {st.limit} active students, and you have {activeStudents}.
+          Archive a few, or switch to {proName}. You can still record payments, and
+          nothing has been deleted.
         </span>
         <GoProButton />
       </div>
@@ -1406,8 +1416,10 @@ function BillingPanel({ entitlement, activeStudents, ownerName = '' }) {
       {st.reason === 'over' && (
         <p style={{color:'var(--warn)'}}>
           You have {activeStudents} active students and {liteName} covers {st.limit}, so
-          TutorTally is read-only. Archive some students or switch to {proName}. Nothing has been
-          deleted and your export still works.
+          new students and lessons are paused and your calendar has stopped bringing
+          new ones in. Archive some students or switch to {proName}. Recording payments,
+          editing and archiving all still work, nothing has been deleted, and your
+          export still works.
         </p>
       )}
 
@@ -6655,7 +6667,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.12.1</div>}
+        {!loading && <div className="version-tag">v6.13</div>}
       </div>
 
       {showAddModal && (
