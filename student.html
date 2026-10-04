@@ -237,14 +237,18 @@
   // from last time, then the rest on the day. Naming only the dates left the
   // parent unable to tell which of their payments went where, which is exactly
   // the question they open this for.
-  function detailHTML(l) {
+  function detailHTML(l, scheduled) {
     const parts = (l.paid_dates || []).filter(p => Number(p.amount) > 0.005);
 
     if (l.free) return '<div>Free lesson, nothing to pay.</div>';
     if (l.pre_settled && !parts.length) return '<div>Already settled.</div>';
     if (!parts.length) {
-      return `<div>Nothing paid against this one yet${
-        l.rate > 0 ? `. ${esc(money(l.rate))} due` : ''}.</div>`;
+      if (!(l.rate > 0)) return '<div>Nothing to pay on this one.</div>';
+      // A lesson that has not happened yet is not owed yet - the balance only
+      // ever counts lessons actually taught. Calling it "due" three weeks out
+      // reads as a demand for money the parent does not owe.
+      if (scheduled) return `<div>${esc(money(l.rate))} once this one has happened.</div>`;
+      return `<div>Nothing paid against this one yet. ${esc(money(l.rate))} due.</div>`;
     }
 
     const lines = parts
@@ -280,7 +284,7 @@
             <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}</span>
             ${pillHTML(l, scheduled)}
           </div>
-          ${expandable ? `<div class="detail" id="detail-${key}" hidden>${detailHTML(l)}</div>` : ''}
+          ${expandable ? `<div class="detail" id="detail-${key}" hidden>${detailHTML(l, scheduled)}</div>` : ''}
         </div>
       `;
     }).join('') + '</div>';
