@@ -212,7 +212,8 @@ function accountCard(a) {
       <div class="stats">
         <div class="stat${a.active_students ? '' : ' quiet'}"><b>${a.active_students}</b><span>Students</span></div>
         <div class="stat${a.total_lessons ? '' : ' quiet'}"><b>${a.total_lessons}</b><span>Lessons</span></div>
-        <div class="stat${a.lessons_last_30 ? '' : ' quiet'}"><b>${a.lessons_last_30}</b><span>Last 30d</span></div>
+        <div class="stat${a.lessons_last_30 ? '' : ' quiet'}"><b>${a.lessons_last_30}</b><span>Taught 30d</span></div>
+        <div class="stat${a.lessons_upcoming ? '' : ' quiet'}"><b>${a.lessons_upcoming}</b><span>Booked</span></div>
         <div class="stat${a.payments_logged ? '' : ' quiet'}"><b>${a.payments_logged}</b><span>Payments</span></div>
       </div>
       <div class="foot">
