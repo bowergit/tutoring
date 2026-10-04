@@ -787,8 +787,10 @@
 
     const ns = 'tutortally';
     Cal('init', ns, { origin: 'https://app.cal.com' });
-    Cal.config = Cal.config || {};
-    Cal.config.forwardQueryParams = true;
+    // forwardQueryParams is deliberately NOT set. The only query parameter this
+    // page ever carries is ?t=, the token that is the entire credential for
+    // this family's lesson and payment history. Forwarding it would hand that
+    // token to a third party in an iframe URL and bury it in their logs.
     Cal.ns[ns]('inline', {
       elementOrSelector: '#cal-inline',
       calLink,
