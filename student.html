@@ -787,12 +787,22 @@
 
     const ns = 'tutortally';
     Cal('init', ns, { origin: 'https://app.cal.com' });
+    Cal.config = Cal.config || {};
+    Cal.config.forwardQueryParams = true;
     Cal.ns[ns]('inline', {
       elementOrSelector: '#cal-inline',
       calLink,
-      config: { layout: 'month_view' },
+      // Slots rather than a month grid on a narrow screen. Almost every parent
+      // opens this on a phone, where the grid is too small to read.
+      config: { layout: 'month_view', useSlotsViewOnSmallScreen: 'true' },
     });
-    Cal.ns[ns]('ui', { hideEventTypeDetails: false, layout: 'month_view' });
+    Cal.ns[ns]('ui', {
+      // The page's own accent in each theme, so the calendar does not arrive
+      // looking like a different product bolted onto the bottom.
+      cssVarsPerTheme: { light: { 'cal-brand': '#a15c00' }, dark: { 'cal-brand': '#ffa500' } },
+      hideEventTypeDetails: false,
+      layout: 'month_view',
+    });
   }
 
   const actions = [
