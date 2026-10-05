@@ -138,9 +138,13 @@ function daysSince(iso) {
 }
 
 function agoLabel(iso) {
-  const d = daysSince(iso);
-  if (d == null) return 'never signed in';
-  if (d === 0) return 'today';
+  if (!iso) return 'never';
+  const mins = Math.floor((Date.now() - Date.parse(iso)) / 60000);
+  if (mins < 2) return 'just now';
+  if (mins < 60) return mins + ' min ago';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + (hrs === 1 ? ' hour ago' : ' hours ago');
+  const d = Math.floor(hrs / 24);
   if (d === 1) return 'yesterday';
   if (d < 30) return d + ' days ago';
   return fmtDate(iso);
@@ -218,8 +222,10 @@ function accountCard(a) {
       </div>
       <div class="foot">
         <div class="meta">
-          Joined ${esc(fmtDate(a.joined) || '?')} · last seen ${esc(agoLabel(a.last_sign_in_at))}<br>
+          Joined ${esc(fmtDate(a.joined) || '?')} · <b>last used ${esc(agoLabel(a.last_seen))}</b>${
+            a.last_entry ? ' · last typed something in ' + esc(agoLabel(a.last_entry)) : ''}<br>
           ${esc(calLabel)}${a.calendar_synced_at ? ', last synced ' + esc(agoLabel(a.calendar_synced_at)) : ''}
+          ${a.calendar_error ? `<br><span style="color:var(--warn)">\u26a0 ${esc(a.calendar_error)}</span>` : ''}
           ${a.pro_free_until ? `<br>Free access runs to <b>${esc(a.pro_free_until)}</b>` : ''}
         </div>
         <div class="btn-row">
@@ -243,7 +249,8 @@ function accountCard(a) {
 }
 
 function render() {
-  const active7 = accounts.filter(a => daysSince(a.last_sign_in_at) !== null && daysSince(a.last_sign_in_at) <= 7).length;
+  const active7 = accounts.filter(a => daysSince(a.last_seen) !== null && daysSince(a.last_seen) <= 7).length;
+  const broken = accounts.filter(a => a.calendar_error).length;
   const withStudents = accounts.filter(a => a.active_students > 0).length;
   const comped = accounts.filter(a => a.free_days_left != null && a.free_days_left >= 0).length;
 
@@ -252,7 +259,8 @@ function render() {
     <div class="sub">Testers, how much they are using it, and who has free access.</div>
     <div class="totals">
       <span><b>${accounts.length}</b> accounts</span>
-      <span><b>${active7}</b> signed in this week</span>
+      <span><b>${active7}</b> used it this week</span>
+      ${broken ? `<span style="color:var(--warn)"><b>${broken}</b> with a calendar problem</span>` : ''}
       <span><b>${withStudents}</b> with students</span>
       <span><b>${comped}</b> on free access</span>
     </div>
