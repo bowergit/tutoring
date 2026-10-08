@@ -1327,10 +1327,12 @@ function BillingBar({ entitlement, activeStudents, blockedOnce, suppressFreeProm
   // Over the limit with no TutorTally Pro: the account stops growing, rather
   // than stopping. Payments and corrections still go through.
   if (!st.access) {
+    const held = Number(entitlement.held_lessons) || 0;
     return (
       <div className="billing-bar warn">
         <span>
           <b>New students and lessons are paused.</b>{blockedOnce ? ' That change was not saved.' : ''}{' '}
+          {held > 0 && <b>{held} new lesson{held === 1 ? ' is' : 's are'} waiting in your calendar. </b>}
           {liteName} covers {st.limit} active students, and you have {activeStudents}.
           Archive a few, or switch to {proName}. You can still record payments, and
           nothing has been deleted.
@@ -1517,23 +1519,55 @@ function BillingPanel({ entitlement, activeStudents, ownerName = '' }) {
 
 // Shown when a write is refused because it would step past TutorTally Lite,
 // rather than letting the form close as though it had saved.
-function StudentLimitModal({ limit, ownerName = '', onClose }) {
+// Shown at the moment something is refused, not only as a line in the bar at
+// the top. A refusal that only changes some text off-screen reads as the app
+// not working; this says what happened, why, and the two ways out.
+//
+// Two situations share it. At the limit, the tutor is trying to add one more.
+// Over it (a lapsed subscription or free period), adding is paused for
+// everything, and the calendar has stopped bringing lessons in, which is the
+// part worth saying out loud because nothing on screen shows it otherwise.
+function StudentLimitModal({ limit, activeCount, held = 0, ownerName = '', onClose }) {
   const [cls, close] = useAnimatedClose(onClose);
   const liteName = planCopyName({ pro: false }, ownerName);
   const proName = planCopyName({ pro: true }, ownerName);
+  const have = Math.max(activeCount ?? limit, limit);
+  const over = have > limit;
+  const toArchive = have - limit;
   return (
     <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
       <div className={`sheet${cls}`}>
-        <h2>That's one more than {liteName} holds</h2>
+        <h2>{over ? `${liteName} is paused` : `That's one more than ${liteName} holds`}</h2>
         <div style={{fontSize:'0.9rem', color:'var(--ink-dim)', lineHeight:1.6, marginBottom:16}}>
-          <p style={{marginTop:0}}>
-            {liteName} covers {limit} active students, and you have {limit}. {proName} is £5 a
-            month for as many as you like, everything else included.
-          </p>
-          <p style={{marginBottom:0}}>
-            If one of your {limit} has finished, archive them instead and the slot comes back.
-            Archiving keeps all their lessons and payments.
-          </p>
+          {over ? (
+            <>
+              <p style={{marginTop:0}}>
+                {liteName} covers {limit} active students, and you have {have}, so adding
+                students and lessons is paused.
+                {held > 0 && <> <b style={{color:'var(--ink)'}}>{held} new lesson{held === 1 ? ' is' : 's are'} waiting
+                in your calendar</b> and will come in as soon as that changes.</>}
+              </p>
+              <p>
+                {proName} is £5 a month for as many students as you like.
+              </p>
+              <p style={{marginBottom:0}}>
+                Or archive {toArchive} student{toArchive === 1 ? '' : 's'} who {toArchive === 1 ? 'has' : 'have'} finished
+                and everything starts again straight away. Archiving keeps all their lessons
+                and payments, and recording payments works either way.
+              </p>
+            </>
+          ) : (
+            <>
+              <p style={{marginTop:0}}>
+                {liteName} covers {limit} active students, and you have {have}. {proName} is £5 a
+                month for as many as you like, everything else included.
+              </p>
+              <p style={{marginBottom:0}}>
+                If one of your {have} has finished, archive them instead and the slot comes back.
+                Archiving keeps all their lessons and payments.
+              </p>
+            </>
+          )}
         </div>
         <GoProButton />
         <button className="btn cancel" style={{width:'100%', marginTop:10}} onClick={close}>
@@ -6494,7 +6528,7 @@ function App() {
     WRITES_BLOCKED = !st.access;
     NEW_STUDENT_BLOCKED = !st.pro && st.atLimit;
     CURRENT_FREE_LIMIT = st.limit;
-    notifyBlockedWrite = () => setBlockedOnce(true);
+    notifyBlockedWrite = () => { setBlockedOnce(true); setLimitPrompt(true); };
     notifyStudentLimit = () => setLimitPrompt(true);
   }, [entitlement, students]);
 
@@ -6748,7 +6782,7 @@ function App() {
                       onClick={() => setShowGlobalTools(true)}>⚙ Settings</button>
             )}
             <button className="add-btn" onClick={() =>
-              NEW_STUDENT_BLOCKED ? setLimitPrompt(true) : setShowAddModal(true)
+              (NEW_STUDENT_BLOCKED || WRITES_BLOCKED) ? setLimitPrompt(true) : setShowAddModal(true)
             } data-wt="add">+ Add</button>
           </div>
         </div>
@@ -6847,7 +6881,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v6.17.1</div>}
+        {!loading && <div className="version-tag">v6.17.2</div>}
       </div>
 
       {showAddModal && (
@@ -6901,6 +6935,8 @@ function App() {
       {limitPrompt && (
         <StudentLimitModal
           limit={CURRENT_FREE_LIMIT}
+          activeCount={activeStudents.length}
+          held={Number(entitlement?.held_lessons) || 0}
           ownerName={tutorDisplayName}
           onClose={() => setLimitPrompt(false)}
         />
