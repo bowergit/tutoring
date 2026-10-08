@@ -267,8 +267,6 @@ function buildQueue(accounts) {
   const days = iso => daysSince(iso);
 
   for (const a of accounts) {
-    const who = a.name || a.email || 'Unknown';
-
     if (a.calendar_error) {
       out.push({ a, tone: 'bad', why: 'calendar is erroring, lessons are not coming in' });
     }
@@ -288,7 +286,6 @@ function buildQueue(accounts) {
     } else if (a.active_students > 0 && a.total_lessons === 0 && days(a.joined) >= 3) {
       out.push({ a, tone: 'bad', why: 'has a student but no lessons have ever synced' });
     }
-    out.forEach(q => { if (!q.who) q.who = who; });
   }
   return out;
 }
