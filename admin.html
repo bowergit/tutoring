@@ -13,6 +13,8 @@
     --bg: #f7f8f4; --card: #ffffff; --card-2: #f5f7f6; --line: #dfe7e3;
     --ink: #15211f; --ink-dim: #596965; --accent: #a15c00; --accent-fill: #ffa500; --on-accent: #15211f; --accent-light: #fff1d9;
     --good: #0f7a35; --good-light: #e3f7e9; --warn: #c0362c; --warn-light: #fdecea; --muted: #87938f;
+    --amber: #9a5b00; --amber-light: #fdf1dc;
+    --tip-bg: #15211f; --tip-ink: #f3f7f5; --tip-good: #6ee7a0; --tip-bad: #ff9a85; --tip-todo: #ffc46b;
     --r-sm: 9px; --r-md: 13px; --r-lg: 17px;
     --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
   }
@@ -21,6 +23,8 @@
       --bg: #101716; --card: #182321; --card-2: #1e2a27; --line: #30413d;
       --ink: #eef8f5; --ink-dim: #a5b7b1; --accent: #ffa500; --accent-light: #3a2604;
       --good: #4ade80; --good-light: #0f2e1a; --warn: #ff8a63; --warn-light: #351d15; --muted: #7f918c;
+      --amber: #f6c26b; --amber-light: #33260c;
+      --tip-bg: #eef8f5; --tip-ink: #15211f; --tip-good: #0f7a35; --tip-bad: #c0362c; --tip-todo: #a15c00;
       --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
     }
   }
@@ -28,119 +32,231 @@
   body {
     margin: 0; background: var(--bg); color: var(--ink);
     font-family: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    -webkit-font-smoothing: antialiased; padding: 24px 16px 60px;
+    -webkit-font-smoothing: antialiased; padding: 22px 16px 60px;
     -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
   }
   .wrap { max-width: 720px; margin: 0 auto; }
   h1 { font-size: 1.3rem; font-weight: 750; letter-spacing: -0.02em; margin: 0 0 2px; }
-  .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; }
+  .sub { color: var(--muted); font-size: 0.82rem; }
+  .top { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 4px; }
+  .top > div { flex: 1; min-width: 0; }
+  .hint { color: var(--muted); font-size: 0.78rem; margin-top: 6px; }
   .section-label {
+    display: flex; align-items: center; gap: 8px;
     font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
-    color: var(--muted); margin: 24px 0 8px;
+    color: var(--muted); margin: 26px 0 8px;
   }
-  .card {
+  .panel {
     background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
-    box-shadow: var(--sh-2); margin-bottom: 11px; overflow: hidden;
+    box-shadow: var(--sh-2); overflow: hidden;
   }
-  .head {
-    display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap;
-    padding: 13px 15px 10px;
-  }
-  .who { font-weight: 650; font-size: 0.95rem; }
-  .mail { color: var(--muted); font-size: 0.8rem; word-break: break-all; }
-  .pill {
-    font-size: 0.7rem; font-weight: 700; padding: 3px 9px; border-radius: 999px;
-    text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
-  }
-  .pill.comp   { background: var(--good-light); color: var(--good); }
-  .pill.free   { background: var(--card-2); color: var(--muted); }
-  .pill.lapsed { background: var(--warn-light); color: var(--warn); }
-  .stats {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
-    gap: 1px; background: var(--line); border-top: 1px solid var(--line);
-  }
-  .stat { background: var(--card); padding: 9px 12px; }
-  .stat b { display: block; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .stat span { display: block; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
-  .stat.quiet b { color: var(--muted); }
-  .foot { padding: 11px 15px 13px; border-top: 1px solid var(--line); }
-  .meta { font-size: 0.78rem; color: var(--muted); line-height: 1.5; margin-bottom: 9px; }
-  .btn {
-    font-family: inherit; font-size: 0.8rem; font-weight: 650; cursor: pointer;
-    padding: 8px 13px; border-radius: var(--r-sm); border: 1px solid var(--line);
-    background: var(--card-2); color: var(--ink);
-  }
-  .btn.primary { background: var(--accent-fill); border-color: transparent; color: #15211f; }
-  .btn.danger { color: var(--warn); }
-  .btn:disabled { opacity: 0.5; cursor: default; }
-  .btn-row { display: flex; gap: 7px; flex-wrap: wrap; }
-  textarea, input[type=email], input[type=password] {
-    width: 100%; font-family: inherit; font-size: 0.85rem; padding: 9px 11px;
-    border-radius: var(--r-sm); border: 1px solid var(--line);
-    background: var(--card-2); color: var(--ink); resize: vertical;
-  }
-  .notes { margin-top: 10px; }
-  .note {
-    font-size: 0.8rem; line-height: 1.5; padding: 8px 0;
-    border-top: 1px dashed var(--line); white-space: pre-wrap; word-break: break-word;
-  }
-  .note time { display: block; color: var(--muted); font-size: 0.72rem; margin-bottom: 2px; }
-  .note .who { color: var(--ink-dim); font-weight: 650; }
-  .empty { color: var(--muted); font-size: 0.85rem; padding: 18px 0; text-align: center; }
-  .gate { max-width: 340px; margin: 60px auto; }
-  .gate .field { margin-bottom: 11px; }
-  .gate label { display: block; font-size: 0.78rem; font-weight: 650; margin-bottom: 4px; }
-  .msg { font-size: 0.82rem; margin: 10px 0; }
-  .msg.bad { color: var(--warn); }
-  .msg.ok { color: var(--good); }
-  .totals {
-    display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.82rem;
-    color: var(--muted); margin-bottom: 4px;
-  }
-  .totals b { color: var(--ink); font-variant-numeric: tabular-nums; }
 
-  /* The worklist. Deliberately the first thing on the page: the point is to
-     answer "what should I do today", not to be browsed. */
-  .queue { margin-bottom: 18px; }
+  /* Headline numbers. Two across on a phone, four on anything wider. */
+  .kpis {
+    display: grid; grid-template-columns: repeat(2, 1fr);
+    gap: 1px; background: var(--line);
+  }
+  @media (min-width: 560px) { .kpis { grid-template-columns: repeat(4, 1fr); } }
+  .kpi { background: var(--card); padding: 12px 14px; }
+  .kpi b { display: block; font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+  .kpi span { display: block; font-size: 0.74rem; color: var(--muted); margin-top: 1px; }
+  .kpi.quiet b { color: var(--muted); }
+  .panel-note { padding: 11px 14px; border-top: 1px solid var(--line); font-size: 0.82rem; color: var(--ink-dim); line-height: 1.5; }
+  .panel-note .small { font-size: 0.75rem; color: var(--muted); }
+  .mode { font-size: 0.66rem; padding: 2px 7px; border-radius: 999px; letter-spacing: 0.05em; }
+  .mode.live { background: var(--good-light); color: var(--good); }
+  .mode.test { background: var(--amber-light); color: var(--amber); }
+
+  .rows { border-top: 1px solid var(--line); }
+  .row-item {
+    display: flex; align-items: baseline; gap: 10px; width: 100%;
+    padding: 10px 14px; border: 0; border-top: 1px solid var(--line); background: none;
+    font: inherit; font-size: 0.83rem; color: var(--ink); text-align: left; cursor: pointer;
+  }
+  .row-item:first-child { border-top: 0; }
+  .row-item .grow { flex: 1; min-width: 0; font-weight: 600; }
+  .row-item .dim { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+  .rows-head { padding: 10px 14px 0; font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  /* Setup funnel: one bar per step, how many testers have done it. Tapping a
+     step lists the ones who have not, which is the actual job. */
+  .funnel { padding: 12px 14px 12px; border-top: 1px solid var(--line); }
+  .f-head { font-size: 0.76rem; color: var(--muted); margin-bottom: 6px; }
+  .f-row {
+    display: grid; grid-template-columns: 84px 1fr 44px; align-items: center; gap: 10px;
+    width: 100%; padding: 6px 0; border: 0; background: none; cursor: pointer;
+    font: inherit; color: inherit; text-align: left;
+  }
+  .f-label { font-size: 0.8rem; font-weight: 600; }
+  .f-track { height: 8px; border-radius: 4px; background: var(--card-2); border: 1px solid var(--line); overflow: hidden; }
+  .f-fill { display: block; height: 100%; background: var(--accent-fill); border-radius: 4px; }
+  .f-n { font-size: 0.78rem; color: var(--ink-dim); text-align: right; font-variant-numeric: tabular-nums; }
+  .f-row:hover .f-label, .f-row:focus-visible .f-label { text-decoration: underline; }
+
+  /* The worklist. */
   .q-item {
-    display: flex; gap: 10px; align-items: baseline;
+    display: flex; gap: 10px; align-items: baseline; width: 100%;
     padding: 10px 13px; border-radius: var(--r-md); margin-bottom: 7px;
-    background: var(--card); border: 1px solid var(--line); font-size: 0.85rem;
-    border-left: 3px solid var(--muted); cursor: pointer;
+    background: var(--card); border: 1px solid var(--line); font: inherit; font-size: 0.85rem;
+    border-left: 3px solid var(--muted); cursor: pointer; text-align: left; color: var(--ink);
   }
   .q-item.bad  { border-left-color: var(--warn); }
-  .q-item.warn { border-left-color: var(--gold, #b7791f); }
+  .q-item.warn { border-left-color: var(--amber); }
   .q-who { font-weight: 650; flex-shrink: 0; }
-  .q-why { color: var(--muted); }
+  .q-why { color: var(--ink-dim); }
+  .q-tag { font-size: 0.68rem; color: var(--muted); margin-left: auto; flex-shrink: 0; }
   .q-empty {
     padding: 14px; border-radius: var(--r-md); background: var(--good-light);
     color: var(--good); font-size: 0.85rem; font-weight: 600; text-align: center;
   }
+
+  /* Groups. */
+  .tabs {
+    display: flex; gap: 4px; padding: 4px; margin-bottom: 9px;
+    background: var(--card-2); border: 1px solid var(--line); border-radius: 12px;
+  }
+  .tab {
+    flex: 1; border: 0; background: none; font: inherit; font-size: 0.8rem; font-weight: 650;
+    padding: 8px 4px; border-radius: 9px; color: var(--ink-dim); cursor: pointer; white-space: nowrap;
+  }
+  .tab[aria-selected="true"] { background: var(--card); color: var(--ink); box-shadow: var(--sh-2); }
+  .tab .n { color: var(--muted); font-weight: 600; margin-left: 3px; }
+  .search {
+    width: 100%; font-family: inherit; font-size: 0.85rem; padding: 9px 11px; margin-bottom: 10px;
+    border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px;
+    font: inherit; font-size: 0.78rem; font-weight: 600; padding: 6px 11px; border-radius: 999px;
+    background: var(--accent-light); color: var(--accent); border: 0; cursor: pointer;
+  }
+
+  /* One account. Collapsed it answers "who, what state, where did they stop";
+     opening it is for doing something about it. */
+  .acct {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+    box-shadow: var(--sh-2); margin-bottom: 9px; overflow: hidden;
+    transition: box-shadow 0.4s;
+  }
+  .acct.flash { box-shadow: 0 0 0 2px var(--accent-fill); }
+  .acct-head { padding: 12px 14px 12px; cursor: pointer; }
+  .acct-head:focus-visible { outline: 2px solid var(--accent-fill); outline-offset: -2px; border-radius: var(--r-lg); }
+  .line1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .line1 .who { font-weight: 650; font-size: 0.95rem; margin-right: 3px; }
+  .chev { margin-left: auto; color: var(--muted); font-size: 1.1rem; line-height: 1; transition: transform 0.15s; }
+  .acct.open .chev { transform: rotate(90deg); }
+  .line2 { font-size: 0.78rem; color: var(--muted); margin-top: 3px; word-break: break-all; }
+  .peek {
+    font-size: 0.78rem; color: var(--ink-dim); margin-top: 9px; padding-left: 9px;
+    border-left: 2px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .peek b { font-weight: 650; }
+
+  .pill {
+    font-size: 0.66rem; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap;
+  }
+  .pill.good  { background: var(--good-light); color: var(--good); }
+  .pill.bad   { background: var(--warn-light); color: var(--warn); }
+  .pill.amber { background: var(--amber-light); color: var(--amber); }
+  .pill.accent { background: var(--accent-light); color: var(--accent); }
+  .pill.muted { background: var(--card-2); color: var(--muted); border: 1px solid var(--line); }
 
   /* Setup steps, in the order the app asks for them. */
   .steps { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
   .step {
     font-size: 0.68rem; font-weight: 650; padding: 3px 8px; border-radius: 999px;
     border: 1px solid var(--line); background: var(--card-2); color: var(--muted);
-    white-space: nowrap;
+    white-space: nowrap; cursor: help;
   }
   .step.done { background: var(--good-light); color: var(--good); border-color: transparent; }
-  .step.next { background: var(--warn-light); color: var(--warn); border-color: transparent; }
-  .pill.pay { background: var(--warn-light); color: var(--warn); }
+  .step.bad  { background: var(--warn-light); color: var(--warn); border-color: transparent; }
+  .step.next { background: var(--accent-light); color: var(--accent); border-color: transparent; }
+  .step:focus-visible { outline: 2px solid var(--accent-fill); outline-offset: 1px; }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 1px; background: var(--line); border-top: 1px solid var(--line);
+  }
+  .stat { background: var(--card); padding: 9px 12px; cursor: help; }
+  .stat b { display: block; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat span { display: block; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
+  .stat.quiet b { color: var(--muted); }
+  /* Anything with an explanation behind it says so, quietly. */
+  [data-tip] > span, .kpi[data-tip] span {
+    text-decoration: underline dotted; text-underline-offset: 3px;
+    text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent);
+  }
+  .kpi[data-tip] { cursor: help; }
+
+  .body { border-top: 1px solid var(--line); }
+  .foot { padding: 11px 14px 14px; border-top: 1px solid var(--line); }
+  .meta { font-size: 0.78rem; color: var(--ink-dim); line-height: 1.6; margin-bottom: 11px; }
+  .meta .bad { color: var(--warn); }
+  .btn {
+    font-family: inherit; font-size: 0.8rem; font-weight: 650; cursor: pointer;
+    padding: 8px 13px; border-radius: var(--r-sm); border: 1px solid var(--line);
+    background: var(--card-2); color: var(--ink); text-decoration: none; display: inline-block;
+  }
+  .btn.primary { background: var(--accent-fill); border-color: transparent; color: #15211f; }
+  .btn.danger { color: var(--warn); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn-row { display: flex; gap: 7px; flex-wrap: wrap; }
+  .move { display: flex; align-items: center; gap: 8px; margin-top: 11px; font-size: 0.78rem; color: var(--muted); }
+  .move select {
+    font: inherit; font-size: 0.8rem; padding: 6px 9px; border-radius: var(--r-sm);
+    border: 1px solid var(--line); background: var(--card-2); color: var(--ink);
+  }
+  textarea, input[type=email], input[type=password] {
+    width: 100%; font-family: inherit; font-size: 0.85rem; padding: 9px 11px;
+    border-radius: var(--r-sm); border: 1px solid var(--line);
+    background: var(--card-2); color: var(--ink); resize: vertical;
+  }
+  .notes { margin-top: 14px; }
+  .notes-label { font-size: 0.7rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+  .note {
+    font-size: 0.8rem; line-height: 1.5; padding: 8px 0;
+    border-top: 1px dashed var(--line); white-space: pre-wrap; word-break: break-word;
+  }
+  .note time { display: block; color: var(--muted); font-size: 0.72rem; margin-bottom: 2px; }
+  .note .by { color: var(--ink-dim); font-weight: 650; }
+  .empty { color: var(--muted); font-size: 0.85rem; padding: 18px 0; text-align: center; }
+  .gate { max-width: 340px; margin: 60px auto; }
+  .gate .field { margin-bottom: 11px; }
+  .gate label { display: block; font-size: 0.78rem; font-weight: 650; margin-bottom: 4px; }
+  .msg { font-size: 0.82rem; margin: 10px 0; }
+  .msg.bad { color: var(--warn); }
+  .version { color: var(--muted); font-size: 0.7rem; margin-top: 14px; }
+
+  /* One tooltip for the whole page, positioned against whatever asked for it.
+     It lives outside the cards so their rounded corners never clip it. */
+  #tip {
+    position: fixed; z-index: 50; max-width: 290px; padding: 9px 11px; border-radius: 10px;
+    background: var(--tip-bg); color: var(--tip-ink); font-size: 0.78rem; line-height: 1.45;
+    box-shadow: 0 10px 28px -10px rgba(0,0,0,.45); pointer-events: none;
+    opacity: 0; transform: translateY(3px); transition: opacity 0.12s, transform 0.12s;
+  }
+  #tip.show { opacity: 1; transform: none; }
+  #tip .t-title { font-weight: 700; margin-bottom: 2px; }
+  #tip .t-title.good { color: var(--tip-good); }
+  #tip .t-title.bad  { color: var(--tip-bad); }
+  #tip .t-title.todo { color: var(--tip-todo); }
 </style>
 </head>
 <body>
 <div class="wrap" id="app"><div class="empty">Loading…</div></div>
+<div id="tip" role="tooltip"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script>
-// The admin panel for whoever is looking after the testers.
+// The admin panel for the people running the tester programme.
 //
 // Everything on this page comes from one endpoint that holds the service key
 // and checks the caller against the admins table before it reads anything. The
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
+const VERSION = 'v6.16.0';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -150,8 +266,35 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 });
 
 const app = document.getElementById('app');
-let accounts = [];
-let openNotes = new Set();
+const tip = document.getElementById('tip');
+
+const SEGMENTS = [
+  ['tester', 'Beta testers'],
+  ['team', 'Team'],
+  ['test', 'Test accounts'],
+];
+const STEP_LABELS = [
+  ['name', 'Name'], ['phone', 'Phone'], ['calendar', 'Calendar'], ['student', 'Student'],
+  ['lessons', 'Lessons'], ['payment', 'Payment'], ['parent_link', 'Parent link'],
+];
+const stepLabel = key => (STEP_LABELS.find(([k]) => k === key) || [])[1] || key;
+// Parent-link opens were first recorded on this day. Anything earlier simply
+// was not counted, which matters when reading a zero.
+const PARENT_OPENS_COUNTED_FROM = '8 Oct 2026';
+
+let data = { accounts: [], income: null, me: null, loadedAt: null };
+const ui = {
+  seg: recall('tt-admin-seg'),
+  q: '',
+  missing: null,
+  open: new Set(),
+};
+if (!SEGMENTS.some(([k]) => k === ui.seg)) ui.seg = 'tester';
+
+// A remembered tab is a convenience. Private browsing, blocked storage or a
+// cleared site must never stop the page working.
+function remember(k, v) { try { localStorage.setItem(k, v); } catch {} }
+function recall(k) { try { return localStorage.getItem(k); } catch { return null; } }
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -169,6 +312,11 @@ function fmtDateTime(iso) {
 function fmtDate(iso) {
   if (!iso) return null;
   return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function fmtShort(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 function daysSince(iso) {
@@ -189,6 +337,29 @@ function agoLabel(iso) {
   return fmtDate(iso);
 }
 
+// "£5" not "£5.00", but "£4.17" kept intact.
+function money(pence) {
+  if (pence == null) return '—';
+  const pounds = pence / 100;
+  const whole = Math.abs(pounds - Math.round(pounds)) < 0.005;
+  return '£' + pounds.toLocaleString('en-GB', {
+    minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 2,
+  });
+}
+const gbp = pounds => money(Math.round(Number(pounds || 0) * 100));
+
+const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+
+// Stored by the app as international digits: 447700900123.
+function fmtPhone(digits) {
+  if (!digits) return '';
+  return digits.startsWith('44')
+    ? '+44 ' + digits.slice(2, 6) + ' ' + digits.slice(6)
+    : '+' + digits;
+}
+
+const nameOf = a => a.name || a.email || 'Unnamed';
+
 async function call(action, extra = {}) {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return { ok: false, problem: 'signed_out' };
@@ -206,7 +377,7 @@ function renderGate(message) {
   app.innerHTML = `
     <div class="gate">
       <h1>TutorTally admin</h1>
-      <div class="sub">
+      <div class="sub" style="margin-bottom:18px">
         Use the same email and password as TutorTally itself. If you reached
         this from inside the app you should not see this at all.
       </div>
@@ -233,48 +404,264 @@ function renderGate(message) {
   });
 }
 
-// ---- The list -----------------------------------------------------------
+// ---- What each account is ----------------------------------------------
 
-// The order the app asks for them in, so the first unticked one is literally
-// where that tutor stopped.
-const SETUP_STEPS = [
-  ['name',        'Name'],
-  ['phone',       'Phone'],
-  ['calendar',    'Calendar'],
-  ['student',     'Student'],
-  ['lessons',     'Lessons'],
-  ['payment',     'Payment'],
-  ['parent_link', 'Parent link'],
-];
+const isPaying = a => ['active', 'past_due'].includes(a.billing?.status);
+const freeForever = a => a.free_days_left != null && a.free_days_left > 3650;
+const freeActive = a => a.free_days_left != null && a.free_days_left >= 0;
+// Has students, lessons arriving and at least one payment logged: the point at
+// which TutorTally is doing its job for them rather than being looked at.
+const usingItProperly = a => a.active_students > 0 && a.total_lessons > 0 && a.payments_logged > 0;
+const wouldNeedPro = a => a.over_limit_by > 0 && !isPaying(a);
+
+/**
+ * The setup steps, in the order the app asks for them, each with the state a
+ * hover or a tap explains. Three states rather than two, because "connected but
+ * broken" is the one that matters most and a tick would hide it.
+ */
+function stepsOf(a) {
+  const out = [];
+  const add = (key, label, state, title, body) => out.push({ key, label, state, title, body });
+
+  add('name', 'Name', a.has_name ? 'done' : 'todo',
+    a.has_name ? 'Filled in' : 'Not filled in yet',
+    a.has_name ? `Shows as "${a.name}".` : 'No name on the account. They add it in Settings → Your account.');
+
+  add('phone', 'Phone', a.has_phone ? 'done' : 'todo',
+    a.has_phone ? 'Filled in' : 'Not filled in yet',
+    a.has_phone ? fmtPhone(a.phone) : 'No phone number yet. They add it in Settings → Your account.');
+
+  const calName = a.calendar === 'google' ? 'Google Calendar'
+    : a.calendar === 'link' ? 'Calendar link (Apple, Outlook or similar)' : null;
+  const synced = a.calendar_synced_at ? ` Last sync ${agoLabel(a.calendar_synced_at)}.` : '';
+  if (a.calendar && a.calendar_error) {
+    add('calendar', 'Calendar', 'bad', 'Error',
+      `${calName} is connected but failing: ${a.calendar_error}.${synced}`);
+  } else if (a.calendar) {
+    add('calendar', 'Calendar', 'done', 'Connected', `${calName}.${synced || ' Not synced yet.'}`);
+  } else {
+    add('calendar', 'Calendar', 'todo', 'Not connected yet',
+      'No calendar connected, so lessons cannot come in on their own.');
+  }
+
+  const archived = a.total_students - a.active_students;
+  add('student', 'Student', a.active_students > 0 ? 'done' : 'todo',
+    a.active_students > 0 ? 'Added' : 'None added yet',
+    a.active_students > 0
+      ? `${plural(a.active_students, 'active student')}${archived > 0 ? `, ${archived} archived` : ''}.`
+      : 'No students on the account yet.');
+
+  let lessonsWhy = 'Needs a calendar connected first.';
+  if (a.calendar && a.calendar_error) lessonsWhy = 'Their calendar is failing, so nothing can come through.';
+  else if (a.calendar && a.active_students === 0) lessonsWhy = 'Calendar is connected. Lessons appear once a student is added whose name matches the calendar events.';
+  else if (a.calendar) lessonsWhy = 'Calendar is connected but no event has matched a student yet. Usually the event titles do not contain the student\'s name.';
+  add('lessons', 'Lessons', a.total_lessons > 0 ? 'done' : 'todo',
+    a.total_lessons > 0 ? 'Coming in' : 'None yet',
+    a.total_lessons > 0
+      ? `${plural(a.total_lessons, 'lesson')} in total. ${a.lessons_last_30} taught in the last 30 days, ${a.lessons_upcoming} booked ahead.`
+      : lessonsWhy);
+
+  add('payment', 'Payment', a.payments_logged > 0 ? 'done' : 'todo',
+    a.payments_logged > 0 ? 'Logged' : 'None logged yet',
+    a.payments_logged > 0
+      ? `${plural(a.payments_logged, 'payment')} logged, ${gbp(a.money_logged)} in total${a.last_payment_date ? `, latest dated ${fmtShort(a.last_payment_date)}` : ''}. ${paidLine(a)}`
+      : 'They have not recorded any money from a parent yet.');
+
+  add('parent_link', 'Parent link', a.parent_views_ever > 0 ? 'done' : 'todo',
+    a.parent_views_ever > 0 ? 'Opened' : 'Not opened yet',
+    a.parent_views_ever > 0
+      ? `A parent last opened a link ${agoLabel(a.last_parent_view)}. ${a.parent_days_30d ? `Opened on ${plural(a.parent_days_30d, 'day')} in the last 30.` : ''}`
+      : `No parent has opened one of their links. Opens are counted from ${PARENT_OPENS_COUNTED_FROM}.`);
+
+  return out;
+}
+
+function paidLine(a) {
+  if (!a.taught_chargeable) return '';
+  return `${a.taught_paid} of the ${a.taught_chargeable} lessons they have taught since tracking money are paid for.`;
+}
 
 function stepsHTML(a) {
-  const firstTodo = SETUP_STEPS.find(([k]) => !a.setup[k]);
-  return '<div class="steps">' + SETUP_STEPS.map(([k, label]) => {
-    const done = a.setup[k];
-    const isNext = !done && firstTodo && firstTodo[0] === k;
-    return `<span class="step ${done ? 'done' : isNext ? 'next' : ''}">${
-      done ? '\u2713 ' : ''}${esc(label)}</span>`;
+  const steps = stepsOf(a);
+  const next = steps.find(s => s.state === 'todo');
+  return '<div class="steps">' + steps.map(s => {
+    const cls = s.state === 'done' ? 'done' : s.state === 'bad' ? 'bad' : s === next ? 'next' : '';
+    const mark = s.state === 'done' ? '✓ ' : s.state === 'bad' ? '⚠ ' : '';
+    const tone = s.state === 'done' ? 'good' : s.state === 'bad' ? 'bad' : 'todo';
+    return `<span class="step ${cls}" tabindex="0"
+      data-tip="${esc(s.body)}" data-tip-title="${esc(s.label + ': ' + s.title)}" data-tip-tone="${tone}"
+      aria-label="${esc(`${s.label}: ${s.title}. ${s.body}`)}">${mark}${esc(s.label)}</span>`;
   }).join('') + '</div>';
 }
 
+function pillsHTML(a) {
+  const out = [];
+  const b = a.billing || {};
+  if (b.status === 'past_due') out.push('<span class="pill bad">Payment failing</span>');
+  else if (isPaying(a) && b.cancel_at_period_end) out.push(`<span class="pill amber">Cancels ${esc(fmtShort(b.current_period_end))}</span>`);
+  else if (isPaying(a)) out.push(`<span class="pill good">Paying${b.mrr_pence ? ' ' + esc(money(b.mrr_pence)) + '/mo' : ''}</span>`);
+
+  if (!isPaying(a)) {
+    if (freeForever(a)) out.push('<span class="pill good">Free forever</span>');
+    else if (freeActive(a)) out.push(`<span class="pill ${a.free_days_left <= 7 ? 'amber' : 'good'}">Free · ${a.free_days_left}d left</span>`);
+    else if (a.free_days_left != null) out.push('<span class="pill bad">Free ended</span>');
+    else out.push('<span class="pill muted">Lite</span>');
+  }
+  if (wouldNeedPro(a)) out.push(`<span class="pill accent">${a.over_limit_by} over limit</span>`);
+  if (a.is_admin) out.push('<span class="pill muted">Admin</span>');
+  return out.join('');
+}
+
+// ---- Income -------------------------------------------------------------
+
+function incomeHTML() {
+  const inc = data.income;
+  const accById = new Map(data.accounts.map(a => [a.owner_id, a]));
+  const modeBadge = inc?.available
+    ? `<span class="mode ${inc.live ? 'live' : 'test'}">${inc.live ? 'Live' : 'Test mode'}</span>` : '';
+
+  if (!inc || !inc.available) {
+    return `
+      <div class="section-label">Income</div>
+      <div class="panel"><div class="panel-note">${esc(inc?.problem || 'Income is not available right now.')}
+        The rest of the page is unaffected.</div></div>`;
+  }
+
+  const payers = data.accounts.filter(a => a.segment !== 'test' && isPaying(a));
+  const pipeline = data.accounts.filter(a => a.segment === 'tester' && wouldNeedPro(a));
+
+  let note = '';
+  if (!inc.live) {
+    note += '<div>Stripe is running on test keys, so these are pretend payments made with test cards. Nothing here is real money.</div>';
+  }
+  if (!inc.paying && pipeline.length) {
+    const names = pipeline.map(nameOf);
+    const list = names.length === 1 ? names[0]
+      : names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1];
+    const worth = inc.pro_price_pence ? ` If ${pipeline.length === 1 ? 'they' : 'they all'} went Pro, that is ${money(inc.pro_price_pence * pipeline.length)} a month.` : '';
+    note += `<div>Nobody is paying yet. ${esc(list)} ${pipeline.length === 1 ? 'is' : 'are'} over the free limit.${esc(worth)}</div>`;
+  } else if (!inc.paying) {
+    note += '<div>Nobody is paying yet, and no beta tester is over the free limit.</div>';
+  }
+  if (inc.trialing) note += `<div>${esc(plural(inc.trialing, 'account'))} on a free trial, not counted until it bills.</div>`;
+  if (inc.excluded_count) {
+    note += `<div class="small">${esc(money(inc.excluded_pence))} from ${esc(plural(inc.excluded_count, 'payment'))} by your test accounts is left out of these numbers.</div>`;
+  }
+
+  const payerRows = payers.length ? `
+    <div class="rows-head">Paying</div>
+    <div class="rows">${payers.map(a => `
+      <button class="row-item" data-jump="${esc(a.owner_id)}">
+        <span class="grow">${esc(nameOf(a))}</span>
+        <span class="dim">${esc(money(a.billing.mrr_pence))}/mo${a.billing.since ? ' · since ' + esc(fmtShort(a.billing.since)) : ''}</span>
+      </button>`).join('')}</div>` : '';
+
+  const recentRows = (inc.recent || []).length ? `
+    <div class="rows-head">Latest payments</div>
+    <div class="rows">${inc.recent.slice(0, 5).map(r => {
+      const a = accById.get(r.owner_id);
+      return `
+      <button class="row-item" ${a ? `data-jump="${esc(a.owner_id)}"` : 'disabled'}>
+        <span class="grow">${esc(a ? nameOf(a) : 'Unknown customer')}</span>
+        <span class="dim">${esc(fmtShort(r.at))} · ${esc(money(r.amount_pence))}${r.refunded_pence ? ` (${esc(money(r.refunded_pence))} refunded)` : ''}</span>
+      </button>`;
+    }).join('')}</div>` : '';
+
+  return `
+    <div class="section-label">Income ${modeBadge}</div>
+    <div class="panel">
+      <div class="kpis">
+        <div class="kpi${inc.mrr_pence ? '' : ' quiet'}" data-tip-title="Monthly recurring" data-tip="What paying customers are billed every month, read live from Stripe. Test accounts are left out.">
+          <b>${esc(money(inc.mrr_pence))}</b><span>a month</span></div>
+        <div class="kpi${inc.paying ? '' : ' quiet'}" data-tip-title="Paying" data-tip="Live Pro subscriptions, including any whose latest payment failed while Stripe retries it.">
+          <b>${inc.paying}</b><span>paying</span></div>
+        <div class="kpi${inc.collected_pence ? '' : ' quiet'}" data-tip-title="Collected" data-tip="Every successful payment since TutorTally started taking money, minus refunds, before Stripe's fees.">
+          <b>${esc(money(inc.collected_pence))}</b><span>collected, all time</span></div>
+        <div class="kpi${inc.this_month_pence ? '' : ' quiet'}" data-tip-title="This month" data-tip="Collected since the 1st of this month.">
+          <b>${esc(money(inc.this_month_pence))}</b><span>this month</span></div>
+      </div>
+      ${note ? `<div class="panel-note">${note}</div>` : ''}
+      ${payerRows}
+      ${recentRows}
+    </div>`;
+}
+
+// ---- Beta testers overview ---------------------------------------------
+
+function testersHTML(testers) {
+  const n = testers.length;
+  if (!n) {
+    return `<div class="section-label">Beta testers</div>
+      <div class="panel"><div class="panel-note">No beta testers yet. New sign-ups land here automatically.</div></div>`;
+  }
+  const active7 = testers.filter(a => daysSince(a.last_seen) !== null && daysSince(a.last_seen) <= 7).length;
+  const proper = testers.filter(usingItProperly).length;
+  const overLimit = testers.filter(wouldNeedPro).length;
+
+  const funnel = STEP_LABELS.map(([key, label]) => {
+    const done = testers.filter(a => stepsOf(a).find(s => s.key === key).state === 'done').length;
+    const pct = Math.round((done / n) * 100);
+    const stuck = n - done;
+    return `
+      <button class="f-row" data-missing="${key}"
+        aria-label="${esc(`${done} of ${n} beta testers have done ${label}. Show the ${stuck} who have not.`)}">
+        <span class="f-label">${esc(label)}</span>
+        <span class="f-track"><span class="f-fill" style="width:${pct}%"></span></span>
+        <span class="f-n">${done}/${n}</span>
+      </button>`;
+  }).join('');
+
+  return `
+    <div class="section-label">Beta testers</div>
+    <div class="panel">
+      <div class="kpis">
+        <div class="kpi" data-tip-title="Beta testers" data-tip="Everyone not in Team or Test accounts. Move an account between groups from inside its card.">
+          <b>${n}</b><span>beta testers</span></div>
+        <div class="kpi${active7 ? '' : ' quiet'}" data-tip-title="Used it this week" data-tip="Had TutorTally open in the last 7 days.">
+          <b>${active7}</b><span>used it this week</span></div>
+        <div class="kpi${proper ? '' : ' quiet'}" data-tip-title="Using it properly" data-tip="Has students, lessons coming in, and has logged at least one payment. The point where TutorTally is doing its job for them.">
+          <b>${proper}</b><span>using it properly</span></div>
+        <div class="kpi${overLimit ? '' : ' quiet'}" data-tip-title="Over the free limit" data-tip="More active students than the free plan allows, and not paying. These are the testers who would need Pro if their free access stopped.">
+          <b>${overLimit}</b><span>over the free limit</span></div>
+      </div>
+      <div class="funnel">
+        <div class="f-head">How far they got. Tap a step to see who is stuck before it.</div>
+        ${funnel}
+      </div>
+    </div>`;
+}
+
+// ---- Needs attention ----------------------------------------------------
+
 /**
- * What to do today, rather than eight cards to read and form your own opinion
- * about. Everything here is derived from the account rows already loaded, so it
- * costs nothing and can never disagree with the cards below it.
+ * What to do today, rather than a list of cards to read and form your own
+ * opinion about. Derived from the rows already loaded, so it costs nothing and
+ * can never disagree with the cards below it. Test accounts never appear, and
+ * the team only appears when something of theirs is actually broken.
  */
-function buildQueue(accounts) {
+function buildQueue(list) {
   const out = [];
   const days = iso => daysSince(iso);
 
-  for (const a of accounts) {
+  for (const a of list) {
+    if (a.segment === 'test') continue;
+    const b = a.billing || {};
+    if (b.status === 'past_due') {
+      out.push({ a, tone: 'bad', why: 'their Pro payment failed and Stripe is retrying' });
+    }
     if (a.calendar_error) {
       out.push({ a, tone: 'bad', why: 'calendar is erroring, lessons are not coming in' });
     }
-    if (a.free_days_left != null && a.free_days_left >= 0 && a.free_days_left <= 7) {
-      out.push({ a, tone: 'warn', why: `free access ends in ${a.free_days_left} day${a.free_days_left === 1 ? '' : 's'}` });
+    if (a.segment === 'team') continue;
+
+    if (isPaying(a) && b.cancel_at_period_end) {
+      out.push({ a, tone: 'warn', why: `cancelled Pro, it ends ${fmtShort(b.current_period_end)}` });
     }
-    if (a.free_days_left != null && a.free_days_left < 0 && a.over_limit_by > 0) {
-      out.push({ a, tone: 'bad', why: `free access ended and they are ${a.over_limit_by} student${a.over_limit_by === 1 ? '' : 's'} over the limit` });
+    if (!freeForever(a) && freeActive(a) && a.free_days_left <= 7) {
+      out.push({ a, tone: 'warn', why: `free access ends in ${plural(a.free_days_left, 'day')}` });
+    }
+    if (a.free_days_left != null && a.free_days_left < 0 && wouldNeedPro(a)) {
+      out.push({ a, tone: 'bad', why: `free access ended and they are ${plural(a.over_limit_by, 'student')} over the limit` });
     }
     // Signed up, had a proper look around, then stopped. Distinct from someone
     // who signed up and never started, which is the next rule.
@@ -284,187 +671,405 @@ function buildQueue(accounts) {
     if (a.active_students === 0 && days(a.joined) != null && days(a.joined) >= 3) {
       out.push({ a, tone: 'warn', why: `joined ${days(a.joined)} days ago, never added a student` });
     } else if (a.active_students > 0 && a.total_lessons === 0 && days(a.joined) >= 3) {
-      out.push({ a, tone: 'bad', why: 'has a student but no lessons have ever synced' });
+      out.push({ a, tone: 'bad', why: 'has a student but no lessons have ever come in' });
+    }
+    // Either parents owe them a lot of money or, far more likely, they are not
+    // logging it. Both are worth a message.
+    const unpaid = a.taught_chargeable - a.taught_paid;
+    if (a.taught_chargeable >= 8 && unpaid / a.taught_chargeable > 0.5) {
+      out.push({ a, tone: 'warn', why: `${unpaid} of ${a.taught_chargeable} lessons taught have no payment logged` });
     }
   }
-  return out;
+  return out.sort((x, y) => (x.tone === 'bad' ? 0 : 1) - (y.tone === 'bad' ? 0 : 1));
 }
 
-function queueHTML(accounts) {
-  const items = buildQueue(accounts);
+function queueHTML(list) {
+  const items = buildQueue(list);
   if (!items.length) {
     return '<div class="section-label">Needs attention</div>'
       + '<div class="q-empty">Nothing needs chasing today.</div>';
   }
-  return '<div class="section-label">Needs attention \u00b7 ' + items.length + '</div>'
-    + '<div class="queue">' + items.map(q => `
-        <div class="q-item ${q.tone}" data-jump="${esc(q.a.owner_id)}">
-          <span class="q-who">${esc(q.a.name || q.a.email || 'Unknown')}</span>
+  return `<div class="section-label">Needs attention · ${items.length}</div>`
+    + items.map(q => `
+        <button class="q-item ${q.tone}" data-jump="${esc(q.a.owner_id)}">
+          <span class="q-who">${esc(nameOf(q.a))}</span>
           <span class="q-why">${esc(q.why)}</span>
-        </div>`).join('') + '</div>';
+          ${q.a.segment === 'team' ? '<span class="q-tag">team</span>' : ''}
+        </button>`).join('');
 }
 
-function statusPill(a) {
-  if (a.free_days_left != null && a.free_days_left >= 0) {
-    return `<span class="pill comp">Free · ${a.free_days_left}d left</span>`;
+// ---- The account list ---------------------------------------------------
+
+function statsHTML(a) {
+  const archived = a.total_students - a.active_students;
+  const paidVal = a.taught_chargeable ? `${a.taught_paid}/${a.taught_chargeable}` : '—';
+  const cell = (val, label, title, body, quiet) =>
+    `<div class="stat${quiet ? ' quiet' : ''}" tabindex="0" data-tip-title="${esc(title)}" data-tip="${esc(body)}"><b>${esc(val)}</b><span>${esc(label)}</span></div>`;
+  return `<div class="stats">
+    ${cell(a.active_students, 'Students', 'Students',
+      `${plural(a.active_students, 'active student')}${archived ? `, ${archived} archived` : ''}. The free plan covers ${a.free_student_limit}.`,
+      !a.active_students)}
+    ${cell(a.lessons_last_30, 'Taught 30d', 'Taught in the last 30 days', 'Lessons dated in the last 30 days, mostly from their calendar.', !a.lessons_last_30)}
+    ${cell(a.lessons_upcoming, 'Booked', 'Booked ahead', 'Lessons in the diary from tomorrow on.', !a.lessons_upcoming)}
+    ${cell(paidVal, 'Lessons paid', 'Lessons paid for',
+      a.taught_chargeable
+        ? `${a.taught_paid} of the ${a.taught_chargeable} lessons taught since they started tracking money have enough logged against them to count as paid. One payment can cover many lessons, so this is the number to watch, not the payment count.`
+        : 'No chargeable lessons taught yet.',
+      !a.taught_chargeable)}
+    ${cell(gbp(a.money_logged), 'Fees logged', 'Fees logged',
+      a.payments_logged
+        ? `What parents have paid this tutor, as recorded in TutorTally: ${plural(a.payments_logged, 'payment')}${a.last_payment_date ? `, latest dated ${fmtShort(a.last_payment_date)}` : ''}. This is their income, not ours.`
+        : 'No payments from parents recorded yet.',
+      !a.payments_logged)}
+    ${cell(a.parent_days_30d, 'Parent opens', 'Parent-link opens',
+      a.parent_views_ever
+        ? `Parents opened a link on ${plural(a.parent_days_30d, 'day')} in the last 30. Counted in days, so one parent refreshing five times is one.`
+        : `No parent has opened a link yet. Counted from ${PARENT_OPENS_COUNTED_FROM}.`,
+      !a.parent_days_30d)}
+  </div>`;
+}
+
+function metaHTML(a) {
+  const lines = [];
+  lines.push(`Joined ${esc(fmtDate(a.joined) || '?')} · last used <b>${esc(agoLabel(a.last_seen))}</b>${
+    a.last_entry ? ' · last added something ' + esc(agoLabel(a.last_entry)) : ''}`);
+
+  const calName = a.calendar === 'google' ? 'Google Calendar' : a.calendar === 'link' ? 'Calendar link' : null;
+  if (calName) {
+    lines.push(`${calName}${a.calendar_synced_at ? ', last sync ' + esc(agoLabel(a.calendar_synced_at)) : ''}${
+      a.calendar_error ? `<br><span class="bad">⚠ ${esc(a.calendar_error)}</span>` : ''}`);
+  } else {
+    lines.push('No calendar connected');
   }
-  if (a.free_days_left != null) return '<span class="pill lapsed">Free ended</span>';
-  return '<span class="pill free">No free access</span>';
+
+  const b = a.billing || {};
+  if (isPaying(a)) {
+    lines.push(`Pays ${esc(money(b.mrr_pence))} a month${b.since ? ' since ' + esc(fmtDate(b.since)) : ''}${
+      b.collected_pence != null ? ` · ${esc(money(b.collected_pence))} collected so far` : ''}${
+      b.cancel_at_period_end ? ` · <span class="bad">cancelled, ends ${esc(fmtDate(b.current_period_end))}</span>` : ''}`);
+  } else if (b.collected_pence) {
+    lines.push(`Used to pay: ${esc(money(b.collected_pence))} collected in total`);
+  }
+
+  if (freeForever(a)) lines.push('Free access with no end date');
+  else if (a.pro_free_until) lines.push(`Free access ${a.free_days_left < 0 ? 'ended' : 'runs to'} <b>${esc(fmtDate(a.pro_free_until))}</b>`);
+
+  return `<div class="meta">${lines.join('<br>')}</div>`;
 }
 
-function accountCard(a) {
-  const notesOpen = openNotes.has(a.owner_id);
-  const calLabel = a.calendar === 'google' ? 'Google Calendar'
-    : a.calendar === 'link' ? 'Calendar link' : 'No calendar connected';
+function notesHTML(a) {
+  return `
+    <div class="notes">
+      <div class="notes-label">Notes · ${a.notes.length}</div>
+      <textarea rows="2" data-note-box placeholder="What did they say? Where did it come from?"></textarea>
+      <div class="btn-row" style="margin:7px 0 4px">
+        <button class="btn" data-act="save-note">Add note</button>
+      </div>
+      ${a.notes.length
+        ? a.notes.map(nt => `<div class="note"><time><span class="by">${esc(nt.author || 'Unknown')}</span> · ${esc(fmtDateTime(nt.created_at))}</time>${esc(nt.body)}</div>`).join('')
+        : '<div class="note" style="color:var(--muted)">Nothing recorded yet.</div>'}
+    </div>`;
+}
+
+function accountHTML(a) {
+  const open = ui.open.has(a.owner_id);
+  const latest = a.notes[0];
+  const line2 = [a.name ? a.email : null, `used ${agoLabel(a.last_seen)}`].filter(Boolean).join(' · ');
 
   return `
-    <div class="card" data-owner="${esc(a.owner_id)}">
-      <div class="head">
-        <span class="who">${esc(a.name || a.email || 'Unnamed')}</span>
-        ${statusPill(a)}
-        ${a.over_limit_by > 0
-          ? `<span class="pill pay">${a.over_limit_by} over the free limit</span>`
-          : ''}
-        <span class="mail">${esc(a.email || '')}</span>
-      </div>
-      <div class="stats">
-        <div class="stat${a.active_students ? '' : ' quiet'}"><b>${a.active_students}</b><span>Students</span></div>
-        <div class="stat${a.total_lessons ? '' : ' quiet'}"><b>${a.total_lessons}</b><span>Lessons</span></div>
-        <div class="stat${a.lessons_last_30 ? '' : ' quiet'}"><b>${a.lessons_last_30}</b><span>Taught 30d</span></div>
-        <div class="stat${a.lessons_upcoming ? '' : ' quiet'}"><b>${a.lessons_upcoming}</b><span>Booked</span></div>
-        <div class="stat${a.payments_logged ? '' : ' quiet'}"><b>${a.payments_logged}</b><span>Payments</span></div>
-        <div class="stat${a.parent_days_30d ? '' : ' quiet'}"><b>${a.parent_days_30d}</b><span>Parent opens</span></div>
-      </div>
-      <div class="foot">
-        <div class="meta">
-          Joined ${esc(fmtDate(a.joined) || '?')} · <b>last used ${esc(agoLabel(a.last_seen))}</b>${
-            a.last_entry ? ' · last typed something in ' + esc(agoLabel(a.last_entry)) : ''}<br>
-          ${esc(calLabel)}${a.calendar_synced_at ? ', last synced ' + esc(agoLabel(a.calendar_synced_at)) : ''}
-          ${a.calendar_error ? `<br><span style="color:var(--warn)">\u26a0 ${esc(a.calendar_error)}</span>` : ''}
-          ${a.pro_free_until ? `<br>Free access runs to <b>${esc(a.pro_free_until)}</b>` : ''}
-          ${a.parent_days_30d
-            ? `<br>Parents opened their link on ${a.parent_days_30d} day${a.parent_days_30d === 1 ? '' : 's'} in the last 30, last ${esc(agoLabel(a.last_parent_view))}`
-            : '<br>No parent has opened a link in the last 30 days'}
+    <div class="acct${open ? ' open' : ''}" data-owner="${esc(a.owner_id)}">
+      <div class="acct-head" data-toggle role="button" tabindex="0" aria-expanded="${open}">
+        <div class="line1">
+          <span class="who">${esc(nameOf(a))}</span>
+          ${pillsHTML(a)}
+          <span class="chev" aria-hidden="true">›</span>
         </div>
+        <div class="line2">${esc(line2)}</div>
         ${stepsHTML(a)}
-        <div class="btn-row">
-          <button class="btn primary" data-act="grant" data-months="3">+3 months free</button>
-          <button class="btn" data-act="grant" data-months="1">+1 month</button>
-          ${a.pro_free_until ? '<button class="btn danger" data-act="revoke">End free access</button>' : ''}
-          <button class="btn" data-act="notes">${notesOpen ? 'Hide' : 'Notes'} (${a.notes.length})</button>
-        </div>
-        ${notesOpen ? `
-          <div class="notes">
-            <textarea rows="3" data-note-box placeholder="What did they say? Where did it come from?"></textarea>
-            <div class="btn-row" style="margin-top:7px">
-              <button class="btn primary" data-act="save-note">Add note</button>
-            </div>
-            ${a.notes.length
-              ? a.notes.map(nt => `<div class="note"><time><span class="who">${esc(nt.author || 'Unknown')}</span> · ${esc(fmtDateTime(nt.created_at))}</time>${esc(nt.body)}</div>`).join('')
-              : '<div class="note" style="color:var(--muted)">Nothing recorded yet.</div>'}
-          </div>` : ''}
+        ${latest && !open ? `<div class="peek"><b>${esc(latest.author || 'Unknown')}:</b> ${esc(latest.body)}</div>` : ''}
       </div>
+      ${open ? `
+        <div class="body">
+          ${statsHTML(a)}
+          <div class="foot">
+            ${metaHTML(a)}
+            <div class="btn-row">
+              ${a.phone ? `<a class="btn" href="https://wa.me/${esc(a.phone)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+              ${a.email ? `<a class="btn" href="mailto:${esc(a.email)}">Email</a>` : ''}
+              ${!freeForever(a) ? '<button class="btn primary" data-act="grant">+1 month free</button>' : ''}
+              ${freeActive(a) ? '<button class="btn danger" data-act="revoke">End free access</button>' : ''}
+            </div>
+            <label class="move">Group
+              <select data-seg-select>
+                ${SEGMENTS.map(([k, label]) => `<option value="${k}"${a.segment === k ? ' selected' : ''}>${esc(label)}</option>`).join('')}
+              </select>
+            </label>
+            ${notesHTML(a)}
+          </div>
+        </div>` : ''}
     </div>`;
 }
 
-function render() {
-  const active7 = accounts.filter(a => daysSince(a.last_seen) !== null && daysSince(a.last_seen) <= 7).length;
-  const broken = accounts.filter(a => a.calendar_error).length;
-  // Who would actually have to do something if the free ride stopped. Everyone
-  // else is a tester, not a customer, however keen they sound.
-  const wouldPay = accounts.filter(a => a.over_limit_by > 0).length;
-  const parentOpens = accounts.reduce((t, a) => t + a.parent_days_30d, 0);
-  const withStudents = accounts.filter(a => a.active_students > 0).length;
-  const comped = accounts.filter(a => a.free_days_left != null && a.free_days_left >= 0).length;
-
-  app.innerHTML = `
-    <h1>TutorTally admin</h1>
-    <div class="sub">Testers, how much they are using it, and who has free access.</div>
-    <div class="totals">
-      <span><b>${accounts.length}</b> accounts</span>
-      <span><b>${active7}</b> used it this week</span>
-      <span><b>${wouldPay}</b> over the free limit</span>
-      <span><b>${parentOpens}</b> parent opens (30d)</span>
-      ${broken ? `<span style="color:var(--warn)"><b>${broken}</b> with a calendar problem</span>` : ''}
-      <span><b>${withStudents}</b> with students</span>
-      <span><b>${comped}</b> on free access</span>
-    </div>
-    ${queueHTML(accounts)}
-    <div class="section-label">Accounts · last used first</div>
-    ${accounts.length ? accounts.map(accountCard).join('') : '<div class="empty">No accounts.</div>'}
-    <div class="btn-row" style="margin-top:20px">
-      <a class="btn" href="/" style="text-decoration:none">← Back to TutorTally</a>
-      <button class="btn" id="signOut">Sign out</button>
-    </div>`;
-
-  document.getElementById('signOut').addEventListener('click', async () => {
-    await sb.auth.signOut();
-    renderGate(null);
+function visibleAccounts() {
+  const q = ui.q.trim().toLowerCase();
+  return data.accounts.filter(a => {
+    if (a.segment !== ui.seg) return false;
+    if (q && !`${a.name || ''} ${a.email || ''}`.toLowerCase().includes(q)) return false;
+    if (ui.missing && stepsOf(a).find(s => s.key === ui.missing)?.state === 'done') return false;
+    return true;
   });
 }
 
-// One listener for the whole list rather than per button, so re-rendering a card
+function listHTML() {
+  const list = visibleAccounts();
+  const missingLabel = ui.missing ? stepLabel(ui.missing) : null;
+  const chip = missingLabel
+    ? `<button class="chip" data-clear-missing>Not done yet: ${esc(missingLabel)} ✕</button>` : '';
+  const emptyText = ui.missing ? `Everyone here has done ${missingLabel}.`
+    : ui.q ? 'Nobody matches that search.'
+    : ui.seg === 'test' ? 'No test accounts. Move one here from its card so it stops counting as a tester.'
+    : 'Nobody in this group yet.';
+  return chip + (list.length ? list.map(accountHTML).join('') : `<div class="empty">${esc(emptyText)}</div>`);
+}
+
+function tabsHTML() {
+  return `<div class="tabs" role="tablist">${SEGMENTS.map(([k, label]) => {
+    const n = data.accounts.filter(a => a.segment === k).length;
+    return `<button class="tab" role="tab" data-seg="${k}" aria-selected="${ui.seg === k}">${esc(label)}<span class="n">${n}</span></button>`;
+  }).join('')}</div>`;
+}
+
+function render() {
+  hideTip();
+  const testers = data.accounts.filter(a => a.segment === 'tester');
+  app.innerHTML = `
+    <div class="top">
+      <div>
+        <h1>TutorTally admin</h1>
+        <div class="sub">Signed in as ${esc(data.me || '?')} · loaded ${esc(fmtDateTime(data.loadedAt))}</div>
+      </div>
+      <button class="btn" data-act="refresh">Refresh</button>
+    </div>
+    <div class="hint">Hover over, or tap, anything underlined or any setup step to see what it means.</div>
+    ${incomeHTML()}
+    ${testersHTML(testers)}
+    ${queueHTML(data.accounts)}
+    <div class="section-label" id="accounts">Accounts</div>
+    ${tabsHTML()}
+    <input type="search" class="search" id="q" placeholder="Search by name or email" value="${esc(ui.q)}" autocomplete="off">
+    <div id="list">${listHTML()}</div>
+    <div class="btn-row" style="margin-top:22px">
+      <a class="btn" href="/">← Back to TutorTally</a>
+      <button class="btn" data-act="signout">Sign out</button>
+    </div>
+    <div class="version">${VERSION}</div>`;
+}
+
+function renderList() {
+  hideTip();
+  document.getElementById('list').innerHTML = listHTML();
+}
+
+function openAccount(ownerId) {
+  const a = data.accounts.find(x => x.owner_id === ownerId);
+  if (!a) return;
+  ui.seg = a.segment;
+  remember('tt-admin-seg', ui.seg);
+  ui.q = '';
+  ui.missing = null;
+  ui.open.add(ownerId);
+  render();
+  const card = app.querySelector(`.acct[data-owner="${ownerId}"]`);
+  if (!card) return;
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  card.classList.add('flash');
+  setTimeout(() => card.classList.remove('flash'), 1600);
+}
+
+// ---- Tooltip ------------------------------------------------------------
+//
+// Hover on a computer, tap on a phone. A tap pins it until the next tap, so it
+// can be read without holding a finger on the screen.
+
+let tipFor = null;
+let tipPinned = false;
+
+function showTip(el, pin) {
+  const title = el.dataset.tipTitle;
+  const body = el.dataset.tip;
+  const tone = el.dataset.tipTone || '';
+  tip.innerHTML = (title ? `<div class="t-title ${esc(tone)}">${esc(title)}</div>` : '') + `<div>${esc(body)}</div>`;
+  tip.classList.add('show');
+  tipFor = el;
+  tipPinned = !!pin;
+
+  const r = el.getBoundingClientRect();
+  const w = tip.offsetWidth;
+  const h = tip.offsetHeight;
+  let left = r.left + r.width / 2 - w / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - w - 8));
+  let top = r.bottom + 8;
+  if (top + h > window.innerHeight - 8) top = r.top - h - 8;
+  tip.style.left = left + 'px';
+  tip.style.top = Math.max(8, top) + 'px';
+}
+
+function hideTip() {
+  tip.classList.remove('show');
+  tipFor = null;
+  tipPinned = false;
+}
+
+document.addEventListener('pointerover', (e) => {
+  if (e.pointerType !== 'mouse') return;
+  const t = e.target.closest?.('[data-tip]');
+  if (t && t !== tipFor) showTip(t, false);
+});
+document.addEventListener('pointerout', (e) => {
+  if (e.pointerType !== 'mouse' || tipPinned || !tipFor) return;
+  if (!tipFor.contains(e.relatedTarget)) hideTip();
+});
+document.addEventListener('focusin', (e) => {
+  const t = e.target.closest?.('[data-tip]');
+  if (t) showTip(t, false);
+});
+document.addEventListener('focusout', () => { if (!tipPinned) hideTip(); });
+window.addEventListener('scroll', hideTip, { passive: true });
+window.addEventListener('resize', hideTip);
+
+// ---- Interaction --------------------------------------------------------
+//
+// One listener for the whole page rather than per element, so re-rendering
 // never leaves a dead handler behind.
+
 app.addEventListener('click', async (e) => {
-  const jump = e.target.closest('[data-jump]');
-  if (jump) {
-    const card = app.querySelector(`[data-owner="${jump.dataset.jump}"]`);
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      card.style.transition = 'box-shadow 0.4s';
-      card.style.boxShadow = '0 0 0 2px var(--accent-fill)';
-      setTimeout(() => { card.style.boxShadow = 'var(--sh-2)'; }, 1600);
-    }
+  const tipEl = e.target.closest('[data-tip]');
+  if (tipEl) {
+    // Explaining a step must never also open or close the card it sits in.
+    if (tipFor === tipEl && tipPinned) hideTip();
+    else showTip(tipEl, true);
+    return;
+  }
+  hideTip();
+
+  const el = e.target.closest('[data-jump],[data-missing],[data-seg],[data-clear-missing],[data-act],[data-toggle]');
+  if (!el) return;
+
+  if (el.dataset.jump) return openAccount(el.dataset.jump);
+
+  if (el.dataset.missing) {
+    ui.seg = 'tester';
+    ui.q = '';
+    ui.missing = el.dataset.missing;
+    render();
+    document.getElementById('accounts')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
   }
 
-  const btn = e.target.closest('button[data-act]');
-  if (!btn) return;
-  const card = btn.closest('[data-owner]');
-  if (!card) return;
-  const ownerId = card.dataset.owner;
-  const act = btn.dataset.act;
-
-  if (act === 'notes') {
-    if (openNotes.has(ownerId)) openNotes.delete(ownerId);
-    else openNotes.add(ownerId);
+  if (el.dataset.seg) {
+    ui.seg = el.dataset.seg;
+    ui.missing = null;
+    remember('tt-admin-seg', ui.seg);
     return render();
   }
 
+  if ('clearMissing' in el.dataset) {
+    ui.missing = null;
+    return renderList();
+  }
+
+  if ('toggle' in el.dataset) {
+    const id = el.closest('[data-owner]').dataset.owner;
+    if (ui.open.has(id)) ui.open.delete(id); else ui.open.add(id);
+    return renderList();
+  }
+
+  if (el.dataset.act) return handleAct(el);
+});
+
+app.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const head = e.target.closest('[data-toggle]');
+  if (!head || e.target !== head) return;
+  e.preventDefault();
+  head.click();
+});
+
+app.addEventListener('input', (e) => {
+  if (e.target.id !== 'q') return;
+  ui.q = e.target.value;
+  renderList();
+});
+
+app.addEventListener('change', async (e) => {
+  const sel = e.target.closest('select[data-seg-select]');
+  if (!sel) return;
+  const ownerId = sel.closest('[data-owner]').dataset.owner;
+  sel.disabled = true;
+  const r = await call('segment', { owner_id: ownerId, segment: sel.value });
+  if (!r.ok) { alert('Could not move that account: ' + (r.problem || 'unknown')); sel.disabled = false; return; }
+  await load(true);
+});
+
+// Same date sum the server does, so the confirm can say where the grant lands.
+function grantPreview(a) {
+  const today = new Date().toISOString().slice(0, 10);
+  const base = a.pro_free_until && a.pro_free_until > today
+    ? new Date(a.pro_free_until + 'T00:00:00Z') : new Date();
+  const d = new Date(base.getTime());
+  const day = d.getDate();
+  d.setMonth(d.getMonth() + 1);
+  if (d.getDate() < day) d.setDate(0);
+  return d.toISOString();
+}
+
+async function handleAct(btn) {
+  const act = btn.dataset.act;
+
+  if (act === 'refresh') { btn.disabled = true; return load(true); }
+  if (act === 'signout') {
+    await sb.auth.signOut();
+    return renderGate(null);
+  }
+
+  const card = btn.closest('[data-owner]');
+  if (!card) return;
+  const ownerId = card.dataset.owner;
+  const a = data.accounts.find(x => x.owner_id === ownerId);
+
   if (act === 'grant') {
-    const months = Number(btn.dataset.months);
-    const who = accounts.find(a => a.owner_id === ownerId);
-    if (!confirm(`Give ${who?.email || 'this account'} ${months} month${months === 1 ? '' : 's'} of free access?`)) return;
+    if (!confirm(`Give ${nameOf(a)} another month of free access?\n\nIt would run to ${fmtDate(grantPreview(a))}.`)) return;
     btn.disabled = true;
-    const r = await call('grant', { owner_id: ownerId, months });
+    const r = await call('grant', { owner_id: ownerId, months: 1 });
     if (!r.ok) { alert('Could not do that: ' + (r.problem || 'unknown')); btn.disabled = false; return; }
-    return load();
+    return load(true);
   }
 
   if (act === 'revoke') {
-    const who = accounts.find(a => a.owner_id === ownerId);
-    if (!confirm(`End free access for ${who?.email || 'this account'}?`)) return;
+    if (!confirm(`End free access for ${nameOf(a)}?\n\nThey keep everything and can still log payments. If they are over the free limit, they cannot add new students or lessons until they go Pro.`)) return;
     btn.disabled = true;
     const r = await call('revoke', { owner_id: ownerId });
     if (!r.ok) { alert('Could not do that: ' + (r.problem || 'unknown')); btn.disabled = false; return; }
-    return load();
+    return load(true);
   }
 
   if (act === 'save-note') {
     const box = card.querySelector('[data-note-box]');
     const body = (box?.value || '').trim();
-    if (!body) return;
+    if (!body) { box?.focus(); return; }
     btn.disabled = true;
     const r = await call('note', { owner_id: ownerId, body });
     if (!r.ok) { alert('Could not save that note: ' + (r.problem || 'unknown')); btn.disabled = false; return; }
-    return load();
+    return load(true);
   }
-});
+}
 
 // ---- Boot ---------------------------------------------------------------
 
-async function load() {
-  app.innerHTML = '<div class="empty">Loading…</div>';
+// Quiet reloads keep the page where it is after an action, instead of blanking
+// it to "Loading…" and throwing away the scroll position.
+async function load(quiet = false) {
+  if (!quiet) app.innerHTML = '<div class="empty">Loading…</div>';
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return renderGate(null);
 
@@ -474,24 +1079,22 @@ async function load() {
     app.innerHTML = `
       <div class="gate">
         <h1>Not an admin</h1>
-        <div class="sub">
+        <div class="sub" style="margin-bottom:16px">
           This account cannot see the admin panel. If it should be able to, ask
           Daniel to add it.
         </div>
-        <button class="btn" id="so">Sign out</button>
+        <button class="btn" data-act="signout">Sign out</button>
       </div>`;
-    document.getElementById('so').addEventListener('click', async () => {
-      await sb.auth.signOut();
-      renderGate(null);
-    });
     return;
   }
   if (!r.ok) {
     app.innerHTML = `<div class="empty">Could not load: ${esc(r.problem || 'unknown')}</div>`;
     return;
   }
-  accounts = r.accounts || [];
+  const y = window.scrollY;
+  data = { accounts: r.accounts || [], income: r.income || null, me: r.me, loadedAt: new Date().toISOString() };
   render();
+  if (quiet) window.scrollTo(0, y);
 }
 
 load();
