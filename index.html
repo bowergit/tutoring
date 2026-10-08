@@ -322,6 +322,37 @@
   .attn-item:active { background: color-mix(in srgb, var(--warn) 10%, transparent); }
   .attn-why { font-size: 0.74rem; color: var(--warn); font-weight: 600; white-space: nowrap; }
 
+  /* ── New in your calendar ── */
+  .cand {
+    background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent-fill) 40%, transparent);
+    border-radius: var(--r-lg); padding: 13px 15px 9px; margin-bottom: 12px; box-shadow: var(--sh-1);
+  }
+  .cand-title {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em;
+    font-weight: 700; color: var(--accent); margin-bottom: 4px;
+  }
+  .cand-item { padding: 9px 0; }
+  .cand-item + .cand-item { border-top: 1px solid color-mix(in srgb, var(--accent-fill) 25%, transparent); }
+  .cand-row { display: flex; align-items: center; gap: 7px; }
+  .cand-main { flex: 1; min-width: 0; }
+  .cand-name { font-weight: 650; font-size: 0.9rem; color: var(--ink); }
+  .cand-sub { font-size: 0.74rem; color: var(--ink-dim); margin-top: 2px; overflow-wrap: anywhere; line-height: 1.4; }
+  .cand-q { font-size: 0.8rem; color: var(--ink-dim); margin-bottom: 6px; }
+  .cand .btn { flex: 0 0 auto; min-width: 0; padding: 7px 12px; font-size: 0.8rem; }
+  .cand input {
+    flex: 1; min-width: 0; font: inherit; font-size: 0.88rem; padding: 7px 9px;
+    border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  }
+  .cand-done {
+    display: flex; align-items: center; gap: 10px; padding: 8px 0 6px;
+    font-size: 0.8rem; font-weight: 600; color: var(--ink);
+  }
+  .cand-done button {
+    margin-left: auto; background: none; border: none; padding: 2px 4px; cursor: pointer;
+    font: inherit; font-size: 0.8rem; font-weight: 700; color: var(--accent);
+  }
+  .cand-foot { font-size: 0.74rem; color: var(--ink-dim); padding: 4px 0 4px; }
+
   /* ── Revenue trend ── */
   .rev-row { display: flex; align-items: center; gap: 10px; padding: 5px 0; }
   .rev-month { font-size: 0.75rem; color: var(--muted); width: 62px; flex-shrink: 0; }
@@ -3475,6 +3506,211 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
 // Surfaces the two things that actually cost money if missed: someone owing
 // for a while, and an active student with nothing in the diary. Hidden
 // entirely when there's nothing wrong, so it never becomes wallpaper.
+// ---------- New in your calendar ----------
+//
+// A name that keeps turning up in the diary but belongs to no student is very
+// likely a new pupil. The sync records those every time it runs, every couple
+// of hours, so this can offer them on the home screen instead of only to
+// someone who presses Sync in Settings and reads a list there.
+//
+// Ignoring one is permanent, because otherwise the gym and the school run
+// would be offered again every couple of hours.
+
+function escapeRegexLiteral(s) {
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function demoCandidates() {
+  const inDays = d => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+  return [
+    { id: 'demo-cand-1', title: 'Maths - Ellie Rose', event_count: 6, next_date: inDays(3) },
+    { id: 'demo-cand-2', title: 'Gym', event_count: 13, next_date: inDays(1) },
+  ];
+}
+
+// Whether a student already on the account would pick this title up. Checked
+// here as well as in the sync, so a student added by hand stops being offered
+// straight away rather than after the next sync.
+function titleClaimedBy(title, students) {
+  const t = String(title).toLowerCase();
+  return students.some(s => {
+    const pattern = String(s.calendar_title_pattern || '').trim();
+    if (pattern) {
+      try { if (new RegExp(pattern, 'i').test(title)) return true; } catch {}
+    }
+    const name = String(s.name || '').trim().toLowerCase();
+    if (!name) return false;
+    if (t.includes(name)) return true;
+    const first = name.split(/\s+/)[0];
+    return first && first !== name && t.includes(first);
+  });
+}
+
+function CalendarCandidates({ session, students, atLimit, onDataChanged }) {
+  const N = useNameDisplay();
+  const { nameMode } = usePrivacy();
+  const [rows, setRows] = useState([]);
+  const [editing, setEditing] = useState(null);
+  const [names, setNames] = useState({});
+  const [busy, setBusy] = useState(null);
+  const [done, setDone] = useState(null);
+
+  useEffect(() => {
+    if (DEMO_MODE) { setRows(demoCandidates()); return; }
+    let cancelled = false;
+    supabase.from('tutoring_calendar_candidates')
+      .select('id,title,event_count,next_date')
+      .is('dismissed_at', null)
+      .order('event_count', { ascending: false })
+      .then(({ data }) => { if (!cancelled) setRows(data || []); }, () => {});
+    return () => { cancelled = true; };
+  }, [session?.user?.id]);
+
+  // The confirmation fades once it has been read, and takes the card with it
+  // if there is nothing else to show.
+  useEffect(() => {
+    if (!done) return;
+    const t = setTimeout(() => setDone(null), done.undo ? 8000 : 6000);
+    return () => clearTimeout(t);
+  }, [done]);
+
+  const visible = rows.filter(r => !titleClaimedBy(r.title, students));
+  if (!visible.length && !done) return null;
+
+  // In fake or hidden name mode the calendar text is exactly what is being
+  // kept off screen, so it is masked along with the name.
+  const masked = nameMode !== 'normal';
+  const showName = (name, id) => masked ? N(name, id) : name;
+  const showTitle = title => masked ? 'Calendar event' : `"${title}"`;
+  const nextLabel = d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  async function add(r, rawName) {
+    const name = rawName.trim().slice(0, 80);
+    if (!name) return;
+    setBusy(r.id);
+    // Matching on the name keeps "name in your calendar" readable on their
+    // card. If the name typed is not in the event title at all, the exact
+    // title is used instead, escaped so a bracket or a plus sign in it is read
+    // literally rather than as pattern syntax.
+    const pattern = r.title.toLowerCase().includes(name.toLowerCase())
+      ? name : escapeRegexLiteral(r.title);
+    const { error } = await supabase.from('tutoring_students').insert({
+      name,
+      calendar_title_pattern: pattern,
+      active: true,
+      lesson_location: 'tutor_home',
+      owner_id: session?.user?.id,
+    });
+    if (error) {
+      setBusy(null);
+      // Refused for the student limit: the Pro prompt has already appeared,
+      // and repeating it here would only be noise.
+      if (!NEW_STUDENT_BLOCKED && !WRITES_BLOCKED) setDone({ text: `Could not add ${name}: ${error.message}` });
+      return;
+    }
+    setRows(list => list.filter(x => x.id !== r.id));
+    setEditing(null);
+    setDone({ text: `${showName(name, r.id)} added. Bringing their lessons in…` });
+    onDataChanged?.();
+
+    // Adding a student IS the request to see their lessons, so they are pulled
+    // in now rather than at the next scheduled sync up to two hours away.
+    let synced = false;
+    if (!DEMO_MODE) {
+      const res = await fetch(`${FN_BASE}/google-calendar-sync`, {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      }).then(x => x.json()).catch(() => null);
+      synced = !!res?.results?.some(x => x.ok && !x.skipped_for_google && !x.locked);
+      onDataChanged?.();
+    }
+    setDone({
+      text: synced || DEMO_MODE
+        ? `${showName(name, r.id)} added, with ${r.event_count} lesson${r.event_count === 1 ? '' : 's'} from your calendar.`
+        : `${showName(name, r.id)} added. Their lessons will come in with the next sync.`,
+    });
+    setBusy(null);
+  }
+
+  async function ignore(r) {
+    setRows(list => list.filter(x => x.id !== r.id));
+    if (editing === r.id) setEditing(null);
+    setDone({ text: `Ignored. ${showTitle(r.title)} won't be suggested again.`, undo: r });
+    if (!DEMO_MODE) {
+      await supabase.from('tutoring_calendar_candidates')
+        .update({ dismissed_at: new Date().toISOString() }).eq('id', r.id);
+    }
+  }
+
+  async function undo(r) {
+    setDone(null);
+    setRows(list => [...list, r].sort((a, b) => b.event_count - a.event_count));
+    if (!DEMO_MODE) {
+      await supabase.from('tutoring_calendar_candidates')
+        .update({ dismissed_at: null }).eq('id', r.id);
+    }
+  }
+
+  return (
+    <div className="cand">
+      <div className="cand-title">
+        {visible.length ? `New in your calendar · ${visible.length}` : 'New in your calendar'}
+      </div>
+      {done && (
+        <div className="cand-done">
+          <span>{done.text}</span>
+          {done.undo && <button onClick={() => undo(done.undo)}>Undo</button>}
+        </div>
+      )}
+      {visible.slice(0, 3).map(r => {
+        const guess = guessStudentName(r.title);
+        const typed = names[r.id] ?? guess;
+        return (
+          <div className="cand-item" key={r.id}>
+            {editing === r.id ? (
+              <>
+                <div className="cand-q">Add a student called</div>
+                <div className="cand-row">
+                  <input type="text" value={typed} autoFocus
+                    onChange={e => setNames({ ...names, [r.id]: e.target.value })}
+                    onKeyDown={e => { if (e.key === 'Enter') add(r, typed); }} />
+                  <button className="btn save" disabled={!!busy || !typed.trim()} onClick={() => add(r, typed)}>
+                    {busy === r.id ? 'Adding…' : 'Add'}
+                  </button>
+                  <button className="btn cancel" disabled={!!busy} onClick={() => setEditing(null)}>Cancel</button>
+                </div>
+                <div className="cand-sub">
+                  Change the name if the guess is wrong. Their lessons come in straight away,
+                  and you can fill in the rest on their card.
+                </div>
+              </>
+            ) : (
+              <div className="cand-row">
+                <div className="cand-main">
+                  <div className="cand-name">{showName(guess, r.id)}</div>
+                  <div className="cand-sub">
+                    {showTitle(r.title)} · {r.event_count} in your calendar
+                    {r.next_date ? ` · next ${nextLabel(r.next_date)}` : ''}
+                  </div>
+                </div>
+                <button className="btn save" disabled={!!busy} onClick={() => setEditing(r.id)}>Add</button>
+                <button className="btn cancel" disabled={!!busy} onClick={() => ignore(r)}>Ignore</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {visible.length > 3 && (
+        <div className="cand-foot">{visible.length - 3} more after these.</div>
+      )}
+      {atLimit && visible.length > 0 && (
+        <div className="cand-foot">
+          You are using all your free student places, so adding one needs TutorTally Pro.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function NeedsAttention({ students, lessons, payments, allocations, rateHistory, onJump }) {
   const M = useMoney();
   const N = useNameDisplay();
@@ -6568,6 +6804,14 @@ function App() {
         {!loading && <SummaryWidget students={students} rateHistory={rateHistory} />}
 
         {!loading && (
+          <CalendarCandidates
+            session={session} students={students}
+            atLimit={!billingReadState.pro && billingReadState.atLimit}
+            onDataChanged={loadAll}
+          />
+        )}
+
+        {!loading && (
           <NeedsAttention
             students={students} lessons={lessons} payments={payments}
             allocations={allocations} rateHistory={rateHistory}
@@ -6602,7 +6846,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v6.16.1</div>}
+        {!loading && <div className="version-tag">v6.17.0</div>}
       </div>
 
       {showAddModal && (
