@@ -85,6 +85,7 @@
     border-top: 1px dashed var(--line); white-space: pre-wrap; word-break: break-word;
   }
   .note time { display: block; color: var(--muted); font-size: 0.72rem; margin-bottom: 2px; }
+  .note .who { color: var(--ink-dim); font-weight: 650; }
   .empty { color: var(--muted); font-size: 0.85rem; padding: 18px 0; text-align: center; }
   .gate { max-width: 340px; margin: 60px auto; }
   .gate .field { margin-bottom: 11px; }
@@ -154,6 +155,15 @@ let openNotes = new Set();
 
 function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// Notes land minutes apart when two people are working through the list
+// together, so the day on its own is not enough to read them in order.
+function fmtDateTime(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleString('en-GB', {
+    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+  });
 }
 
 function fmtDate(iso) {
@@ -353,7 +363,7 @@ function accountCard(a) {
               <button class="btn primary" data-act="save-note">Add note</button>
             </div>
             ${a.notes.length
-              ? a.notes.map(nt => `<div class="note"><time>${esc(fmtDate(nt.created_at))}</time>${esc(nt.body)}</div>`).join('')
+              ? a.notes.map(nt => `<div class="note"><time><span class="who">${esc(nt.author || 'Unknown')}</span> · ${esc(fmtDateTime(nt.created_at))}</time>${esc(nt.body)}</div>`).join('')
               : '<div class="note" style="color:var(--muted)">Nothing recorded yet.</div>'}
           </div>` : ''}
       </div>
