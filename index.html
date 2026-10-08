@@ -3508,10 +3508,11 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
 // entirely when there's nothing wrong, so it never becomes wallpaper.
 // ---------- New in your calendar ----------
 //
-// A name that keeps turning up in the diary but belongs to no student is very
-// likely a new pupil. The sync records those every time it runs, every couple
-// of hours, so this can offer them on the home screen instead of only to
-// someone who presses Sync in Settings and reads a list there.
+// A name in the diary that belongs to no student is quite likely a new pupil,
+// so it is offered from the very first booking. The sync records those every
+// time it runs, every couple of hours, so this can offer them on the home
+// screen instead of only to someone who presses Sync in Settings and reads a
+// list there.
 //
 // Ignoring one is permanent, because otherwise the gym and the school run
 // would be offered again every couple of hours.
@@ -6846,7 +6847,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v6.17.0</div>}
+        {!loading && <div className="version-tag">v6.17.1</div>}
       </div>
 
       {showAddModal && (
