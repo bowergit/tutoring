@@ -97,6 +97,35 @@
     color: var(--muted); margin-bottom: 4px;
   }
   .totals b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  /* The worklist. Deliberately the first thing on the page: the point is to
+     answer "what should I do today", not to be browsed. */
+  .queue { margin-bottom: 18px; }
+  .q-item {
+    display: flex; gap: 10px; align-items: baseline;
+    padding: 10px 13px; border-radius: var(--r-md); margin-bottom: 7px;
+    background: var(--card); border: 1px solid var(--line); font-size: 0.85rem;
+    border-left: 3px solid var(--muted); cursor: pointer;
+  }
+  .q-item.bad  { border-left-color: var(--warn); }
+  .q-item.warn { border-left-color: var(--gold, #b7791f); }
+  .q-who { font-weight: 650; flex-shrink: 0; }
+  .q-why { color: var(--muted); }
+  .q-empty {
+    padding: 14px; border-radius: var(--r-md); background: var(--good-light);
+    color: var(--good); font-size: 0.85rem; font-weight: 600; text-align: center;
+  }
+
+  /* Setup steps, in the order the app asks for them. */
+  .steps { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+  .step {
+    font-size: 0.68rem; font-weight: 650; padding: 3px 8px; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--card-2); color: var(--muted);
+    white-space: nowrap;
+  }
+  .step.done { background: var(--good-light); color: var(--good); border-color: transparent; }
+  .step.next { background: var(--warn-light); color: var(--warn); border-color: transparent; }
+  .pill.pay { background: var(--warn-light); color: var(--warn); }
 </style>
 </head>
 <body>
@@ -196,6 +225,78 @@ function renderGate(message) {
 
 // ---- The list -----------------------------------------------------------
 
+// The order the app asks for them in, so the first unticked one is literally
+// where that tutor stopped.
+const SETUP_STEPS = [
+  ['name',        'Name'],
+  ['phone',       'Phone'],
+  ['calendar',    'Calendar'],
+  ['student',     'Student'],
+  ['lessons',     'Lessons'],
+  ['payment',     'Payment'],
+  ['parent_link', 'Parent link'],
+];
+
+function stepsHTML(a) {
+  const firstTodo = SETUP_STEPS.find(([k]) => !a.setup[k]);
+  return '<div class="steps">' + SETUP_STEPS.map(([k, label]) => {
+    const done = a.setup[k];
+    const isNext = !done && firstTodo && firstTodo[0] === k;
+    return `<span class="step ${done ? 'done' : isNext ? 'next' : ''}">${
+      done ? '\u2713 ' : ''}${esc(label)}</span>`;
+  }).join('') + '</div>';
+}
+
+/**
+ * What to do today, rather than eight cards to read and form your own opinion
+ * about. Everything here is derived from the account rows already loaded, so it
+ * costs nothing and can never disagree with the cards below it.
+ */
+function buildQueue(accounts) {
+  const out = [];
+  const days = iso => daysSince(iso);
+
+  for (const a of accounts) {
+    const who = a.name || a.email || 'Unknown';
+
+    if (a.calendar_error) {
+      out.push({ a, tone: 'bad', why: 'calendar is erroring, lessons are not coming in' });
+    }
+    if (a.free_days_left != null && a.free_days_left >= 0 && a.free_days_left <= 7) {
+      out.push({ a, tone: 'warn', why: `free access ends in ${a.free_days_left} day${a.free_days_left === 1 ? '' : 's'}` });
+    }
+    if (a.free_days_left != null && a.free_days_left < 0 && a.over_limit_by > 0) {
+      out.push({ a, tone: 'bad', why: `free access ended and they are ${a.over_limit_by} student${a.over_limit_by === 1 ? '' : 's'} over the limit` });
+    }
+    // Signed up, had a proper look around, then stopped. Distinct from someone
+    // who signed up and never started, which is the next rule.
+    if (a.total_lessons > 0 && days(a.last_seen) != null && days(a.last_seen) >= 14) {
+      out.push({ a, tone: 'warn', why: `was using it, nothing for ${days(a.last_seen)} days` });
+    }
+    if (a.active_students === 0 && days(a.joined) != null && days(a.joined) >= 3) {
+      out.push({ a, tone: 'warn', why: `joined ${days(a.joined)} days ago, never added a student` });
+    } else if (a.active_students > 0 && a.total_lessons === 0 && days(a.joined) >= 3) {
+      out.push({ a, tone: 'bad', why: 'has a student but no lessons have ever synced' });
+    }
+    out.forEach(q => { if (!q.who) q.who = who; });
+  }
+  return out;
+}
+
+function queueHTML(accounts) {
+  const items = buildQueue(accounts);
+  if (!items.length) {
+    return '<div class="section-label">Needs attention</div>'
+      + '<div class="q-empty">Nothing needs chasing today.</div>';
+  }
+  return '<div class="section-label">Needs attention \u00b7 ' + items.length + '</div>'
+    + '<div class="queue">' + items.map(q => `
+        <div class="q-item ${q.tone}" data-jump="${esc(q.a.owner_id)}">
+          <span class="q-who">${esc(q.a.name || q.a.email || 'Unknown')}</span>
+          <span class="q-why">${esc(q.why)}</span>
+        </div>`).join('') + '</div>';
+}
+
 function statusPill(a) {
   if (a.free_days_left != null && a.free_days_left >= 0) {
     return `<span class="pill comp">Free · ${a.free_days_left}d left</span>`;
@@ -214,6 +315,9 @@ function accountCard(a) {
       <div class="head">
         <span class="who">${esc(a.name || a.email || 'Unnamed')}</span>
         ${statusPill(a)}
+        ${a.over_limit_by > 0
+          ? `<span class="pill pay">${a.over_limit_by} over the free limit</span>`
+          : ''}
         <span class="mail">${esc(a.email || '')}</span>
       </div>
       <div class="stats">
@@ -222,6 +326,7 @@ function accountCard(a) {
         <div class="stat${a.lessons_last_30 ? '' : ' quiet'}"><b>${a.lessons_last_30}</b><span>Taught 30d</span></div>
         <div class="stat${a.lessons_upcoming ? '' : ' quiet'}"><b>${a.lessons_upcoming}</b><span>Booked</span></div>
         <div class="stat${a.payments_logged ? '' : ' quiet'}"><b>${a.payments_logged}</b><span>Payments</span></div>
+        <div class="stat${a.parent_days_30d ? '' : ' quiet'}"><b>${a.parent_days_30d}</b><span>Parent opens</span></div>
       </div>
       <div class="foot">
         <div class="meta">
@@ -230,7 +335,11 @@ function accountCard(a) {
           ${esc(calLabel)}${a.calendar_synced_at ? ', last synced ' + esc(agoLabel(a.calendar_synced_at)) : ''}
           ${a.calendar_error ? `<br><span style="color:var(--warn)">\u26a0 ${esc(a.calendar_error)}</span>` : ''}
           ${a.pro_free_until ? `<br>Free access runs to <b>${esc(a.pro_free_until)}</b>` : ''}
+          ${a.parent_days_30d
+            ? `<br>Parents opened their link on ${a.parent_days_30d} day${a.parent_days_30d === 1 ? '' : 's'} in the last 30, last ${esc(agoLabel(a.last_parent_view))}`
+            : '<br>No parent has opened a link in the last 30 days'}
         </div>
+        ${stepsHTML(a)}
         <div class="btn-row">
           <button class="btn primary" data-act="grant" data-months="3">+3 months free</button>
           <button class="btn" data-act="grant" data-months="1">+1 month</button>
@@ -254,6 +363,10 @@ function accountCard(a) {
 function render() {
   const active7 = accounts.filter(a => daysSince(a.last_seen) !== null && daysSince(a.last_seen) <= 7).length;
   const broken = accounts.filter(a => a.calendar_error).length;
+  // Who would actually have to do something if the free ride stopped. Everyone
+  // else is a tester, not a customer, however keen they sound.
+  const wouldPay = accounts.filter(a => a.over_limit_by > 0).length;
+  const parentOpens = accounts.reduce((t, a) => t + a.parent_days_30d, 0);
   const withStudents = accounts.filter(a => a.active_students > 0).length;
   const comped = accounts.filter(a => a.free_days_left != null && a.free_days_left >= 0).length;
 
@@ -263,11 +376,14 @@ function render() {
     <div class="totals">
       <span><b>${accounts.length}</b> accounts</span>
       <span><b>${active7}</b> used it this week</span>
+      <span><b>${wouldPay}</b> over the free limit</span>
+      <span><b>${parentOpens}</b> parent opens (30d)</span>
       ${broken ? `<span style="color:var(--warn)"><b>${broken}</b> with a calendar problem</span>` : ''}
       <span><b>${withStudents}</b> with students</span>
       <span><b>${comped}</b> on free access</span>
     </div>
-    <div class="section-label">Accounts · newest first</div>
+    ${queueHTML(accounts)}
+    <div class="section-label">Accounts · last used first</div>
     ${accounts.length ? accounts.map(accountCard).join('') : '<div class="empty">No accounts.</div>'}
     <div class="btn-row" style="margin-top:20px">
       <a class="btn" href="/" style="text-decoration:none">← Back to TutorTally</a>
@@ -283,6 +399,18 @@ function render() {
 // One listener for the whole list rather than per button, so re-rendering a card
 // never leaves a dead handler behind.
 app.addEventListener('click', async (e) => {
+  const jump = e.target.closest('[data-jump]');
+  if (jump) {
+    const card = app.querySelector(`[data-owner="${jump.dataset.jump}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.style.transition = 'box-shadow 0.4s';
+      card.style.boxShadow = '0 0 0 2px var(--accent-fill)';
+      setTimeout(() => { card.style.boxShadow = 'var(--sh-2)'; }, 1600);
+    }
+    return;
+  }
+
   const btn = e.target.closest('button[data-act]');
   if (!btn) return;
   const card = btn.closest('[data-owner]');

@@ -1859,7 +1859,7 @@ function Toggle({ checked, onChange, label }) {
 }
 
 // ---------- Summary Widget ----------
-function SummaryWidget({ students, rateHistory, showNet = false }) {
+function SummaryWidget({ students, rateHistory }) {
   const M = useMoney();
   const active = students.filter(s => s.active);
   const readSavedTarget = () => {
@@ -1869,11 +1869,13 @@ function SummaryWidget({ students, rateHistory, showNet = false }) {
   const [fullTarget, setFullTarget] = useState(readSavedTarget);
   const [targetSaving, setTargetSaving] = useState('idle');
 
-  const weeklyNet = active.reduce((sum, s) => {
-    const rate = getCurrentRate(s.id, rateHistory);
-    return sum + (s.pays_in_cash ? rate : rate * 0.6);
-  }, 0);
-  const annualNet = weeklyNet * 40;
+  // What the lessons are worth, not what is left after tax. The old figure
+  // quietly took 40% off anyone not paying cash, which made this account's
+  // numbers mean something different from every other tutor's and impossible
+  // to check against the revenue chart sitting a tap away.
+  const weeklyGross = active.reduce(
+    (sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
+  const annualGross = weeklyGross * 40;
   const fmt = n => n >= 1000000 ? `£${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
 
   useEffect(() => {
@@ -1905,10 +1907,8 @@ function SummaryWidget({ students, rateHistory, showNet = false }) {
 
   const stats = [
     { label: 'students', value: active.length,  accent: false },
-    ...(showNet ? [
-      { label: 'net/week', value: M(weeklyNet, 'summary-week', fmt),  accent: true  },
-      { label: 'net/year', value: M(annualNet, 'summary-year', fmt),  accent: true  },
-    ] : []),
+    { label: 'per week', value: M(weeklyGross, 'summary-week', fmt), accent: true },
+    { label: 'per year', value: M(annualGross, 'summary-year', fmt), accent: true },
   ];
 
   return (
@@ -2000,10 +2000,10 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
   const currGrossW = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
   const currNetW   = active.reduce((sum, s) => {
     const r = getCurrentRate(s.id, rateHistory);
-    return sum + (s.pays_in_cash ? r : r * 0.6);
+    return sum + r;
   }, 0);
   const addGrossW = e * er;
-  const addNetW   = e * er * (ec ? 1 : 0.6);
+  const addNetW   = e * er;
 
   const fmt = n => n >= 1000000 ? `£${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
   const M = useMoney();
@@ -2011,9 +2011,9 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
   const rows = [
     { label: 'Students',  curr: active.length,    add: e,      isCount: true },
     { label: 'Gross/wk', curr: currGrossW,        add: addGrossW  },
-    { label: 'Net/wk',   curr: currNetW,          add: addNetW    },
+    { label: 'Per wk',   curr: currNetW,          add: addNetW    },
     { label: 'Gross/yr', curr: currGrossW * 40,   add: addGrossW * 40 },
-    { label: 'Net/yr',   curr: currNetW * 40,     add: addNetW * 40   },
+    { label: 'Per yr',   curr: currNetW * 40,     add: addNetW * 40   },
   ];
 
   return (
@@ -3302,96 +3302,6 @@ function SetupChecklist({ session, students, onOpenTool, onAddStudent }) {
   );
 }
 
-function PlatformStats({ session }) {
-  const [stats, setStats] = useState(null);
-  const [state, setState] = useState('idle');
-  const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    if (!isDanielAccount(session) || !session?.access_token) return;
-    let cancelled = false;
-    setState('loading');
-    fetch(`${FN_BASE}/platform-stats`, {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
-      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
-      .then(body => {
-        if (cancelled) return;
-        setStats(body);
-        setState('ready');
-      })
-      .catch(() => {
-        if (!cancelled) setState('error');
-      });
-    return () => { cancelled = true; };
-  }, [session?.access_token]);
-
-  if (!isDanielAccount(session)) return null;
-  const fmtMoney = n => n >= 1000000 ? `£${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n || 0)}`;
-
-  return (
-    <div style={{
-      border:'1px solid var(--line)', background:'var(--card-2)', borderRadius:'var(--r-lg)',
-      padding:'14px', margin:'18px 0 6px',
-    }}>
-      <div style={{fontSize:'0.72rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700, marginBottom:10}}>
-        TutorTally admin
-      </div>
-      {state === 'loading' && <div style={{fontSize:'0.84rem', color:'var(--muted)'}}>Loading platform stats...</div>}
-      {state === 'error' && <div style={{fontSize:'0.84rem', color:'var(--warn)'}}>Could not load platform stats.</div>}
-      {state === 'ready' && stats && (
-        <>
-          <button
-            type="button"
-            onClick={() => setOpen(!open)}
-            aria-expanded={open}
-            style={{display:'block', width:'100%', padding:0, border:0, background:'none', color:'inherit', font:'inherit', textAlign:'left', cursor:'pointer'}}
-          >
-            <div style={{display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap:10}}>
-              {[
-                ['Tutors using it', stats.tutors_using_it],
-                ['Students total', stats.students_total],
-                ['Annualised gross', fmtMoney(stats.annualised_gross)],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <div style={{fontSize:'1.35rem', lineHeight:1, fontWeight:800, color:'var(--ink)'}}>{value}</div>
-                  <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.05em', marginTop:5}}>{label}</div>
-                </div>
-              ))}
-            </div>
-          </button>
-          {open && (
-            <div style={{marginTop:14, paddingTop:12, borderTop:'1px solid var(--line)'}}>
-              <div style={{fontSize:'0.68rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.07em', fontWeight:700, marginBottom:7}}>Tutor usage</div>
-              {(stats.tutors || []).map(tutor => (
-                <div key={tutor.id} style={{display:'grid', gridTemplateColumns:'minmax(0, 1fr) auto', gap:12, alignItems:'center', padding:'10px 0', borderTop:'1px solid var(--line)'}}>
-                  <div style={{minWidth:0}}>
-                    <div style={{fontWeight:700, fontSize:'0.88rem', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{tutor.name}</div>
-                    <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:2}}>{tutor.imported_students} imported student{tutor.imported_students === 1 ? '' : 's'}</div>
-                  </div>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontWeight:750, fontSize:'0.9rem'}}>{fmtMoney(tutor.weekly_gross)}</div>
-                    <div style={{fontSize:'0.7rem', color:'var(--muted)', marginTop:2}}>weekly gross</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-// ---------- Revenue trend ----------
-// Two different questions, one chart. "Earned" is what the lessons taught in
-// a month were worth; "received" is what actually landed in the bank that
-// month. They diverge whenever someone pays late, in advance, or in a lump.
-//
-// Earned is the default because it is the one with history behind it: lesson
-// records go back as far as the calendar does, whereas payment tracking only
-// starts when the tutor starts logging payments, so a received-only chart
-// shows a couple of bars and looks broken.
 function RevenueTrend({ payments, lessons, students, rateHistory }) {
   const M = useMoney();
   const [basis, setBasis] = React.useState('earned');
@@ -3861,17 +3771,18 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
                 )}
               </ToolsSection>
 
-              {isAdmin && (
-                <ToolsSection title="TutorTally admin">
+              <ToolsSection title="Account">
+                {isAdmin && (
                   <ToolsRow
-                    title="Tester dashboard"
+                    title="ADMIN PANEL"
                     subtitle="Accounts, usage and free access"
+                    // Same tab on purpose. Opening a new one on an iPhone can
+                    // land outside the installed app, where the signed-in
+                    // session does not exist and the page asks for a password
+                    // nobody remembers setting.
                     onClick={() => { window.location.href = '/admin'; }}
                   />
-                </ToolsSection>
-              )}
-
-              <ToolsSection title="Account">
+                )}
                 <ToolsRow
                   title="Your account"
                   subtitle="Your details, password and account deletion"
@@ -6654,7 +6565,7 @@ function App() {
           </>
         )}
 
-        {!loading && <SummaryWidget students={students} rateHistory={rateHistory} showNet={isDanielAccount(session)} />}
+        {!loading && <SummaryWidget students={students} rateHistory={rateHistory} />}
 
         {!loading && (
           <NeedsAttention
@@ -6691,9 +6602,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <PlatformStats session={session} />}
-
-        {!loading && <div className="version-tag">v6.14</div>}
+        {!loading && <div className="version-tag">v6.15</div>}
       </div>
 
       {showAddModal && (
