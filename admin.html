@@ -174,10 +174,12 @@
   .step.next { background: var(--accent-light); color: var(--accent); border-color: transparent; }
   .step:focus-visible { outline: 2px solid var(--accent-fill); outline-offset: 1px; }
 
+  /* Six figures: three by two on a phone, one row on anything wider. */
   .stats {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    display: grid; grid-template-columns: repeat(3, 1fr);
     gap: 1px; background: var(--line); border-top: 1px solid var(--line);
   }
+  @media (min-width: 640px) { .stats { grid-template-columns: repeat(6, 1fr); } }
   .stat { background: var(--card); padding: 9px 12px; cursor: help; }
   .stat b { display: block; font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
   .stat span { display: block; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
@@ -256,7 +258,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.16.0';
+const VERSION = 'v6.16.1';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -436,7 +438,7 @@ function stepsOf(a) {
   const synced = a.calendar_synced_at ? ` Last sync ${agoLabel(a.calendar_synced_at)}.` : '';
   if (a.calendar && a.calendar_error) {
     add('calendar', 'Calendar', 'bad', 'Error',
-      `${calName} is connected but failing: ${a.calendar_error}.${synced}`);
+      `${calName} is connected but failing: ${String(a.calendar_error).replace(/\.\s*$/, '')}.${synced}`);
   } else if (a.calendar) {
     add('calendar', 'Calendar', 'done', 'Connected', `${calName}.${synced || ' Not synced yet.'}`);
   } else {
@@ -507,7 +509,11 @@ function pillsHTML(a) {
     else if (a.free_days_left != null) out.push('<span class="pill bad">Free ended</span>');
     else out.push('<span class="pill muted">Lite</span>');
   }
-  if (wouldNeedPro(a)) out.push(`<span class="pill accent">${a.over_limit_by} over limit</span>`);
+  // For a tester it is the conversion signal. For anyone else it only matters
+  // when it is actually stopping them adding students.
+  if (wouldNeedPro(a) && (a.segment === 'tester' || !freeActive(a))) {
+    out.push(`<span class="pill accent">${a.over_limit_by} over limit</span>`);
+  }
   if (a.is_admin) out.push('<span class="pill muted">Admin</span>');
   return out.join('');
 }
