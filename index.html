@@ -3710,6 +3710,22 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   const archived = students.filter(s => !s.active);
   const danielOnly = isDanielAccount(session);
 
+  // The admin panel had no way in from the app at all: it was a URL you had to
+  // be told. The one person who most needed it never found it, and nothing in
+  // the logs looked wrong, because he had simply never loaded the page.
+  //
+  // Asked of the database rather than hardcoded, because who is an admin is a
+  // row in a table and must stay that way. The function only ever answers about
+  // the caller, so a tutor who is not an admin learns nothing except "no".
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    supabase.rpc('tutoring_is_admin')
+      .then(({ data }) => { if (!cancelled) setIsAdmin(data === true); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [session?.user?.id]);
+
   // Growth calculator state (shared with perspective calc)
   const active = students.filter(s => s.active);
   const avgRate = active.length > 0
@@ -3844,6 +3860,16 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
                   />
                 )}
               </ToolsSection>
+
+              {isAdmin && (
+                <ToolsSection title="TutorTally admin">
+                  <ToolsRow
+                    title="Tester dashboard"
+                    subtitle="Accounts, usage and free access"
+                    onClick={() => { window.location.href = '/admin'; }}
+                  />
+                </ToolsSection>
+              )}
 
               <ToolsSection title="Account">
                 <ToolsRow
@@ -6667,7 +6693,7 @@ function App() {
 
         {!loading && <PlatformStats session={session} />}
 
-        {!loading && <div className="version-tag">v6.13</div>}
+        {!loading && <div className="version-tag">v6.14</div>}
       </div>
 
       {showAddModal && (

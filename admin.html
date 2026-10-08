@@ -167,7 +167,10 @@ function renderGate(message) {
   app.innerHTML = `
     <div class="gate">
       <h1>TutorTally admin</h1>
-      <div class="sub">Sign in with your admin account.</div>
+      <div class="sub">
+        Use the same email and password as TutorTally itself. If you reached
+        this from inside the app you should not see this at all.
+      </div>
       <form id="gateForm">
         <div class="field">
           <label>Email</label>
@@ -267,6 +270,7 @@ function render() {
     <div class="section-label">Accounts · newest first</div>
     ${accounts.length ? accounts.map(accountCard).join('') : '<div class="empty">No accounts.</div>'}
     <div class="btn-row" style="margin-top:20px">
+      <a class="btn" href="/" style="text-decoration:none">← Back to TutorTally</a>
       <button class="btn" id="signOut">Sign out</button>
     </div>`;
 
