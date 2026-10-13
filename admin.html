@@ -237,7 +237,6 @@
   .note-editor:focus { outline: 2px solid var(--accent-fill); outline-offset: -1px; }
   .note-editor[data-empty="true"]::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
   .note-editor ul { margin: 2px 0; padding-left: 20px; }
-  .note-hint { font-size: 0.72rem; color: var(--muted); margin-top: 5px; line-height: 1.4; }
   .note .by { color: var(--ink-dim); font-weight: 650; }
   .empty { color: var(--muted); font-size: 0.85rem; padding: 18px 0; text-align: center; }
   .gate { max-width: 340px; margin: 60px auto; }
@@ -246,6 +245,33 @@
   .msg { font-size: 0.82rem; margin: 10px 0; }
   .msg.bad { color: var(--warn); }
   .version { color: var(--muted); font-size: 0.7rem; margin-top: 14px; }
+
+  /* Small movements where things used to jump: opacity and position only,
+     short, and switched off entirely for anyone whose phone asks for less
+     motion. */
+  @keyframes fadeIn   { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes barGrow  { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  .acct.opening .body { animation: fadeIn .22s ease both; }
+  #list.enter .acct { animation: fadeInUp .28s cubic-bezier(.2,.8,.2,1) backwards; }
+  #list.enter .acct:nth-child(2) { animation-delay: .03s; }
+  #list.enter .acct:nth-child(3) { animation-delay: .06s; }
+  #list.enter .acct:nth-child(4) { animation-delay: .09s; }
+  #list.enter .acct:nth-child(n+5) { animation-delay: .12s; }
+  .intro .panel, .intro .q-item, .intro .q-empty { animation: fadeInUp .32s cubic-bezier(.2,.8,.2,1) backwards; }
+  .intro .f-fill { transform-origin: left center; animation: barGrow .7s cubic-bezier(.2,.8,.2,1) .15s backwards; }
+  .chip { animation: fadeIn .18s ease backwards; }
+  .tab { transition: background .2s ease, color .2s ease, box-shadow .2s ease; }
+  .btn, .q-item, .row-item { transition: transform .12s ease, background .18s ease, border-color .18s ease; }
+  .btn:active:not(:disabled), .q-item:active, .row-item:active { transform: scale(.98); }
+  .f-row .f-fill { transition: width .4s cubic-bezier(.2,.8,.2,1); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 1ms !important; animation-delay: 0ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 1ms !important; scroll-behavior: auto !important;
+    }
+  }
 
   /* One tooltip for the whole page, positioned against whatever asked for it.
      It lives outside the cards so their rounded corners never clip it. */
@@ -275,7 +301,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.20.0';
+const VERSION = 'v6.21.0';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -1045,7 +1071,6 @@ function notesHTML(a) {
       <div class="note-editor" contenteditable="true" data-note-box data-empty="true"
         role="textbox" aria-multiline="true"
         data-placeholder="What did they say? Where did it come from?"></div>
-      <div class="note-hint">Bold or underline: paste it in, Ctrl/⌘+B or U, or on iPhone select it and tap Format. Start a line with - and a space for bullets.</div>
       <div class="btn-row" style="margin:7px 0 4px">
         <button class="btn" data-act="save-note">Add note</button>
       </div>
@@ -1147,11 +1172,32 @@ function render() {
       <button class="btn" data-act="signout">Sign out</button>
     </div>
     <div class="version">${VERSION}</div>`;
+  playIntroOnce();
 }
 
 function renderList() {
   hideTip();
   document.getElementById('list').innerHTML = listHTML();
+}
+
+// The accounts ease in when the group or the step filter changes, but not on
+// every keystroke in search, where it would flicker.
+function animateList() {
+  const list = document.getElementById('list');
+  if (!list) return;
+  list.classList.remove('enter');
+  void list.offsetWidth;
+  list.classList.add('enter');
+}
+
+// Only the very first paint gets the full ease-in. Re-renders after a note or
+// a grant would otherwise replay it, which reads as the page reloading.
+let introShown = false;
+function playIntroOnce() {
+  if (introShown) return;
+  introShown = true;
+  app.classList.add('intro');
+  setTimeout(() => app.classList.remove('intro'), 1300);
 }
 
 function openAccount(ownerId) {
@@ -1246,6 +1292,7 @@ app.addEventListener('click', async (e) => {
     ui.q = '';
     ui.missing = el.dataset.missing;
     render();
+    animateList();
     document.getElementById('accounts')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
   }
@@ -1254,18 +1301,24 @@ app.addEventListener('click', async (e) => {
     ui.seg = el.dataset.seg;
     ui.missing = null;
     remember('tt-admin-seg', ui.seg);
-    return render();
+    render();
+    return animateList();
   }
 
   if ('clearMissing' in el.dataset) {
     ui.missing = null;
-    return renderList();
+    renderList();
+    return animateList();
   }
 
   if ('toggle' in el.dataset) {
     const id = el.closest('[data-owner]').dataset.owner;
-    if (ui.open.has(id)) ui.open.delete(id); else ui.open.add(id);
-    return renderList();
+    const opening = !ui.open.has(id);
+    if (opening) ui.open.add(id); else ui.open.delete(id);
+    renderList();
+    // Only the card just tapped fades its details in.
+    if (opening) app.querySelector(`.acct[data-owner="${id}"]`)?.classList.add('opening');
+    return;
   }
 
   if (el.dataset.act) return handleAct(el);
