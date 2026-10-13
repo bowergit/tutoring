@@ -3588,7 +3588,7 @@ function titleClaimedBy(title, students) {
   });
 }
 
-function CalendarCandidates({ session, students, atLimit, onDataChanged }) {
+function CalendarCandidates({ session, students, atLimit, onDataChanged, refreshTick }) {
   const N = useNameDisplay();
   const { nameMode } = usePrivacy();
   const [rows, setRows] = useState([]);
@@ -3597,8 +3597,14 @@ function CalendarCandidates({ session, students, atLimit, onDataChanged }) {
   const [busy, setBusy] = useState(null);
   const [done, setDone] = useState(null);
 
+  // The demo has nothing to re-read, so it is seeded once and then left to
+  // whatever the visitor adds or ignores.
+  const demoSeeded = React.useRef(false);
   useEffect(() => {
-    if (DEMO_MODE) { setRows(demoCandidates()); return; }
+    if (DEMO_MODE) {
+      if (!demoSeeded.current) { demoSeeded.current = true; setRows(demoCandidates()); }
+      return;
+    }
     let cancelled = false;
     supabase.from('tutoring_calendar_candidates')
       .select('id,title,event_count,next_date')
@@ -3606,7 +3612,11 @@ function CalendarCandidates({ session, students, atLimit, onDataChanged }) {
       .order('event_count', { ascending: false })
       .then(({ data }) => { if (!cancelled) setRows(data || []); }, () => {});
     return () => { cancelled = true; };
-  }, [session?.user?.id]);
+    // Read again every time the app reloads its data, not only on first open.
+    // Reading once meant a name the refresh button had just found sat in the
+    // database while this card said nothing, which is the exact moment the
+    // tutor is looking for it.
+  }, [session?.user?.id, refreshTick]);
 
   // The confirmation fades once it has been read, and takes the card with it
   // if there is nothing else to show.
@@ -6910,6 +6920,7 @@ function App() {
             session={session} students={students}
             atLimit={!billingReadState.pro && billingReadState.atLimit}
             onDataChanged={loadAll}
+            refreshTick={lastSynced ? lastSynced.getTime() : 0}
           />
         )}
 
@@ -6948,7 +6959,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v6.18.0</div>}
+        {!loading && <div className="version-tag">v6.18.1</div>}
       </div>
 
       {showAddModal && (
