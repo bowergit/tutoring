@@ -199,6 +199,14 @@
     box-shadow: var(--sh-2);
     transition: box-shadow .25s var(--ease), transform .25s var(--ease), border-color .25s var(--ease);
   }
+  /* The student just added, or just jumped to, lit the way the walkthrough
+     lights a control: a solid orange edge and a soft glow, long enough to find
+     it on the page and then gone. The old faint ring was easy to miss on a
+     phone mid-scroll. */
+  .card.spotlit {
+    border-color: var(--accent-fill);
+    box-shadow: 0 0 0 2px var(--accent-fill), 0 0 26px 4px rgba(255,165,0,.45), var(--sh-2);
+  }
   .card.is-open { box-shadow: var(--sh-3); border-color: color-mix(in srgb, var(--accent) 26%, var(--line)); }
   @media (hover:hover) { .card:hover { box-shadow: var(--sh-3); } }
   .card-header {
@@ -3588,7 +3596,7 @@ function titleClaimedBy(title, students) {
   });
 }
 
-function CalendarCandidates({ session, students, atLimit, onDataChanged, refreshTick }) {
+function CalendarCandidates({ session, students, atLimit, onDataChanged, onAdded, refreshTick }) {
   const N = useNameDisplay();
   const { nameMode } = usePrivacy();
   const [rows, setRows] = useState([]);
@@ -3646,13 +3654,13 @@ function CalendarCandidates({ session, students, atLimit, onDataChanged, refresh
     // literally rather than as pattern syntax.
     const pattern = r.title.toLowerCase().includes(name.toLowerCase())
       ? name : escapeRegexLiteral(r.title);
-    const { error } = await supabase.from('tutoring_students').insert({
+    const { data: added, error } = await supabase.from('tutoring_students').insert({
       name,
       calendar_title_pattern: pattern,
       active: true,
       lesson_location: 'tutor_home',
       owner_id: session?.user?.id,
-    });
+    }).select('id').single();
     if (error) {
       setBusy(null);
       // Refused for the student limit: the Pro prompt has already appeared,
@@ -3662,25 +3670,23 @@ function CalendarCandidates({ session, students, atLimit, onDataChanged, refresh
     }
     setRows(list => list.filter(x => x.id !== r.id));
     setEditing(null);
-    setDone({ text: `${showName(name, r.id)} added. Bringing their lessons in…` });
-    onDataChanged?.();
+    setBusy(null);
+
+    // No "added" message. The student's own card, lit up on the page, says it
+    // better: scroll to it once the reload has given it a card to scroll to.
+    await onDataChanged?.();
+    if (added?.id) onAdded?.(added.id);
 
     // Adding a student IS the request to see their lessons, so they are pulled
-    // in now rather than at the next scheduled sync up to two hours away.
-    let synced = false;
+    // in now, in the background, rather than at the next scheduled sync up to
+    // two hours away. The card fills in when they land; if the sync fails the
+    // scheduled one catches up.
     if (!DEMO_MODE) {
-      const res = await fetch(`${FN_BASE}/google-calendar-sync`, {
-        headers: { Authorization: `Bearer ${session?.access_token}` },
-      }).then(x => x.json()).catch(() => null);
-      synced = !!res?.results?.some(x => x.ok && !x.skipped_for_google && !x.locked);
-      onDataChanged?.();
+      fetch(`${FN_BASE}/google-calendar-sync`, { headers: await authHeaders() })
+        .then(x => x.json())
+        .then(() => onDataChanged?.())
+        .catch(() => {});
     }
-    setDone({
-      text: synced || DEMO_MODE
-        ? `${showName(name, r.id)} added, with ${r.event_count} lesson${r.event_count === 1 ? '' : 's'} from your calendar.`
-        : `${showName(name, r.id)} added. Their lessons will come in with the next sync.`,
-    });
-    setBusy(null);
   }
 
   async function ignore(r) {
@@ -5645,9 +5651,8 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
 
   return (
     <div
-      className={`card${open ? ' is-open' : ''}`}
+      className={`card${open ? ' is-open' : ''}${focused ? ' spotlit' : ''}`}
       id={'student-' + student.id}
-      style={focused ? { borderColor: 'var(--accent)', boxShadow: 'var(--sh-3), var(--ring)' } : undefined}
     >
       <div className="card-header" data-wt="card" onClick={() => setOpen(!open)}>
         <div style={{minWidth:0}}>
@@ -6761,12 +6766,24 @@ function App() {
   function jumpToStudent(id) {
     setQuery('');
     setFocusStudentId(id);
-    // Let the filter clear before scrolling, or the card may not be mounted yet.
-    setTimeout(() => {
+    // Let the filter clear before scrolling, or the card may not be mounted
+    // yet. A student added a moment ago only gets a card once the reload has
+    // landed, so it is looked for a few times rather than once. The glow then
+    // runs for two seconds from when the card is actually on its way into
+    // view, plus the scroll itself, rather than from the tap.
+    let tries = 0;
+    const find = () => {
       const el = document.getElementById('student-' + id);
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 60);
-    setTimeout(() => setFocusStudentId(null), 2200);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => setFocusStudentId(cur => (cur === id ? null : cur)), 2400);
+      } else if (++tries < 20) {
+        setTimeout(find, 100);
+      } else {
+        setFocusStudentId(cur => (cur === id ? null : cur));
+      }
+    };
+    setTimeout(find, 60);
   }
 
   // Still restoring the session from storage: hold a blank screen for the
@@ -6920,6 +6937,7 @@ function App() {
             session={session} students={students}
             atLimit={!billingReadState.pro && billingReadState.atLimit}
             onDataChanged={loadAll}
+            onAdded={jumpToStudent}
             refreshTick={lastSynced ? lastSynced.getTime() : 0}
           />
         )}
@@ -6959,7 +6977,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v6.18.1</div>}
+        {!loading && <div className="version-tag">v6.18.2</div>}
       </div>
 
       {showAddModal && (
