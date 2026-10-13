@@ -227,11 +227,17 @@
   .note-body ul { margin: 2px 0 4px; padding-left: 20px; }
   .note-body li { margin: 1px 0; }
   .note-body strong { color: var(--ink); }
-  .note-tools { display: flex; gap: 6px; margin-bottom: 6px; }
-  .note-tools button {
-    font: inherit; font-size: 0.78rem; min-width: 36px; padding: 5px 10px; cursor: pointer;
-    border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--card-2); color: var(--ink);
+  /* The note box: formatted while typing, styled like the other fields. */
+  .note-editor {
+    width: 100%; min-height: 66px; padding: 9px 11px; border-radius: var(--r-sm);
+    border: 1px solid var(--line); background: var(--card-2); color: var(--ink);
+    font-family: inherit; font-size: 0.85rem; line-height: 1.5;
+    white-space: pre-wrap; overflow-wrap: anywhere;
   }
+  .note-editor:focus { outline: 2px solid var(--accent-fill); outline-offset: -1px; }
+  .note-editor[data-empty="true"]::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
+  .note-editor ul { margin: 2px 0; padding-left: 20px; }
+  .note-hint { font-size: 0.72rem; color: var(--muted); margin-top: 5px; line-height: 1.4; }
   .note .by { color: var(--ink-dim); font-weight: 650; }
   .empty { color: var(--muted); font-size: 0.85rem; padding: 18px 0; text-align: center; }
   .gate { max-width: 340px; margin: 60px auto; }
@@ -269,7 +275,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.19.0';
+const VERSION = 'v6.20.0';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -421,48 +427,214 @@ function plainNote(text) {
     .replace(/\s*\n\s*/g, ' ');
 }
 
-function noteWrap(value, start, end, marker) {
-  const before = value.slice(0, start);
-  const sel = value.slice(start, end);
-  const after = value.slice(end);
-  if (before.endsWith(marker) && after.startsWith(marker)) {
-    return { value: before.slice(0, -marker.length) + sel + after.slice(marker.length),
-             start: start - marker.length, end: end - marker.length };
+// A stored note as the editor shows it. Every piece of text is escaped first.
+function noteToEditorHTML(text) {
+  if (!text) return '';
+  let html = '';
+  let inList = false;
+  for (const line of String(text).split('\n')) {
+    if (NOTE_BULLET.test(line)) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${noteInlineHTML(line.replace(NOTE_BULLET, '')) || '<br>'}</li>`;
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div>${noteInlineHTML(line) || '<br>'}</div>`;
+    }
   }
-  return { value: before + marker + sel + marker + after, start: start + marker.length, end: end + marker.length };
+  if (inList) html += '</ul>';
+  return html;
 }
 
-function noteBullets(value, start, end) {
-  const a = value.lastIndexOf('\n', start - 1) + 1;
-  let b = value.indexOf('\n', end);
-  if (b === -1) b = value.length;
-  const lines = value.slice(a, b).split('\n');
-  const filled = lines.filter(l => l.trim());
-  let next;
-  if (!filled.length) next = ['• '];
-  else if (filled.every(l => NOTE_BULLET.test(l))) next = lines.map(l => l.replace(NOTE_BULLET, ''));
-  else next = lines.map(l => (!l.trim() || NOTE_BULLET.test(l)) ? l : '• ' + l);
-  const joined = next.join('\n');
-  return { value: value.slice(0, a) + joined + value.slice(b), start: a + joined.length, end: a + joined.length };
+const NOTE_SKIP = new Set(['SCRIPT', 'STYLE', 'META', 'TITLE', 'HEAD', 'LINK', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'svg', 'IMG']);
+const NOTE_BLOCK = /^(DIV|P|H[1-6]|BLOCKQUOTE|PRE|SECTION|ARTICLE|HEADER|FOOTER|TABLE|TBODY|TR)$/;
+
+// The editor's contents, or a pasted document, as a stored note: only bold,
+// underline, bullets and line breaks survive. Bold is read from inline styles
+// as well as tags, because Google Docs wraps a whole paste in a
+// <b style="font-weight:normal"> and marks the real bold with font-weight:700.
+function editorToNote(root) {
+  const lines = [];
+  let cur = null;
+  const open = (bullet) => {
+    if (cur && !cur.segs.length) { if (bullet) cur.bullet = true; return; }
+    cur = { bullet: !!bullet, segs: [] };
+    lines.push(cur);
+  };
+  const styleOf = (el, st) => {
+    let { b, u } = st;
+    const tag = el.tagName;
+    if (tag === 'B' || tag === 'STRONG' || /^H[1-6]$/.test(tag)) b = true;
+    if (tag === 'U' || tag === 'INS') u = true;
+    const fw = el.style && el.style.fontWeight;
+    if (fw) b = fw === 'bold' || fw === 'bolder' || parseInt(fw, 10) >= 600;
+    const td = el.style && (el.style.textDecorationLine || el.style.textDecoration);
+    if (td) u = /underline/.test(td);
+    return { b, u };
+  };
+  const walk = (node, st) => {
+    if (node.nodeType === 3) {
+      const t = node.nodeValue.replace(/\u00a0/g, ' ').replace(/[\r\n]+/g, ' ');
+      if (!t) return;
+      if (!cur) open(false);
+      cur.segs.push({ text: t, b: st.b, u: st.u });
+      return;
+    }
+    if (node.nodeType !== 1 || NOTE_SKIP.has(node.tagName)) return;
+    const tag = node.tagName;
+    if (tag === 'BR') { if (!cur) open(false); cur = null; return; }
+    const style = styleOf(node, st);
+    if (tag === 'LI') {
+      open(true);
+      node.childNodes.forEach(c => walk(c, style));
+      cur = null;
+      return;
+    }
+    if (tag === 'UL' || tag === 'OL' || NOTE_BLOCK.test(tag)) {
+      if (cur && cur.segs.length) cur = null;
+      node.childNodes.forEach(c => walk(c, style));
+      cur = null;
+      return;
+    }
+    node.childNodes.forEach(c => walk(c, style));
+  };
+  root.childNodes.forEach(c => walk(c, { b: false, u: false }));
+
+  const out = lines.map(l => {
+    const merged = [];
+    for (const seg of l.segs) {
+      const last = merged[merged.length - 1];
+      if (last && last.b === seg.b && last.u === seg.u) last.text += seg.text;
+      else merged.push({ ...seg });
+    }
+    let text = '';
+    for (const seg of merged) {
+      const lead = seg.text.match(/^\s*/)[0];
+      const trail = seg.text.slice(lead.length).match(/\s*$/)[0];
+      const core = seg.text.slice(lead.length, seg.text.length - trail.length);
+      if (!core || (!seg.b && !seg.u)) { text += seg.text; continue; }
+      let w = core;
+      if (seg.u) w = `__${w}__`;
+      if (seg.b) w = `**${w}**`;
+      text += lead + w + trail;
+    }
+    text = text.replace(/\s+$/, '');
+    return l.bullet ? '• ' + text.replace(NOTE_BULLET, '') : text;
+  });
+  while (out.length && !out[out.length - 1].trim()) out.pop();
+  return out.join('\n');
 }
 
-function noteEnter(value, pos) {
-  const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
-  const line = value.slice(lineStart, pos);
-  const m = line.match(/^(\s*)([-*•])\s+/);
-  if (!m) return null;
-  if (!line.slice(m[0].length).trim()) {
-    return { value: value.slice(0, lineStart) + value.slice(pos), start: lineStart, end: lineStart };
+function notePasteHTML(e) {
+  const cd = e.clipboardData;
+  if (!cd) return null;
+  const html = cd.getData('text/html');
+  const plain = cd.getData('text/plain');
+  let note;
+  if (html) note = editorToNote(new DOMParser().parseFromString(html, 'text/html').body);
+  else if (plain) note = plain.replace(/\r\n?/g, '\n');
+  else return null;
+  // One line pasted into the middle of a sentence must stay in that sentence.
+  if (!note.includes('\n') && !NOTE_BULLET.test(note)) return noteInlineHTML(note);
+  return noteToEditorHTML(note);
+}
+
+// Every line in its own block. Typing into an empty box puts the first line
+// straight into the box itself rather than into a line of its own, and the
+// list command then treats that loose text and the next line as one
+// paragraph, dragging both into the bullet. Wrapping loose text as it appears
+// keeps "- " on line two from swallowing line one.
+function noteNormalise(root) {
+  const isBlock = n => n.nodeType === 1 && /^(DIV|P|UL|OL)$/.test(n.nodeName);
+  if (![...root.childNodes].some(n => !isBlock(n) && !(n.nodeType === 3 && !n.nodeValue))) return;
+  const sel = window.getSelection();
+  const keep = sel && sel.rangeCount ? { node: sel.anchorNode, offset: sel.anchorOffset } : null;
+  let line = null;
+  for (const n of [...root.childNodes]) {
+    if (isBlock(n)) { line = null; continue; }
+    if (n.nodeType === 3 && !n.nodeValue) { n.remove(); continue; }
+    if (n.nodeName === 'BR') {
+      if (line) { n.remove(); line = null; }
+      else { const empty = document.createElement('div'); root.insertBefore(empty, n); empty.appendChild(n); }
+      continue;
+    }
+    if (!line) { line = document.createElement('div'); root.insertBefore(line, n); }
+    line.appendChild(n);
   }
-  const ins = '\n' + m[1] + m[2] + ' ';
-  return { value: value.slice(0, pos) + ins + value.slice(pos), start: pos + ins.length, end: pos + ins.length };
+  if (keep && keep.node && keep.node !== root && root.contains(keep.node)) {
+    try { sel.collapse(keep.node, keep.offset); } catch {}
+  }
 }
 
-function applyToBox(box, result) {
-  if (!result) return;
-  box.value = result.value;
-  box.focus();
-  box.setSelectionRange(result.start, result.end);
+// Enter on an empty bullet ends the list, as in every notes app. The line
+// becomes an ordinary line after the list, and any bullets below it carry on
+// as their own list. Done directly rather than through the browser's list
+// command, which mis-handles exactly this case.
+function noteEnterKey(e, root) {
+  if (e.key !== 'Enter' || e.shiftKey) return false;
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+  const at = sel.anchorNode;
+  const li = (at && (at.nodeType === 1 ? at : at.parentElement))?.closest('li');
+  if (!li || !root.contains(li) || li.textContent.replace(/\u00a0/g, ' ').trim()) return false;
+  e.preventDefault();
+  const ul = li.parentNode;
+  const line = document.createElement('div');
+  line.appendChild(document.createElement('br'));
+  const rest = [];
+  for (let n = li.nextSibling; n; n = n.nextSibling) rest.push(n);
+  ul.parentNode.insertBefore(line, ul.nextSibling);
+  if (rest.length) {
+    const tail = document.createElement(ul.nodeName);
+    rest.forEach(n => tail.appendChild(n));
+    line.parentNode.insertBefore(tail, line.nextSibling);
+  }
+  li.remove();
+  if (!ul.children.length) ul.remove();
+  const r = document.createRange();
+  r.setStart(line, 0);
+  r.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(r);
+  return true;
+}
+
+// "- " (or "* ") typed at the start of a line turns that line into a bullet,
+// joining the list above it if there is one. Built directly: the browser's
+// own list command, given the empty line left behind once "- " is removed,
+// lost the cursor and dragged the line above into the list.
+function noteAutoList(root) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+  const node = sel.anchorNode;
+  if (!node || node.nodeType !== 3 || !root.contains(node)) return false;
+  if (sel.anchorOffset !== 2 || !/^[-*•][ \u00a0]/.test(node.nodeValue)) return false;
+  const block = node.parentNode;
+  if (!block || block.parentNode !== root || !/^(DIV|P)$/.test(block.nodeName)) return false;
+  if (block.firstChild !== node) return false;
+  node.nodeValue = node.nodeValue.slice(2);
+  const li = document.createElement('li');
+  while (block.firstChild) li.appendChild(block.firstChild);
+  if (!li.textContent) { li.textContent = ''; li.appendChild(document.createElement('br')); }
+  const above = block.previousElementSibling;
+  if (above && above.nodeName === 'UL') {
+    above.appendChild(li);
+    block.remove();
+  } else {
+    const ul = document.createElement('ul');
+    ul.appendChild(li);
+    root.replaceChild(ul, block);
+  }
+  const first = li.firstChild;
+  const r = document.createRange();
+  if (first && first.nodeType === 3) r.setStart(first, 0); else r.setStart(li, 0);
+  r.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(r);
+  return true;
+}
+
+function markEmpty(box) {
+  box.dataset.empty = (editorToNote(box) || box.querySelector('li')) ? 'false' : 'true';
 }
 
 async function call(action, extra = {}) {
@@ -870,12 +1042,10 @@ function notesHTML(a) {
   return `
     <div class="notes">
       <div class="notes-label">Notes · ${a.notes.length}</div>
-      <div class="note-tools">
-        <button type="button" data-fmt="bold" aria-label="Bold"><b>B</b></button>
-        <button type="button" data-fmt="underline" aria-label="Underline"><u>U</u></button>
-        <button type="button" data-fmt="list" aria-label="Bullet points">• List</button>
-      </div>
-      <textarea rows="3" data-note-box placeholder="What did they say? Where did it come from?"></textarea>
+      <div class="note-editor" contenteditable="true" data-note-box data-empty="true"
+        role="textbox" aria-multiline="true"
+        data-placeholder="What did they say? Where did it come from?"></div>
+      <div class="note-hint">Bold or underline: paste it in, Ctrl/⌘+B or U, or on iPhone select it and tap Format. Start a line with - and a space for bullets.</div>
       <div class="btn-row" style="margin:7px 0 4px">
         <button class="btn" data-act="save-note">Add note</button>
       </div>
@@ -1101,36 +1271,37 @@ app.addEventListener('click', async (e) => {
   if (el.dataset.act) return handleAct(el);
 });
 
-// The formatting buttons must not take the selection away from the note box
-// before they act on it.
-app.addEventListener('mousedown', (e) => {
-  if (e.target.closest('[data-fmt]')) e.preventDefault();
+// The note box. Pasted formatting is cut down to bold, underline and bullets
+// before it goes in; "- " at the start of a line becomes a bullet.
+app.addEventListener('paste', (e) => {
+  const box = e.target.closest?.('[data-note-box]');
+  if (!box) return;
+  const html = notePasteHTML(e);
+  if (html == null) return;
+  e.preventDefault();
+  document.execCommand('insertHTML', false, html);
+  markEmpty(box);
 });
 
-app.addEventListener('click', (e) => {
-  const btn = e.target.closest('[data-fmt]');
-  if (!btn) return;
-  const box = btn.closest('.notes')?.querySelector('[data-note-box]');
+app.addEventListener('input', (e) => {
+  const box = e.target.closest?.('[data-note-box]');
   if (!box) return;
-  const a = box.selectionStart, b = box.selectionEnd;
-  const kind = btn.dataset.fmt;
-  applyToBox(box, kind === 'list' ? noteBullets(box.value, a, b)
-    : noteWrap(box.value, a, b, kind === 'bold' ? '**' : '__'));
+  noteNormalise(box);
+  noteAutoList(box);
+  markEmpty(box);
+});
+
+// Bold and underline as tags rather than inline styles, which is what the
+// note reader expects (it copes with either, but tags are tidier).
+app.addEventListener('focusin', (e) => {
+  if (e.target.closest?.('[data-note-box]')) {
+    try { document.execCommand('styleWithCSS', false, false); } catch {}
+  }
 });
 
 app.addEventListener('keydown', (e) => {
-  const box = e.target.closest?.('[data-note-box]');
-  if (box) {
-    const mod = e.metaKey || e.ctrlKey;
-    const a = box.selectionStart, b = box.selectionEnd;
-    if (mod && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); applyToBox(box, noteWrap(box.value, a, b, '**')); }
-    else if (mod && (e.key === 'u' || e.key === 'U')) { e.preventDefault(); applyToBox(box, noteWrap(box.value, a, b, '__')); }
-    else if (e.key === 'Enter' && !e.shiftKey && a === b) {
-      const r = noteEnter(box.value, a);
-      if (r) { e.preventDefault(); applyToBox(box, r); }
-    }
-    return;
-  }
+  const noteBox = e.target.closest?.('[data-note-box]');
+  if (noteBox) { if (noteEnterKey(e, noteBox)) markEmpty(noteBox); return; }
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const head = e.target.closest('[data-toggle]');
   if (!head || e.target !== head) return;
@@ -1198,7 +1369,7 @@ async function handleAct(btn) {
 
   if (act === 'save-note') {
     const box = card.querySelector('[data-note-box]');
-    const body = (box?.value || '').trim();
+    const body = box ? editorToNote(box).trim() : '';
     if (!body) { box?.focus(); return; }
     btn.disabled = true;
     const r = await call('note', { owner_id: ownerId, body });

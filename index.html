@@ -182,6 +182,16 @@
     position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
     color: var(--muted); font-size: 0.9rem; pointer-events: none;
   }
+  .list-tools { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .list-tools .search-wrap { flex: 1; min-width: 0; margin-bottom: 0; }
+  .list-btn, .sort-wrap select {
+    font: inherit; font-size: 0.85rem; font-weight: 600; padding: 9px 13px; cursor: pointer;
+    border-radius: var(--r-md); border: 1px solid var(--line); background: var(--card);
+    color: var(--ink); box-shadow: var(--sh-1);
+  }
+  .sort-wrap { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .sort-wrap span { font-size: 0.74rem; color: var(--muted); }
+  .sort-wrap select { padding: 9px 10px; max-width: 160px; }
   .search-wrap .s-clear {
     position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
     background: var(--card-3); border: none; color: var(--ink-dim); cursor: pointer;
@@ -397,20 +407,21 @@
   .rich-note ul { margin: 2px 0 4px; padding-left: 20px; }
   .rich-note li { margin: 1px 0; overflow-wrap: anywhere; }
   .rich-note strong { color: var(--ink); font-weight: 700; }
-  .note-tools { display: flex; gap: 6px; margin-bottom: 6px; }
-  .note-tools button {
-    font: inherit; font-size: 0.8rem; min-width: 38px; padding: 5px 10px; cursor: pointer;
-    border-radius: 8px; border: 1px solid var(--line); background: var(--card-2); color: var(--ink);
+  /* The notes editor: a formatted box rather than a textarea, so bold and
+     underline show as themselves while typing. Styled to match the fields
+     around it. */
+  .note-editor {
+    width: 100%; min-height: 92px; padding: 11px 13px; border: 1px solid var(--line);
+    border-radius: var(--r-md); font-size: 0.95rem; line-height: 1.5; font-family: inherit;
+    background: var(--card-2); color: var(--ink); white-space: pre-wrap; overflow-wrap: anywhere;
+    transition: border-color .18s var(--ease), box-shadow .18s var(--ease), background .18s var(--ease);
   }
-  .note-tools button:disabled { opacity: .45; cursor: default; }
-  .note-preview {
-    margin-top: 8px; padding: 9px 11px; border-radius: 8px; border: 1px dashed var(--line);
-    font-size: 0.84rem; color: var(--ink-dim); line-height: 1.5;
-  }
-  .note-preview-label {
-    font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
-    color: var(--muted); margin-bottom: 4px;
-  }
+  .note-editor:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); background: var(--card); }
+  .note-editor[contenteditable="false"] { color: var(--muted); }
+  .note-editor[data-empty="true"]::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
+  .note-editor ul { margin: 2px 0; padding-left: 22px; }
+  .note-editor b, .note-editor strong { font-weight: 700; }
+  .note-hint { font-size: 0.74rem; color: var(--muted); margin-top: 5px; line-height: 1.4; }
   .empty   { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 0.9rem; }
   .loading { text-align: center; color: var(--muted); padding: 48px 20px; font-size: 0.88rem; letter-spacing: 0.04em; }
 
@@ -1642,6 +1653,44 @@ function currentSchoolYear(baseYear, asOfDate) {
   const rolled = base + crossed;
   // Past Year 13 there is no school year left to show.
   return rolled > 13 ? null : rolled;
+}
+
+// How the student list can be ordered. Year and price put the ones that tend
+// to matter most at the top: exam years first, best-paid first.
+const STUDENT_SORTS = [
+  ['name', 'Name'],
+  ['surname', 'Surname'],
+  ['year', 'School year'],
+  ['price', 'Price'],
+];
+
+function surnameOf(name) {
+  const parts = String(name || '').trim().split(/\s+/);
+  return parts[parts.length - 1] || '';
+}
+
+function sortStudents(list, sortBy, rateHistory) {
+  const cmp = (a, b) => String(a || '').localeCompare(String(b || ''), 'en', { sensitivity: 'base' });
+  const byName = (a, b) => cmp(a.name, b.name);
+  const out = [...list];
+  if (sortBy === 'surname') {
+    out.sort((a, b) => cmp(surnameOf(a.name), surnameOf(b.name)) || byName(a, b));
+  } else if (sortBy === 'year') {
+    const yr = s => currentSchoolYear(s.school_year, s.school_year_as_of_date);
+    // Oldest first; anyone without a year recorded goes to the bottom.
+    out.sort((a, b) => {
+      const ya = yr(a), yb = yr(b);
+      if (ya == null && yb == null) return byName(a, b);
+      if (ya == null) return 1;
+      if (yb == null) return -1;
+      return (yb - ya) || byName(a, b);
+    });
+  } else if (sortBy === 'price') {
+    out.sort((a, b) => (getCurrentRate(b.id, rateHistory) - getCurrentRate(a.id, rateHistory)) || byName(a, b));
+  } else {
+    out.sort(byName);
+  }
+  return out;
 }
 
 const DANIEL_ACCOUNT_EMAILS = new Set([
@@ -3577,15 +3626,17 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
 // entirely when there's nothing wrong, so it never becomes wallpaper.
 // ---------- Note formatting ----------
 //
-// Notes stay plain text in the database, with three markers the editor's
-// buttons put in for you: **bold**, __underline__, and "• " at the start of a
-// line for a bullet. Plain text means anything else that reads notes, from an
-// export to the admin panel, sees something readable, and there is no HTML to
-// sanitise: everything below is rendered as React text, never as markup.
+// Notes are stored as plain text with three markers: **bold**, __underline__,
+// and a bullet ("• " or "- ") at the start of a line. Nobody types those. The
+// editor is an ordinary formatted box: paste bold text and it stays bold,
+// Ctrl/Cmd+B and +U work, on an iPhone it is Format in the menu over selected
+// text, and "- " at the start of a line becomes a bullet. Whatever the box
+// holds is turned back into markers on every change, so only bold, underline
+// and bullets ever reach the database, and what is shown on cards is rendered
+// as React text, never as stored markup.
 // admin.html carries the same rules; keep the two in step.
 const NOTE_INLINE = /\*\*([\s\S]+?)\*\*|__([\s\S]+?)__/;
 const NOTE_BULLET = /^\s*[-*•]\s+/;
-const NOTE_HAS_FORMAT = /\*\*[\s\S]+?\*\*|__[\s\S]+?__|^\s*[-*•]\s+/m;
 
 function noteInline(text, keyBase) {
   const out = [];
@@ -3624,97 +3675,277 @@ function RichNote({ text, className = '' }) {
   );
 }
 
-// Wrap the selection in a marker, or take it off again if it is already
-// wrapped. With nothing selected the markers go in with the cursor between
-// them, ready to type.
-function noteWrap(value, start, end, marker) {
-  const before = value.slice(0, start);
-  const sel = value.slice(start, end);
-  const after = value.slice(end);
-  if (before.endsWith(marker) && after.startsWith(marker)) {
-    return {
-      value: before.slice(0, -marker.length) + sel + after.slice(marker.length),
-      start: start - marker.length, end: end - marker.length,
-    };
-  }
-  return { value: before + marker + sel + marker + after, start: start + marker.length, end: end + marker.length };
+function escHTML(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
-// Bullet the selected lines, or the line the cursor is on. If they are all
-// bullets already, the bullets come off instead.
-function noteBullets(value, start, end) {
-  const a = value.lastIndexOf('\n', start - 1) + 1;
-  let b = value.indexOf('\n', end);
-  if (b === -1) b = value.length;
-  const lines = value.slice(a, b).split('\n');
-  const filled = lines.filter(l => l.trim());
-  let next;
-  if (!filled.length) next = ['• '];
-  else if (filled.every(l => NOTE_BULLET.test(l))) next = lines.map(l => l.replace(NOTE_BULLET, ''));
-  else next = lines.map(l => (!l.trim() || NOTE_BULLET.test(l)) ? l : '• ' + l);
-  const joined = next.join('\n');
-  return { value: value.slice(0, a) + joined + value.slice(b), start: a + joined.length, end: a + joined.length };
+function noteInlineHTML(text) {
+  let out = '';
+  let rest = text;
+  while (rest) {
+    const m = rest.match(NOTE_INLINE);
+    if (!m) { out += escHTML(rest); break; }
+    out += escHTML(rest.slice(0, m.index));
+    out += m[1] != null ? `<b>${noteInlineHTML(m[1])}</b>` : `<u>${noteInlineHTML(m[2])}</u>`;
+    rest = rest.slice(m.index + m[0].length);
+  }
+  return out;
 }
 
-// Enter on a bullet line starts the next bullet; Enter on an empty bullet
-// ends the list, the way every notes app behaves.
-function noteEnter(value, pos) {
-  const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
-  const line = value.slice(lineStart, pos);
-  const m = line.match(/^(\s*)([-*•])\s+/);
-  if (!m) return null;
-  if (!line.slice(m[0].length).trim()) {
-    return { value: value.slice(0, lineStart) + value.slice(pos), start: lineStart, end: lineStart };
-  }
-  const ins = '\n' + m[1] + m[2] + ' ';
-  return { value: value.slice(0, pos) + ins + value.slice(pos), start: pos + ins.length, end: pos + ins.length };
-}
-
-function FormattedNoteInput({ value, onChange, disabled = false, placeholder, rows = 4 }) {
-  const ref = React.useRef(null);
-  function apply(result) {
-    if (!result) return;
-    onChange(result.value);
-    requestAnimationFrame(() => {
-      const ta = ref.current;
-      if (!ta) return;
-      ta.focus();
-      ta.setSelectionRange(result.start, result.end);
-    });
-  }
-  const sel = () => [ref.current?.selectionStart ?? value.length, ref.current?.selectionEnd ?? value.length];
-  function onKeyDown(e) {
-    if (disabled) return;
-    const mod = e.metaKey || e.ctrlKey;
-    const [a, b] = sel();
-    if (mod && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); apply(noteWrap(value, a, b, '**')); return; }
-    if (mod && (e.key === 'u' || e.key === 'U')) { e.preventDefault(); apply(noteWrap(value, a, b, '__')); return; }
-    if (e.key === 'Enter' && !e.shiftKey && a === b) {
-      const r = noteEnter(value, a);
-      if (r) { e.preventDefault(); apply(r); }
+// A stored note, as the editor shows it. Every piece of text is escaped first.
+function noteToEditorHTML(text) {
+  if (!text) return '';
+  let html = '';
+  let inList = false;
+  for (const line of String(text).split('\n')) {
+    if (NOTE_BULLET.test(line)) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${noteInlineHTML(line.replace(NOTE_BULLET, '')) || '<br>'}</li>`;
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div>${noteInlineHTML(line) || '<br>'}</div>`;
     }
   }
-  // Pressing a button must not first steal the selection from the box.
-  const keep = e => e.preventDefault();
+  if (inList) html += '</ul>';
+  return html;
+}
+
+const NOTE_SKIP = new Set(['SCRIPT', 'STYLE', 'META', 'TITLE', 'HEAD', 'LINK', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'svg', 'IMG']);
+const NOTE_BLOCK = /^(DIV|P|H[1-6]|BLOCKQUOTE|PRE|SECTION|ARTICLE|HEADER|FOOTER|TABLE|TBODY|TR)$/;
+
+// Whatever is in the editor, or in a pasted document, as a stored note. Bold
+// and underline come from tags and from inline styles alike, because Google
+// Docs pastes bold as font-weight:700 inside a <b style="font-weight:normal">,
+// and taking the tag at its word would make an entire pasted page bold.
+function editorToNote(root) {
+  const lines = [];
+  let cur = null;
+  const open = (bullet) => {
+    if (cur && !cur.segs.length) { if (bullet) cur.bullet = true; return; }
+    cur = { bullet: !!bullet, segs: [] };
+    lines.push(cur);
+  };
+  const styleOf = (el, st) => {
+    let { b, u } = st;
+    const tag = el.tagName;
+    if (tag === 'B' || tag === 'STRONG' || /^H[1-6]$/.test(tag)) b = true;
+    if (tag === 'U' || tag === 'INS') u = true;
+    const fw = el.style && el.style.fontWeight;
+    if (fw) b = fw === 'bold' || fw === 'bolder' || parseInt(fw, 10) >= 600;
+    const td = el.style && (el.style.textDecorationLine || el.style.textDecoration);
+    if (td) u = /underline/.test(td);
+    return { b, u };
+  };
+  const walk = (node, st) => {
+    if (node.nodeType === 3) {
+      const t = node.nodeValue.replace(/\u00a0/g, ' ').replace(/[\r\n]+/g, ' ');
+      if (!t) return;
+      if (!cur) open(false);
+      cur.segs.push({ text: t, b: st.b, u: st.u });
+      return;
+    }
+    if (node.nodeType !== 1 || NOTE_SKIP.has(node.tagName)) return;
+    const tag = node.tagName;
+    if (tag === 'BR') { if (!cur) open(false); cur = null; return; }
+    const style = styleOf(node, st);
+    if (tag === 'LI') {
+      open(true);
+      node.childNodes.forEach(c => walk(c, style));
+      cur = null;
+      return;
+    }
+    if (tag === 'UL' || tag === 'OL' || NOTE_BLOCK.test(tag)) {
+      if (cur && cur.segs.length) cur = null;
+      node.childNodes.forEach(c => walk(c, style));
+      cur = null;
+      return;
+    }
+    node.childNodes.forEach(c => walk(c, style));
+  };
+  root.childNodes.forEach(c => walk(c, { b: false, u: false }));
+
+  const out = lines.map(l => {
+    const merged = [];
+    for (const seg of l.segs) {
+      const last = merged[merged.length - 1];
+      if (last && last.b === seg.b && last.u === seg.u) last.text += seg.text;
+      else merged.push({ ...seg });
+    }
+    let text = '';
+    for (const seg of merged) {
+      const lead = seg.text.match(/^\s*/)[0];
+      const trail = seg.text.slice(lead.length).match(/\s*$/)[0];
+      const core = seg.text.slice(lead.length, seg.text.length - trail.length);
+      if (!core || (!seg.b && !seg.u)) { text += seg.text; continue; }
+      // Spaces stay outside the markers, so "** bold**" can never happen.
+      let w = core;
+      if (seg.u) w = `__${w}__`;
+      if (seg.b) w = `**${w}**`;
+      text += lead + w + trail;
+    }
+    text = text.replace(/\s+$/, '');
+    return l.bullet ? '• ' + text.replace(NOTE_BULLET, '') : text;
+  });
+  while (out.length && !out[out.length - 1].trim()) out.pop();
+  return out.join('\n');
+}
+
+// What a paste should put in the box: the clipboard's own formatting, cut
+// down to bold, underline, bullets and line breaks, everything else dropped.
+function notePasteHTML(e) {
+  const cd = e.clipboardData;
+  if (!cd) return null;
+  const html = cd.getData('text/html');
+  const plain = cd.getData('text/plain');
+  let note;
+  if (html) note = editorToNote(new DOMParser().parseFromString(html, 'text/html').body);
+  else if (plain) note = plain.replace(/\r\n?/g, '\n');
+  else return null;
+  // One line pasted into the middle of a sentence must stay in that sentence.
+  if (!note.includes('\n') && !NOTE_BULLET.test(note)) return noteInlineHTML(note);
+  return noteToEditorHTML(note);
+}
+
+// Every line in its own block. Typing into an empty box puts the first line
+// straight into the box itself rather than into a line of its own, and the
+// list command then treats that loose text and the next line as one
+// paragraph, dragging both into the bullet. Wrapping loose text as it appears
+// keeps "- " on line two from swallowing line one.
+function noteNormalise(root) {
+  const isBlock = n => n.nodeType === 1 && /^(DIV|P|UL|OL)$/.test(n.nodeName);
+  if (![...root.childNodes].some(n => !isBlock(n) && !(n.nodeType === 3 && !n.nodeValue))) return;
+  const sel = window.getSelection();
+  const keep = sel && sel.rangeCount ? { node: sel.anchorNode, offset: sel.anchorOffset } : null;
+  let line = null;
+  for (const n of [...root.childNodes]) {
+    if (isBlock(n)) { line = null; continue; }
+    if (n.nodeType === 3 && !n.nodeValue) { n.remove(); continue; }
+    if (n.nodeName === 'BR') {
+      if (line) { n.remove(); line = null; }
+      else { const empty = document.createElement('div'); root.insertBefore(empty, n); empty.appendChild(n); }
+      continue;
+    }
+    if (!line) { line = document.createElement('div'); root.insertBefore(line, n); }
+    line.appendChild(n);
+  }
+  if (keep && keep.node && keep.node !== root && root.contains(keep.node)) {
+    try { sel.collapse(keep.node, keep.offset); } catch {}
+  }
+}
+
+// Enter on an empty bullet ends the list, as in every notes app. The line
+// becomes an ordinary line after the list, and any bullets below it carry on
+// as their own list. Done directly rather than through the browser's list
+// command, which mis-handles exactly this case.
+function noteEnterKey(e, root) {
+  if (e.key !== 'Enter' || e.shiftKey) return false;
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+  const at = sel.anchorNode;
+  const li = (at && (at.nodeType === 1 ? at : at.parentElement))?.closest('li');
+  if (!li || !root.contains(li) || li.textContent.replace(/\u00a0/g, ' ').trim()) return false;
+  e.preventDefault();
+  const ul = li.parentNode;
+  const line = document.createElement('div');
+  line.appendChild(document.createElement('br'));
+  const rest = [];
+  for (let n = li.nextSibling; n; n = n.nextSibling) rest.push(n);
+  ul.parentNode.insertBefore(line, ul.nextSibling);
+  if (rest.length) {
+    const tail = document.createElement(ul.nodeName);
+    rest.forEach(n => tail.appendChild(n));
+    line.parentNode.insertBefore(tail, line.nextSibling);
+  }
+  li.remove();
+  if (!ul.children.length) ul.remove();
+  const r = document.createRange();
+  r.setStart(line, 0);
+  r.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(r);
+  return true;
+}
+
+// "- " (or "* ") typed at the start of a line turns that line into a bullet,
+// joining the list above it if there is one. Built directly: the browser's
+// own list command, given the empty line left behind once "- " is removed,
+// lost the cursor and dragged the line above into the list.
+function noteAutoList(root) {
+  const sel = window.getSelection();
+  if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+  const node = sel.anchorNode;
+  if (!node || node.nodeType !== 3 || !root.contains(node)) return false;
+  if (sel.anchorOffset !== 2 || !/^[-*•][ \u00a0]/.test(node.nodeValue)) return false;
+  const block = node.parentNode;
+  if (!block || block.parentNode !== root || !/^(DIV|P)$/.test(block.nodeName)) return false;
+  if (block.firstChild !== node) return false;
+  node.nodeValue = node.nodeValue.slice(2);
+  const li = document.createElement('li');
+  while (block.firstChild) li.appendChild(block.firstChild);
+  if (!li.textContent) { li.textContent = ''; li.appendChild(document.createElement('br')); }
+  const above = block.previousElementSibling;
+  if (above && above.nodeName === 'UL') {
+    above.appendChild(li);
+    block.remove();
+  } else {
+    const ul = document.createElement('ul');
+    ul.appendChild(li);
+    root.replaceChild(ul, block);
+  }
+  const first = li.firstChild;
+  const r = document.createRange();
+  if (first && first.nodeType === 3) r.setStart(first, 0); else r.setStart(li, 0);
+  r.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(r);
+  return true;
+}
+
+function RichNoteEditor({ value, onChange, disabled = false, placeholder = '' }) {
+  const ref = React.useRef(null);
+  const last = React.useRef(null);
+
+  // Only written into when the value changes from outside. Rewriting the box
+  // on every keystroke would throw the cursor back to the start each time.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || value === last.current) return;
+    el.innerHTML = noteToEditorHTML(value);
+    last.current = value;
+    el.dataset.empty = value ? 'false' : 'true';
+  }, [value]);
+
+  function emit() {
+    const el = ref.current;
+    if (!el) return;
+    const next = editorToNote(el);
+    last.current = next;
+    el.dataset.empty = (next || el.querySelector('li')) ? 'false' : 'true';
+    onChange(next);
+  }
+
+  function onPaste(e) {
+    const html = notePasteHTML(e);
+    if (html == null) return;
+    e.preventDefault();
+    document.execCommand('insertHTML', false, html);
+    emit();
+  }
+
   return (
-    <div>
-      <div className="note-tools">
-        <button type="button" disabled={disabled} onMouseDown={keep} aria-label="Bold"
-          onClick={() => { const [a, b] = sel(); apply(noteWrap(value, a, b, '**')); }}><b>B</b></button>
-        <button type="button" disabled={disabled} onMouseDown={keep} aria-label="Underline"
-          onClick={() => { const [a, b] = sel(); apply(noteWrap(value, a, b, '__')); }}><u>U</u></button>
-        <button type="button" disabled={disabled} onMouseDown={keep} aria-label="Bullet points"
-          onClick={() => { const [a, b] = sel(); apply(noteBullets(value, a, b)); }}>• List</button>
-      </div>
-      <textarea ref={ref} rows={rows} value={value} placeholder={placeholder}
-        onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown} />
-      {!disabled && NOTE_HAS_FORMAT.test(value) && (
-        <div className="note-preview">
-          <div className="note-preview-label">How it will look</div>
-          <RichNote text={value} />
-        </div>
-      )}
-    </div>
+    <div
+      ref={ref}
+      className="note-editor"
+      contentEditable={!disabled}
+      suppressContentEditableWarning
+      role="textbox"
+      aria-multiline="true"
+      data-placeholder={placeholder}
+      onFocus={() => { try { document.execCommand('styleWithCSS', false, false); } catch {} }}
+      onKeyDown={e => { if (noteEnterKey(e, ref.current)) emit(); }}
+      onInput={() => { noteNormalise(ref.current); noteAutoList(ref.current); emit(); }}
+      onPaste={onPaste}
+    />
   );
 }
 
@@ -4839,10 +5070,17 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         </div>
         <div className="field">
           <label>Notes</label>
-          <FormattedNoteInput
+          <RichNoteEditor
             value={nameMode === 'normal' ? (form.general_notes || '') : (nameMode === 'dummy' ? 'Notes hidden while demoing.' : HIDDEN_TEXT_MASK)}
             disabled={nameMode !== 'normal'}
+            placeholder="Anything worth remembering about them"
             onChange={v => setForm({...form, general_notes: v})} />
+          {nameMode === 'normal' && (
+            <div className="note-hint">
+              Bold or underline: paste it in, press Ctrl/⌘+B or U, or on iPhone select
+              the text and tap Format. Start a line with - and a space for bullets.
+            </div>
+          )}
         </div>
         <div className="field">
           <Toggle checked={form.active} onChange={v => setForm({...form, active: v})} label="Active student" />
@@ -6639,6 +6877,13 @@ function App() {
   const [rateHistory, setRateHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  // Search is a button until it is wanted, and the order is remembered on
+  // this device so the list comes back the way it was left.
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [sortBy, setSortBy] = useState(() => {
+    try { return STUDENT_SORTS.some(([k]) => k === localStorage.getItem('tutortally_sort')) ? localStorage.getItem('tutortally_sort') : 'name'; }
+    catch { return 'name'; }
+  });
   const [syncingAll, setSyncingAll] = useState(false);
   const [refreshNote, setRefreshNote] = useState(null);
   const [lastSynced, setLastSynced] = useState(null);
@@ -6922,11 +7167,12 @@ function App() {
   // (auth gate is applied at the end of this component, after all hooks have
   // run - bailing out earlier would change the hook order between renders)
   const q = query.trim().toLowerCase();
-  const shownStudents = q
+  const matchingStudents = q
     ? activeStudents.filter(s =>
         (s.name || '').toLowerCase().includes(q) ||
         (s.school || '').toLowerCase().includes(q))
     : activeStudents;
+  const shownStudents = sortStudents(matchingStudents, sortBy, rateHistory);
 
   function jumpToStudent(id) {
     setQuery('');
@@ -7115,14 +7361,33 @@ function App() {
           />
         )}
 
-        {!loading && activeStudents.length > 3 && (
-          <div className="search-wrap">
-            <span className="s-icon">⌕</span>
-            <input
-              type="text" value={query} onChange={e => setQuery(e.target.value)}
-              placeholder="Search students or schools…"
-            />
-            {query && <button className="s-clear" onClick={() => setQuery('')}>✕</button>}
+        {!loading && activeStudents.length > 1 && (
+          <div className="list-tools">
+            {searchOpen || query ? (
+              <div className="search-wrap">
+                <span className="s-icon">⌕</span>
+                <input
+                  type="search" value={query} autoFocus
+                  onChange={e => setQuery(e.target.value)}
+                  onBlur={() => { if (!query) setSearchOpen(false); }}
+                  placeholder="Search students or schools…"
+                />
+                <button className="s-clear" aria-label="Close search"
+                  onMouseDown={e => e.preventDefault()}
+                  onClick={() => { setQuery(''); setSearchOpen(false); }}>✕</button>
+              </div>
+            ) : (
+              <button className="list-btn" onClick={() => setSearchOpen(true)}>⌕ Search</button>
+            )}
+            <label className="sort-wrap">
+              <span>Sort</span>
+              <select value={sortBy} aria-label="Sort students by" onChange={e => {
+                setSortBy(e.target.value);
+                try { localStorage.setItem('tutortally_sort', e.target.value); } catch {}
+              }}>
+                {STUDENT_SORTS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+              </select>
+            </label>
           </div>
         )}
 
@@ -7142,7 +7407,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v6.19.0</div>}
+        {!loading && <div className="version-tag">v6.20.0</div>}
       </div>
 
       {showAddModal && (
