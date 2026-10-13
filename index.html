@@ -2675,6 +2675,13 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
 // ---------- Monzo ----------
 const FN_BASE = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
 
+// The signed-in session, for edge functions that must know who is asking.
+// The Monzo ones used to be called bare, which meant they answered anyone.
+async function authHeaders(extra = {}) {
+  const { data } = await supabase.auth.getSession();
+  return { ...extra, Authorization: `Bearer ${data?.session?.access_token ?? ''}` };
+}
+
 function MonzoPanel({ students, onDataChanged }) {
   const M = useRawMoney();
   const N = useNameDisplay();
@@ -2693,9 +2700,9 @@ function MonzoPanel({ students, onDataChanged }) {
   async function refresh() {
     setPending(null);
     try {
-      const s = await fetch(`${FN_BASE}/monzo-status`).then(r => r.json());
+      const s = await fetch(`${FN_BASE}/monzo-status`, { headers: await authHeaders() }).then(r => r.json());
       setStatus(s);
-      const p = await fetch(`${FN_BASE}/monzo-review`).then(r => r.json());
+      const p = await fetch(`${FN_BASE}/monzo-review`, { headers: await authHeaders() }).then(r => r.json());
       setPending(p.pending || []);
       setBlocked(p.blocked || []);
     } catch (e) {
@@ -2708,7 +2715,7 @@ function MonzoPanel({ students, onDataChanged }) {
     setBlocked(b => b.filter(x => x.key !== key));
     await fetch(`${FN_BASE}/monzo-review`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: await authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ unblock_key: key }),
     });
     refresh();
@@ -2717,7 +2724,7 @@ function MonzoPanel({ students, onDataChanged }) {
   async function syncNow() {
     setBusy(true); setMsg(null);
     try {
-      const r = await fetch(`${FN_BASE}/monzo-sync`).then(r => r.json());
+      const r = await fetch(`${FN_BASE}/monzo-sync`, { headers: await authHeaders() }).then(r => r.json());
       setMsg(r.ok
         ? `Logged ${r.newly_logged} new payment${r.newly_logged === 1 ? '' : 's'}.`
         : `Problem: ${r.problem}`);
@@ -2732,7 +2739,7 @@ function MonzoPanel({ students, onDataChanged }) {
     try {
       await fetch(`${FN_BASE}/monzo-review`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await authHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ transaction_id: txId, ...body }),
       });
       setPending(p => p.filter(x => x.transaction_id !== txId));
@@ -6452,6 +6459,8 @@ function App() {
   const [rateHistory, setRateHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncingAll, setSyncingAll] = useState(false);
+  const [refreshNote, setRefreshNote] = useState(null);
   const [lastSynced, setLastSynced] = useState(null);
   const [loadError, setLoadError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -6653,6 +6662,53 @@ function App() {
   // nothing anyway, and firing it would just show a misleading empty state.
   useEffect(() => { if (session) loadAll(); }, [session]);
 
+  // The refresh button is the tutor saying "show me what is true right now",
+  // so it goes and asks their calendar, and their bank if Monzo is connected,
+  // instead of only re-reading whatever the last two-hourly sync left behind.
+  //
+  // What is already stored is reloaded straight away so the screen is never
+  // older than it was; it is reloaded again once the syncs land. A slow
+  // calendar never holds the spinner for ever.
+  async function refreshEverything() {
+    if (syncingAll) return;
+    setSyncingAll(true);
+    setRefreshNote(null);
+    const reload = loadAll(true);
+    if (!DEMO_MODE) {
+      const headers = await authHeaders();
+      const call = (fn) => fetch(`${FN_BASE}/${fn}`, { headers })
+        .then(r => r.json()).catch(() => ({ ok: false, problem: 'network' }));
+      const jobs = [call('google-calendar-sync')];
+      // Monzo is Daniel's own bank connection; nobody else has one.
+      if (isDanielAccount(session)) jobs.push(call('monzo-sync'));
+      const timeout = new Promise(res => setTimeout(() => res(null), 45000));
+      const done = await Promise.race([Promise.all(jobs), timeout]);
+      await reload;
+      await loadAll(true);
+
+      const notes = [];
+      if (done) {
+        const [cal, monzo] = done;
+        const calFailed = cal && (cal.ok === false || (cal.results || []).some(r => r.ok === false));
+        if (calFailed) notes.push({ bad: true, text: 'Your calendar could not be read just now. Settings → Calendar says why.' });
+        if (monzo?.ok && monzo.newly_logged > 0) {
+          notes.push({ text: `Monzo: logged ${monzo.newly_logged} new payment${monzo.newly_logged === 1 ? '' : 's'}.` });
+        } else if (monzo && monzo.ok === false && !/not_connected/.test(String(monzo.problem))) {
+          notes.push({ bad: true, text: 'Monzo could not be checked just now. Settings → Monzo says why.' });
+        }
+      } else {
+        notes.push({ text: 'Still syncing in the background. Refresh again in a minute.' });
+      }
+      if (notes.length) {
+        setRefreshNote({ bad: notes.some(x => x.bad), text: notes.map(x => x.text).join(' ') });
+        setTimeout(() => setRefreshNote(null), 7000);
+      }
+    } else {
+      await reload;
+    }
+    setSyncingAll(false);
+  }
+
   const activeStudents = students.filter(s => s.active);
   const archivedCount = students.filter(s => !s.active).length;
   const billingReadState = readEntitlement(entitlement, activeStudents.length);
@@ -6719,6 +6775,16 @@ function App() {
         suppressFreePrompt={billingStillChecking}
         ownerName={tutorDisplayName}
       />
+      {refreshNote && (
+        <div role="status" style={{
+          position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
+          padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600, maxWidth:'92vw',
+          background: refreshNote.bad ? 'var(--warn)' : 'var(--good)',
+          color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
+        }}>
+          {refreshNote.text}
+        </div>
+      )}
       {billingNotice && (
         <div style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
@@ -6774,8 +6840,9 @@ function App() {
           </div>
           </div>
           <div className="header-right">
-            <button className="refresh-btn" onClick={() => loadAll(true)} disabled={refreshing}>
-              <span style={{display:'inline-block', animation: refreshing ? 'spin 0.8s linear infinite' : 'none'}}>↻</span>
+            <button className="refresh-btn" onClick={refreshEverything} disabled={refreshing || syncingAll}
+                    aria-label="Sync calendar and refresh">
+              <span style={{display:'inline-block', animation: (refreshing || syncingAll) ? 'spin 0.8s linear infinite' : 'none'}}>↻</span>
             </button>
             {(!walkthroughOpen || walkthroughPaused) && (
               <button className="header-settings-btn" data-wt="tools"
@@ -6881,7 +6948,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v6.17.2</div>}
+        {!loading && <div className="version-tag">v6.18.0</div>}
       </div>
 
       {showAddModal && (
