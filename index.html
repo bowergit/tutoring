@@ -391,6 +391,26 @@
     border: 1px solid var(--line); display: none;
   }
   .notes-box.visible { display: block; }
+
+  /* Formatted notes: bold, underline and bullets, from plain-text markers. */
+  .rich-note .note-line { min-height: 1.5em; overflow-wrap: anywhere; }
+  .rich-note ul { margin: 2px 0 4px; padding-left: 20px; }
+  .rich-note li { margin: 1px 0; overflow-wrap: anywhere; }
+  .rich-note strong { color: var(--ink); font-weight: 700; }
+  .note-tools { display: flex; gap: 6px; margin-bottom: 6px; }
+  .note-tools button {
+    font: inherit; font-size: 0.8rem; min-width: 38px; padding: 5px 10px; cursor: pointer;
+    border-radius: 8px; border: 1px solid var(--line); background: var(--card-2); color: var(--ink);
+  }
+  .note-tools button:disabled { opacity: .45; cursor: default; }
+  .note-preview {
+    margin-top: 8px; padding: 9px 11px; border-radius: 8px; border: 1px dashed var(--line);
+    font-size: 0.84rem; color: var(--ink-dim); line-height: 1.5;
+  }
+  .note-preview-label {
+    font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); margin-bottom: 4px;
+  }
   .empty   { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 0.9rem; }
   .loading { text-align: center; color: var(--muted); padding: 48px 20px; font-size: 0.88rem; letter-spacing: 0.04em; }
 
@@ -3555,6 +3575,149 @@ function RevenueTrend({ payments, lessons, students, rateHistory }) {
 // Surfaces the two things that actually cost money if missed: someone owing
 // for a while, and an active student with nothing in the diary. Hidden
 // entirely when there's nothing wrong, so it never becomes wallpaper.
+// ---------- Note formatting ----------
+//
+// Notes stay plain text in the database, with three markers the editor's
+// buttons put in for you: **bold**, __underline__, and "• " at the start of a
+// line for a bullet. Plain text means anything else that reads notes, from an
+// export to the admin panel, sees something readable, and there is no HTML to
+// sanitise: everything below is rendered as React text, never as markup.
+// admin.html carries the same rules; keep the two in step.
+const NOTE_INLINE = /\*\*([\s\S]+?)\*\*|__([\s\S]+?)__/;
+const NOTE_BULLET = /^\s*[-*•]\s+/;
+const NOTE_HAS_FORMAT = /\*\*[\s\S]+?\*\*|__[\s\S]+?__|^\s*[-*•]\s+/m;
+
+function noteInline(text, keyBase) {
+  const out = [];
+  let rest = text;
+  let i = 0;
+  while (rest) {
+    const m = rest.match(NOTE_INLINE);
+    if (!m) { out.push(rest); break; }
+    if (m.index > 0) out.push(rest.slice(0, m.index));
+    const key = `${keyBase}-${i++}`;
+    const kids = noteInline(m[1] != null ? m[1] : m[2], key);
+    out.push(m[1] != null ? <strong key={key}>{kids}</strong> : <u key={key}>{kids}</u>);
+    rest = rest.slice(m.index + m[0].length);
+  }
+  return out;
+}
+
+function RichNote({ text, className = '' }) {
+  const blocks = [];
+  let list = null;
+  String(text || '').split('\n').forEach(line => {
+    if (NOTE_BULLET.test(line)) {
+      if (!list) { list = []; blocks.push({ list }); }
+      list.push(line.replace(NOTE_BULLET, ''));
+    } else {
+      list = null;
+      blocks.push({ line });
+    }
+  });
+  return (
+    <div className={`rich-note ${className}`}>
+      {blocks.map((b, i) => b.list
+        ? <ul key={i}>{b.list.map((li, j) => <li key={j}>{noteInline(li, `${i}.${j}`)}</li>)}</ul>
+        : <div key={i} className="note-line">{b.line ? noteInline(b.line, String(i)) : '\u00a0'}</div>)}
+    </div>
+  );
+}
+
+// Wrap the selection in a marker, or take it off again if it is already
+// wrapped. With nothing selected the markers go in with the cursor between
+// them, ready to type.
+function noteWrap(value, start, end, marker) {
+  const before = value.slice(0, start);
+  const sel = value.slice(start, end);
+  const after = value.slice(end);
+  if (before.endsWith(marker) && after.startsWith(marker)) {
+    return {
+      value: before.slice(0, -marker.length) + sel + after.slice(marker.length),
+      start: start - marker.length, end: end - marker.length,
+    };
+  }
+  return { value: before + marker + sel + marker + after, start: start + marker.length, end: end + marker.length };
+}
+
+// Bullet the selected lines, or the line the cursor is on. If they are all
+// bullets already, the bullets come off instead.
+function noteBullets(value, start, end) {
+  const a = value.lastIndexOf('\n', start - 1) + 1;
+  let b = value.indexOf('\n', end);
+  if (b === -1) b = value.length;
+  const lines = value.slice(a, b).split('\n');
+  const filled = lines.filter(l => l.trim());
+  let next;
+  if (!filled.length) next = ['• '];
+  else if (filled.every(l => NOTE_BULLET.test(l))) next = lines.map(l => l.replace(NOTE_BULLET, ''));
+  else next = lines.map(l => (!l.trim() || NOTE_BULLET.test(l)) ? l : '• ' + l);
+  const joined = next.join('\n');
+  return { value: value.slice(0, a) + joined + value.slice(b), start: a + joined.length, end: a + joined.length };
+}
+
+// Enter on a bullet line starts the next bullet; Enter on an empty bullet
+// ends the list, the way every notes app behaves.
+function noteEnter(value, pos) {
+  const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
+  const line = value.slice(lineStart, pos);
+  const m = line.match(/^(\s*)([-*•])\s+/);
+  if (!m) return null;
+  if (!line.slice(m[0].length).trim()) {
+    return { value: value.slice(0, lineStart) + value.slice(pos), start: lineStart, end: lineStart };
+  }
+  const ins = '\n' + m[1] + m[2] + ' ';
+  return { value: value.slice(0, pos) + ins + value.slice(pos), start: pos + ins.length, end: pos + ins.length };
+}
+
+function FormattedNoteInput({ value, onChange, disabled = false, placeholder, rows = 4 }) {
+  const ref = React.useRef(null);
+  function apply(result) {
+    if (!result) return;
+    onChange(result.value);
+    requestAnimationFrame(() => {
+      const ta = ref.current;
+      if (!ta) return;
+      ta.focus();
+      ta.setSelectionRange(result.start, result.end);
+    });
+  }
+  const sel = () => [ref.current?.selectionStart ?? value.length, ref.current?.selectionEnd ?? value.length];
+  function onKeyDown(e) {
+    if (disabled) return;
+    const mod = e.metaKey || e.ctrlKey;
+    const [a, b] = sel();
+    if (mod && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); apply(noteWrap(value, a, b, '**')); return; }
+    if (mod && (e.key === 'u' || e.key === 'U')) { e.preventDefault(); apply(noteWrap(value, a, b, '__')); return; }
+    if (e.key === 'Enter' && !e.shiftKey && a === b) {
+      const r = noteEnter(value, a);
+      if (r) { e.preventDefault(); apply(r); }
+    }
+  }
+  // Pressing a button must not first steal the selection from the box.
+  const keep = e => e.preventDefault();
+  return (
+    <div>
+      <div className="note-tools">
+        <button type="button" disabled={disabled} onMouseDown={keep} aria-label="Bold"
+          onClick={() => { const [a, b] = sel(); apply(noteWrap(value, a, b, '**')); }}><b>B</b></button>
+        <button type="button" disabled={disabled} onMouseDown={keep} aria-label="Underline"
+          onClick={() => { const [a, b] = sel(); apply(noteWrap(value, a, b, '__')); }}><u>U</u></button>
+        <button type="button" disabled={disabled} onMouseDown={keep} aria-label="Bullet points"
+          onClick={() => { const [a, b] = sel(); apply(noteBullets(value, a, b)); }}>• List</button>
+      </div>
+      <textarea ref={ref} rows={rows} value={value} placeholder={placeholder}
+        onChange={e => onChange(e.target.value)} onKeyDown={onKeyDown} />
+      {!disabled && NOTE_HAS_FORMAT.test(value) && (
+        <div className="note-preview">
+          <div className="note-preview-label">How it will look</div>
+          <RichNote text={value} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------- New in your calendar ----------
 //
 // A name in the diary that belongs to no student is quite likely a new pupil,
@@ -4676,8 +4839,10 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         </div>
         <div className="field">
           <label>Notes</label>
-          <textarea value={nameMode === 'normal' ? form.general_notes : (nameMode === 'dummy' ? 'Notes hidden while demoing.' : HIDDEN_TEXT_MASK)}
-            onChange={e => setForm({...form, general_notes: e.target.value})} />
+          <FormattedNoteInput
+            value={nameMode === 'normal' ? (form.general_notes || '') : (nameMode === 'dummy' ? 'Notes hidden while demoing.' : HIDDEN_TEXT_MASK)}
+            disabled={nameMode !== 'normal'}
+            onChange={v => setForm({...form, general_notes: v})} />
         </div>
         <div className="field">
           <Toggle checked={form.active} onChange={v => setForm({...form, active: v})} label="Active student" />
@@ -5884,7 +6049,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           </div>
 
           {student.general_notes && (
-            <div className={`notes-box ${notesOpen ? 'visible' : ''}`}>{student.general_notes}</div>
+            <RichNote className={`notes-box ${notesOpen ? 'visible' : ''}`} text={student.general_notes} />
           )}
         </div>
       </div>
@@ -6977,7 +7142,7 @@ function App() {
             onEdit={setEditingStudent} onDataChanged={loadAll} />
         ))}
 
-        {!loading && <div className="version-tag">v6.18.2</div>}
+        {!loading && <div className="version-tag">v6.19.0</div>}
       </div>
 
       {showAddModal && (

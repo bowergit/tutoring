@@ -221,6 +221,17 @@
     border-top: 1px dashed var(--line); white-space: pre-wrap; word-break: break-word;
   }
   .note time { display: block; color: var(--muted); font-size: 0.72rem; margin-bottom: 2px; }
+  /* Formatted note bodies: bold, underline and bullets from plain-text markers. */
+  .note-body { white-space: normal; }
+  .note-body .note-line { min-height: 1.5em; }
+  .note-body ul { margin: 2px 0 4px; padding-left: 20px; }
+  .note-body li { margin: 1px 0; }
+  .note-body strong { color: var(--ink); }
+  .note-tools { display: flex; gap: 6px; margin-bottom: 6px; }
+  .note-tools button {
+    font: inherit; font-size: 0.78rem; min-width: 36px; padding: 5px 10px; cursor: pointer;
+    border-radius: var(--r-sm); border: 1px solid var(--line); background: var(--card-2); color: var(--ink);
+  }
   .note .by { color: var(--ink-dim); font-weight: 650; }
   .empty { color: var(--muted); font-size: 0.85rem; padding: 18px 0; text-align: center; }
   .gate { max-width: 340px; margin: 60px auto; }
@@ -258,7 +269,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.18.2';
+const VERSION = 'v6.19.0';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -361,6 +372,98 @@ function fmtPhone(digits) {
 }
 
 const nameOf = a => a.name || a.email || 'Unnamed';
+
+// ---- Note formatting --------------------------------------------------------
+//
+// Same rules as the tutor app (index.html, "Note formatting"): notes are plain
+// text with **bold**, __underline__ and "• " bullets. Every piece of text is
+// escaped before any tag is added around it, so a note can format itself but
+// can never inject markup into the page.
+const NOTE_INLINE = /\*\*([\s\S]+?)\*\*|__([\s\S]+?)__/;
+const NOTE_BULLET = /^\s*[-*•]\s+/;
+
+function noteInlineHTML(text) {
+  let out = '';
+  let rest = text;
+  while (rest) {
+    const m = rest.match(NOTE_INLINE);
+    if (!m) { out += esc(rest); break; }
+    out += esc(rest.slice(0, m.index));
+    out += m[1] != null
+      ? `<strong>${noteInlineHTML(m[1])}</strong>`
+      : `<u>${noteInlineHTML(m[2])}</u>`;
+    rest = rest.slice(m.index + m[0].length);
+  }
+  return out;
+}
+
+function richNoteHTML(text) {
+  let html = '';
+  let inList = false;
+  for (const line of String(text || '').split('\n')) {
+    if (NOTE_BULLET.test(line)) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${noteInlineHTML(line.replace(NOTE_BULLET, ''))}</li>`;
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      html += `<div class="note-line">${line ? noteInlineHTML(line) : '&nbsp;'}</div>`;
+    }
+  }
+  if (inList) html += '</ul>';
+  return `<div class="note-body">${html}</div>`;
+}
+
+// One line for the collapsed card: markers off, bullets run together.
+function plainNote(text) {
+  return String(text || '')
+    .replace(/\*\*|__/g, '')
+    .replace(/^\s*[-*•]\s+/gm, '· ')
+    .replace(/\s*\n\s*/g, ' ');
+}
+
+function noteWrap(value, start, end, marker) {
+  const before = value.slice(0, start);
+  const sel = value.slice(start, end);
+  const after = value.slice(end);
+  if (before.endsWith(marker) && after.startsWith(marker)) {
+    return { value: before.slice(0, -marker.length) + sel + after.slice(marker.length),
+             start: start - marker.length, end: end - marker.length };
+  }
+  return { value: before + marker + sel + marker + after, start: start + marker.length, end: end + marker.length };
+}
+
+function noteBullets(value, start, end) {
+  const a = value.lastIndexOf('\n', start - 1) + 1;
+  let b = value.indexOf('\n', end);
+  if (b === -1) b = value.length;
+  const lines = value.slice(a, b).split('\n');
+  const filled = lines.filter(l => l.trim());
+  let next;
+  if (!filled.length) next = ['• '];
+  else if (filled.every(l => NOTE_BULLET.test(l))) next = lines.map(l => l.replace(NOTE_BULLET, ''));
+  else next = lines.map(l => (!l.trim() || NOTE_BULLET.test(l)) ? l : '• ' + l);
+  const joined = next.join('\n');
+  return { value: value.slice(0, a) + joined + value.slice(b), start: a + joined.length, end: a + joined.length };
+}
+
+function noteEnter(value, pos) {
+  const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
+  const line = value.slice(lineStart, pos);
+  const m = line.match(/^(\s*)([-*•])\s+/);
+  if (!m) return null;
+  if (!line.slice(m[0].length).trim()) {
+    return { value: value.slice(0, lineStart) + value.slice(pos), start: lineStart, end: lineStart };
+  }
+  const ins = '\n' + m[1] + m[2] + ' ';
+  return { value: value.slice(0, pos) + ins + value.slice(pos), start: pos + ins.length, end: pos + ins.length };
+}
+
+function applyToBox(box, result) {
+  if (!result) return;
+  box.value = result.value;
+  box.focus();
+  box.setSelectionRange(result.start, result.end);
+}
 
 async function call(action, extra = {}) {
   const { data: { session } } = await sb.auth.getSession();
@@ -767,12 +870,17 @@ function notesHTML(a) {
   return `
     <div class="notes">
       <div class="notes-label">Notes · ${a.notes.length}</div>
-      <textarea rows="2" data-note-box placeholder="What did they say? Where did it come from?"></textarea>
+      <div class="note-tools">
+        <button type="button" data-fmt="bold" aria-label="Bold"><b>B</b></button>
+        <button type="button" data-fmt="underline" aria-label="Underline"><u>U</u></button>
+        <button type="button" data-fmt="list" aria-label="Bullet points">• List</button>
+      </div>
+      <textarea rows="3" data-note-box placeholder="What did they say? Where did it come from?"></textarea>
       <div class="btn-row" style="margin:7px 0 4px">
         <button class="btn" data-act="save-note">Add note</button>
       </div>
       ${a.notes.length
-        ? a.notes.map(nt => `<div class="note"><time><span class="by">${esc(nt.author || 'Unknown')}</span> · ${esc(fmtDateTime(nt.created_at))}</time>${esc(nt.body)}</div>`).join('')
+        ? a.notes.map(nt => `<div class="note"><time><span class="by">${esc(nt.author || 'Unknown')}</span> · ${esc(fmtDateTime(nt.created_at))}</time>${richNoteHTML(nt.body)}</div>`).join('')
         : '<div class="note" style="color:var(--muted)">Nothing recorded yet.</div>'}
     </div>`;
 }
@@ -792,7 +900,7 @@ function accountHTML(a) {
         </div>
         <div class="line2">${esc(line2)}</div>
         ${stepsHTML(a)}
-        ${latest && !open ? `<div class="peek"><b>${esc(latest.author || 'Unknown')}:</b> ${esc(latest.body)}</div>` : ''}
+        ${latest && !open ? `<div class="peek"><b>${esc(latest.author || 'Unknown')}:</b> ${esc(plainNote(latest.body))}</div>` : ''}
       </div>
       ${open ? `
         <div class="body">
@@ -993,7 +1101,36 @@ app.addEventListener('click', async (e) => {
   if (el.dataset.act) return handleAct(el);
 });
 
+// The formatting buttons must not take the selection away from the note box
+// before they act on it.
+app.addEventListener('mousedown', (e) => {
+  if (e.target.closest('[data-fmt]')) e.preventDefault();
+});
+
+app.addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-fmt]');
+  if (!btn) return;
+  const box = btn.closest('.notes')?.querySelector('[data-note-box]');
+  if (!box) return;
+  const a = box.selectionStart, b = box.selectionEnd;
+  const kind = btn.dataset.fmt;
+  applyToBox(box, kind === 'list' ? noteBullets(box.value, a, b)
+    : noteWrap(box.value, a, b, kind === 'bold' ? '**' : '__'));
+});
+
 app.addEventListener('keydown', (e) => {
+  const box = e.target.closest?.('[data-note-box]');
+  if (box) {
+    const mod = e.metaKey || e.ctrlKey;
+    const a = box.selectionStart, b = box.selectionEnd;
+    if (mod && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); applyToBox(box, noteWrap(box.value, a, b, '**')); }
+    else if (mod && (e.key === 'u' || e.key === 'U')) { e.preventDefault(); applyToBox(box, noteWrap(box.value, a, b, '__')); }
+    else if (e.key === 'Enter' && !e.shiftKey && a === b) {
+      const r = noteEnter(box.value, a);
+      if (r) { e.preventDefault(); applyToBox(box, r); }
+    }
+    return;
+  }
   if (e.key !== 'Enter' && e.key !== ' ') return;
   const head = e.target.closest('[data-toggle]');
   if (!head || e.target !== head) return;
