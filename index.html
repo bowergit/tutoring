@@ -322,6 +322,55 @@
   .btn.more  { background: var(--card-2); color: var(--ink);     border: 1px solid var(--line); }
   .btn.edit  { background: var(--card-2); color: var(--ink);     border: 1px solid var(--line); }
 
+
+  /* Student actions: brand-led hierarchy with comfortable mobile targets. */
+  .actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+  .actions .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    min-width: 0; min-height: 46px; padding: 12px 14px;
+    border: 1px solid var(--line); border-radius: var(--r-md);
+    background: var(--card-2); color: var(--ink);
+    font-size: .82rem; font-weight: 650; line-height: 1.3;
+    box-shadow: var(--sh-1);
+    transition: background .18s var(--ease), border-color .18s var(--ease),
+                box-shadow .18s var(--ease), transform .18s var(--ease);
+  }
+  .actions .btn.action-primary {
+    background: var(--accent-fill); color: var(--on-accent);
+    border-color: var(--accent-fill);
+    box-shadow: var(--sh-2), inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .actions .btn.whatsapp {
+    background: var(--accent-light); color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 28%, var(--line));
+  }
+  .actions .btn.needs-setup {
+    background: var(--warn-light); color: var(--warn);
+    border: 1px dashed var(--warn); box-shadow: none;
+  }
+  .actions .btn:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 3px;
+    box-shadow: var(--ring);
+  }
+  @media (hover:hover) {
+    .actions .btn:hover {
+      background: var(--card-3); border-color: var(--accent);
+      box-shadow: var(--sh-2); transform: translateY(-1px); filter: none;
+    }
+    .actions .btn.action-primary:hover { background: #ffb52e; border-color: #ffb52e; }
+    .actions .btn.whatsapp:hover { background: var(--accent-light); }
+    .actions .btn.needs-setup:hover { background: var(--warn-light); border-color: var(--warn); }
+  }
+  .actions .btn:active { transform: scale(.98); box-shadow: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .actions .btn { transition: none; }
+    .actions .btn:hover, .actions .btn:active { transform: none; }
+  }
+
   /* ── Needs attention ── */
   .attn {
     background: var(--warn-light); border: 1px solid color-mix(in srgb, var(--warn) 30%, transparent);
@@ -6471,11 +6520,11 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
 
           <div className="actions">
             {phone
-              ? (balance > 0 && <a className="btn whatsapp" href={paymentWaLink} target="_blank" rel="noopener">💷 Request payment</a>)
+              ? (balance > 0 && <a className="btn action-primary" href={paymentWaLink} target="_blank" rel="noopener">Request payment</a>)
               : balance > 0 && (
-                <button className="btn needs-setup" onClick={() => setSetupHint('payment')}>💷 Request payment</button>
+                <button className="btn needs-setup" onClick={() => setSetupHint('payment')}>Request payment</button>
               )}
-            {bundleWaLink && <a className="btn" href={bundleWaLink} target="_blank" rel="noopener" style={{background:'#128C7E'}}>🔔 Bundle low</a>}
+            {bundleWaLink && <a className="btn action-primary" href={bundleWaLink} target="_blank" rel="noopener">Bundle low</a>}
             {phone
               ? <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener">WhatsApp</a>
               : <button className="btn needs-setup" onClick={() => setSetupHint('whatsapp')}>WhatsApp</button>}
@@ -6484,33 +6533,30 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               className="btn"
               data-wt="parentlink"
               title="Copy the parent's private page link"
-              style={{background:'var(--accent-fill)', color:'var(--on-accent)', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}
               onClick={() => {
                 navigator.clipboard.writeText(cardParentLink).then(() => {
                   setParentLinkCopied(true);
                   setTimeout(() => setParentLinkCopied(false), 1800);
                 });
               }}
-            >{parentLinkCopied ? '✓' : '🔗'}</button>
+            >{parentLinkCopied ? '✓ Copied' : 'Parent link'}</button>
             {/* The pupil's own link. Same one tap, different audience: this one
                 is safe to give the child, since it carries no money at all. */}
             <button
               className="btn"
               title="Copy the student's link, upcoming lessons only"
-              style={{background:'var(--card-2)', color:'var(--ink)', border:'1px solid var(--line)',
-                      flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}
               onClick={() => {
                 navigator.clipboard.writeText(cardPupilLink).then(() => {
                   setCardPupilCopied(true);
                   setTimeout(() => setCardPupilCopied(false), 1800);
                 });
               }}
-            >{cardPupilCopied ? '✓' : '🎓'}</button>
+            >{cardPupilCopied ? '✓ Copied' : 'Student link'}</button>
             {student.spreadsheet_url && (
-              <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener" style={{background:'#1a7f4b', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}>📈</a>
+              <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener" title="Open the student's spreadsheet">Spreadsheet</a>
             )}
             {student.is_zoom && student.zoom_link && (
-              <a className="btn" href={student.zoom_link} target="_blank" rel="noopener" style={{background:'var(--accent-fill)', color:'var(--on-accent)', flex:'0 0 auto', minWidth:'auto', padding:'10px 14px'}}>🎥</a>
+              <a className="btn" href={student.zoom_link} target="_blank" rel="noopener" title="Join the student's Zoom lesson">Join Zoom</a>
             )}
             <button className="btn edit" data-wt="edit" onClick={() => onEdit(student)}>Edit</button>
             <button className="btn more" data-wt="moretools" onClick={() => setShowMoreTools(true)}>More tools</button>
