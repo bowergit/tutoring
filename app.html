@@ -266,7 +266,14 @@
   details[open] .faq-answer p { margin:11px 0 0; opacity:1; transform:none; }
 
   footer { border-top: 1px solid var(--line); padding: 34px 0; color: var(--muted); font-size: 0.86rem; }
+
+  .ico { width:44px; height:44px; display:inline-grid !important; place-items:center; background:var(--accent-light); color:var(--accent); border-radius:14px; }
+  .ico .app-icon { width:24px; height:24px; }
+  .card { border-radius:20px; }
+  .btn { border-radius:14px; }
+  .lede { line-height:1.65; }
 </style>
+<link rel="stylesheet" href="ux.css?v=6.23.0">
 </head>
 <body>
 
@@ -376,11 +383,11 @@
     </div>
 
     <div class="grid g3" style="margin-top:34px">
-      <div class="card rv"><span class="ico">📅</span><h3>It reads your calendar</h3>
+      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2"/></svg></span><h3>It reads your calendar</h3>
         <p class="muted" style="font-size:.93rem">It finds the names in your event titles and offers to make each one a student. Book, move or cancel a lesson in your calendar and TutorTally keeps the record right.</p></div>
-      <div class="card rv"><span class="ico">⚖️</span><h3>It does the arithmetic</h3>
+      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v18 M6 21h12 M3 7h18 M6 7l-4 8h8z M18 7l-4 8h8z"/></svg></span><h3>It does the arithmetic</h3>
         <p class="muted" style="font-size:.93rem">Every payment settles the oldest unpaid lesson first, so the number on each card is simply what that family still owes. Change someone's rate and it recalculates the history properly.</p></div>
-      <div class="card rv"><span class="ico">💬</span><h3>It writes the awkward message</h3>
+      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z M7 10h10 M7 14h6"/></svg></span><h3>It writes the awkward message</h3>
         <p class="muted" style="font-size:.93rem">One tap opens WhatsApp with the amount, the number of lessons and a polite ask already written. You just press send.</p></div>
     </div>
   </div>
@@ -428,13 +435,13 @@
     </div>
 
     <div class="grid g2" style="margin-top:30px">
-      <div class="card rv"><span class="ico">🗂</span><h3>Student cards</h3>
+      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 4h18v5H3z M5 9v11h14V9 M10 13h4"/></svg></span><h3>Student cards</h3>
         <p class="muted" style="font-size:.93rem">See the next lesson, what has been paid, what is overdue, and the balance that actually needs chasing.</p></div>
-      <div class="card rv"><span class="ico">💬</span><h3>Payment requests</h3>
+      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z M7 10h10 M7 14h6"/></svg></span><h3>Payment requests</h3>
         <p class="muted" style="font-size:.93rem">Tap once and WhatsApp opens with the amount, the lesson count and the dates already written in human language.</p></div>
-      <div class="card rv"><span class="ico">📅</span><h3>Changes stay accurate</h3>
+      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2"/></svg></span><h3>Changes stay accurate</h3>
         <p class="muted" style="font-size:.93rem">Your teaching calendar stays the source of truth, so cancellations and rescheduled lessons do not leave a wrong balance behind.</p></div>
-      <div class="card rv"><span class="ico">🔗</span><h3>Parent pages</h3>
+      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2 M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg></span><h3>Parent pages</h3>
         <p class="muted" style="font-size:.93rem">Every family gets a private lesson page, which makes a one-person tutoring business feel organised without extra admin.</p></div>
     </div>
 

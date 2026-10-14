@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>TutorTally</title>
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
@@ -103,9 +103,7 @@
     background: var(--bg);
     color: var(--ink);
     -webkit-font-smoothing: antialiased;
-    /* No pinch-zoom or double-tap-zoom: this is a fixed-layout app, and
-       accidental zoom while scrolling a card list is pure annoyance.
-       manipulation keeps panning and scrolling, drops the zoom gestures. */
+    /* Keep touch interactions responsive while allowing pinch zoom. */
     touch-action: manipulation;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
@@ -864,7 +862,77 @@
   .billing-btn:disabled { opacity:.6; cursor:default; }
   .go-pro-action { display:inline-flex; flex-direction:column; align-items:flex-start; gap:6px; max-width:100%; }
   .billing-err { display:block; color:var(--warn); font-size:0.78rem; line-height:1.35; max-width:min(440px, 100%); }
+
+  /* Dashboard: clear hierarchy, quiet surfaces and actions within reach. */
+  #root { max-width: 860px; }
+  .content { padding: 22px 22px 32px; }
+  .app-header { padding: 18px 22px; }
+  .header-title { font-size: 1.3rem; font-weight: 700; }
+  .header-sub { font-size: .78rem; margin-top: 5px; }
+  .header-right { gap: 8px; }
+  .refresh-btn { width: 44px; border-radius: 13px; display: grid; place-items: center; }
+  .add-btn, .header-settings-btn, .global-tools-btn { align-items: center; justify-content: center; gap: 7px; }
+  .add-btn, .global-tools-btn { display: inline-flex; }
+  .add-btn { border-radius: 13px; padding: 10px 15px; }
+  .overview-heading { display:flex; align-items:center; gap:8px; color:var(--ink-dim); font-size:.8rem; font-weight:600; margin-bottom:18px; }
+  .overview-heading .app-icon { color:var(--accent); }
+  .overview-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; padding-bottom:20px; margin-bottom:18px; border-bottom:1px solid var(--line); }
+  .overview-value { font-size:clamp(1.8rem,5vw,2.4rem); font-weight:700; letter-spacing:-.045em; line-height:1.15; color:var(--ink); }
+  .overview-label { font-size:.76rem; color:var(--ink-dim); margin-top:5px; }
+  .overview-note { font-size:.72rem; color:var(--muted); margin-top:2px; }
+  .card { margin-bottom: 13px; }
+  .card-header { padding: 18px; gap: 12px; }
+  .student-name { font-size: 1.05rem; font-weight: 650; gap: 9px; }
+  .status-row { gap: 6px; margin-top: 9px; }
+  .pill { font-size: .7rem; padding: 4px 9px; font-weight: 600; }
+  .dot.ok { background:var(--good); box-shadow:0 0 0 3px var(--good-light); }
+  .card-body { display:none; max-height:none; }
+  .card-body.open { display:block; max-height:none; }
+  .card-body.open .card-body-inner { animation:tt-enter .22s var(--ease); }
+  .card-body-inner { padding: 0 18px 20px; }
+  .actions { margin: 18px 0 24px; gap: 9px; padding-bottom:20px; border-bottom:1px solid var(--line); }
+  .actions .btn { font-size:.82rem; min-height:48px; }
+  .actions .btn.copy-confirmed { background:var(--good-light); border-color:var(--good); color:var(--good); }
+  .actions .btn.action-muted { background:transparent; box-shadow:none; }
+  .lesson-row, .pay-row, .month-hdr { min-height: 44px; padding-top:11px; padding-bottom:11px; }
+  .lesson-row .chev, .pay-row .chev { opacity:.65; }
+  .lesson-status.completed, .stmt-paid { color:var(--good); }
+  .list-tools { gap:12px; margin:22px 0 14px; }
+  .search-wrap input { min-height:46px; font-size:.9rem; padding-left:40px; }
+  .search-wrap .s-icon { display:flex; align-items:center; }
+  .sort-wrap select { min-height:46px; background:var(--card); }
+  .attn { background:var(--card); border-color:var(--line); border-left:3px solid var(--warn); padding:15px 17px; }
+  .attn-title, .cand-title { display:flex; align-items:center; gap:8px; font-size:.72rem; }
+  .attn-item { min-height:42px; border-bottom:1px solid var(--line-soft); }
+  .attn-item:last-child { border-bottom:0; }
+  .cand { background:var(--card); border-color:var(--line); border-left:3px solid var(--accent-fill); padding:15px 17px; }
+  .cand-item + .cand-item { border-top-color:var(--line); }
+  .cand-name { font-size:.92rem; }
+  .cand-sub { font-size:.8rem; }
+  .version-tag { font-size:.72rem; color:var(--muted); font-weight:500; padding:26px 0 10px; letter-spacing:0; }
+  .empty { background:var(--card); border:1px dashed var(--line); border-radius:20px; margin:16px 0; }
+  .empty .app-icon { width:28px; height:28px; color:var(--accent); margin-bottom:10px; }
+  .empty strong { display:block; color:var(--ink); font-size:1rem; margin-bottom:5px; }
+  @media (min-width:560px) { .actions { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+  @media (max-width:540px) {
+    .content { padding:16px 14px 28px; }
+    .app-header { padding:14px; }
+    .header-title { font-size:1.05rem; }
+    .header-sub { font-size:.7rem; }
+    .header-left { gap:8px; }
+    .brand-mark { width:27px; }
+    .card-header { padding:16px; }
+    .card-body-inner { padding:0 14px 18px; }
+    .list-tools { flex-wrap:wrap; gap:8px; }
+    .list-tools .search-wrap { flex:1 1 100%; }
+    .sort-wrap { margin-left:0; }
+    .overview-grid { gap:10px; }
+    .overview-note { font-size:.66rem; }
+    .actions .btn { padding:11px 8px; }
+  }
+
 </style>
+<link rel="stylesheet" href="ux.css?v=6.23.0">
 </head>
 <body>
 <div id="root"></div>
@@ -1707,7 +1775,8 @@ function StudentLimitModal({ limit, activeCount, held = 0, ownerName = '', onClo
   const toArchive = have - limit;
   return (
     <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
-      <div className={`sheet${cls}`}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
         <h2>{over ? `${liteName} is paused` : `That's one more than ${liteName} holds`}</h2>
         <div style={{fontSize:'0.9rem', color:'var(--ink-dim)', lineHeight:1.6, marginBottom:16}}>
           {over ? (
@@ -2192,20 +2261,14 @@ function SummaryWidget({ students, rateHistory }) {
       padding:'18px 17px', marginBottom:14, boxShadow:'var(--sh-2)',
       position:'relative', overflow:'hidden'
     }}>
-      {/* Hairline of colour rather than a heavy 3px slab across the top. */}
-      <div style={{position:'absolute',top:0,left:0,right:0,height:3,
-        background:'linear-gradient(90deg, var(--gold), var(--accent-2))'}} />
-      {/* Stats row */}
-      {active.length > 0 && (
-        <div style={{display:'flex',gap:0,flexWrap:'wrap',marginBottom:16,paddingBottom:15,borderBottom:'1px solid var(--line)'}}>
-          {stats.map(({label, value, accent}) => (
-            <div key={label} style={{flex:'1 1 70px',minWidth:60}}>
-              <div style={{fontSize:'1.95rem',fontWeight:750,color:accent?'var(--gold)':'var(--ink)',letterSpacing:'-0.035em',lineHeight:1}}>{value}</div>
-              <div style={{fontSize:'0.66rem',color:'var(--muted)',textTransform:'uppercase',letterSpacing:'0.06em',marginTop:4}}>{label}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="overview-heading"><AppIcon name="chart" />Your teaching at a glance</div>
+      {active.length > 0 && <div className="overview-grid">
+        {stats.map(({label, value}) => <div key={label}>
+          <div className="overview-value">{value}</div>
+          <div className="overview-label">{label === 'students' ? 'Active students' : label === 'per week' ? 'Weekly potential' : 'Yearly potential'}</div>
+          {label === 'per year' && <div className="overview-note">Based on 40 teaching weeks</div>}
+        </div>)}
+      </div>}
       <div>
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
           <label htmlFor="fullTarget" style={{fontSize:'0.82rem',color:'var(--ink-dim)',display:'flex',alignItems:'center',gap:6}}>
@@ -2227,7 +2290,7 @@ function SummaryWidget({ students, rateHistory }) {
           </span>
         </div>
         <div style={{background:'var(--card-2)',borderRadius:4,height:5,border:'1px solid var(--line)'}}>
-          <div style={{background:'var(--gold)',opacity:awayFromFull===0?1:0.55,width:`${Math.min(active.length/fullTarget,1)*100}%`,height:'100%',borderRadius:4,transition:'width 0.6s cubic-bezier(0.4,0,0.2,1)'}}></div>
+          <div style={{background:'var(--accent-fill)',opacity:1,width:`${Math.min(active.length/fullTarget,1)*100}%`,height:'100%',borderRadius:4,transition:'width 0.6s cubic-bezier(0.4,0,0.2,1)'}}></div>
         </div>
         {targetSaving !== 'idle' && (
           <div style={{fontSize:'0.72rem',color:targetSaving==='error'?'var(--warn)':'var(--muted)',marginTop:6}}>
@@ -4305,10 +4368,11 @@ function CalendarCandidates({ session, students, atLimit, onDataChanged, onAdded
   }
 
   return (
-    <div className="cand">
-      <div className="cand-title">
-        {visible.length ? `New in your calendar · ${visible.length}` : 'New in your calendar'}
-      </div>
+    <details className="cand cand-disclosure">
+      <summary className="cand-title"><AppIcon name="calendar" />
+        {visible.length ? `Review calendar suggestions · ${visible.length}` : 'Calendar suggestions'}
+        <AppIcon name="chevron" />
+      </summary>
       {done && (
         <div className="cand-done">
           <span>{done.text}</span>
@@ -4362,7 +4426,7 @@ function CalendarCandidates({ session, students, atLimit, onDataChanged, onAdded
           You are using all your free student places, so adding one needs TutorTally Pro.
         </div>
       )}
-    </div>
+    </details>
   );
 }
 
@@ -4420,7 +4484,7 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
 
   return (
     <div className="attn">
-      <div className="attn-title">Needs attention · {items.length}</div>
+      <div className="attn-title"><AppIcon name="bell" />Needs attention · {items.length}</div>
       {items.slice(0, 6).map(it => (
         <div className="attn-item" key={it.id} onClick={() => onJump(it.studentId)}>
           <span>{N(it.name, it.studentId)}</span>
@@ -4568,13 +4632,20 @@ function ToolsSection({ title, children }) {
 }
 
 function ToolsRow({ title, subtitle, onClick, tone = '', end = '›' }) {
+  const key = typeof title === 'string' ? title.toLowerCase() : '';
+  const icon = /delete/.test(key) ? 'trash' : /archive/.test(key) ? 'archive'
+    : /calendar/.test(key) ? 'calendar' : /privacy/.test(key) ? 'shield'
+    : /revenue|growth/.test(key) ? 'chart' : /payment|billing|monzo/.test(key) ? 'payment'
+    : /account|admin/.test(key) ? 'user' : /sign out/.test(key) ? 'logout'
+    : /copy|copied|open/.test(key) ? 'link' : /walkthrough|about/.test(key) ? 'info' : 'notes';
   return (
     <button className={`tools-row ${tone}`} onClick={onClick}>
+      <span className="tools-icon"><AppIcon name={icon} /></span>
       <span className="tools-row-main">
         <span className="tools-row-title">{title}</span>
         {subtitle && <span className="tools-row-sub">{subtitle}</span>}
       </span>
-      {end && <span className="tools-chevron">{end}</span>}
+      {end && <span className="tools-chevron">{end === '›' ? <AppIcon name="chevron" /> : end}</span>}
     </button>
   );
 }
@@ -4681,7 +4752,8 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
 
   return (
     <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
-      <div className={`sheet${cls}`}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
         {!tool && (
           <>
             <h2>Settings</h2>
@@ -5160,7 +5232,8 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
 
   return (
     <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && close()}>
-      <div className={`sheet${cls}`}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
         <h2>{isEdit ? 'Edit student' : 'Add student'}</h2>
 
         {demo && (
@@ -5486,7 +5559,8 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
   if (savedCash) {
     return (
       <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && close()}>
-        <div className={`sheet${cls}`}>
+        <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
           <h2>Payment logged</h2>
           <div style={{fontSize:'0.85rem', color:'var(--muted)', marginBottom:18, lineHeight:1.5}}>
             {moneyText(savedCash.amount)} from {N(student.name, student.id)} on{' '}
@@ -5507,7 +5581,8 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
 
   return (
     <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && close()}>
-      <div className={`sheet${cls}`}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
         <h2>{editing ? 'Edit payment' : 'Log payment'} - {N(student.name, student.id)}</h2>
 
         {demo && (
@@ -5629,7 +5704,8 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
 
   return (
     <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
-      <div className={`sheet${cls}`}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
         <h2 style={{fontSize:'1.5rem', marginBottom:2, letterSpacing:'-0.02em'}}>{M(parseFloat(payment.amount), payment.id)}</h2>
         <div style={{fontSize:'0.86rem', color:'var(--muted)', marginBottom:14}}>
           {new Date(payment.date_paid + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
@@ -5837,7 +5913,8 @@ function StatementSheet({ student, lessons, payments, allocations, payState, sca
 
   return (
     <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
-      <div className={`sheet${cls}`}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
         {masked && (
           <div style={{
             fontSize:'0.76rem', fontWeight:600, color:'#fff', background:'var(--warn)',
@@ -5973,7 +6050,8 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
 
   return (
     <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && close()}>
-      <div className={`sheet${cls}`}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
         <h2>More tools - {N(student.name, student.id)}</h2>
         <div className="tools-menu">
           <ToolsSection title="Payments">
@@ -6088,7 +6166,8 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
   const moneySeed = lesson.id + ':rate';
   return (
     <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
-      <div className={`sheet${cls}`}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
         <h2 style={{fontSize:'1rem',marginBottom:4}}>{dateStr}</h2>
         <div style={{fontSize:'0.88rem',color:'var(--muted)',marginBottom:12}}>
           {lesson.start_time ? `🕐 ${lesson.start_time}` : <span style={{opacity:0.7}}>🕐 time not synced yet</span>}
@@ -6176,8 +6255,21 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
 }
 
 // Small decorative icons keep student actions easy to scan.
-function StudentActionIcon({ name }) {
+function AppIcon({ name }) {
   const paths = {
+    search: 'M21 21l-5-5 M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0',
+    plus: 'M12 5v14 M5 12h14',
+    close: 'M6 6l12 12 M18 6L6 18',
+    calendar: 'M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2',
+    settings: 'M4 7h16 M4 17h16 M8 4v6 M16 14v6',
+    refresh: 'M20 7v5h-5 M4 17v-5h5 M6 6a8 8 0 0 1 14 6 M18 18a8 8 0 0 1-14-6',
+    archive: 'M3 4h18v5H3z M5 9v11h14V9 M10 13h4',
+    shield: 'M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z M9 12l2 2 4-4',
+    user: 'M8 7a4 4 0 1 0 8 0 4 4 0 1 0-8 0 M4 21v-2a8 8 0 0 1 16 0v2',
+    logout: 'M9 4H4v16h5 M9 12h12 M17 8l4 4-4 4',
+    info: 'M12 16v-5 M12 7h.01 M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
+    chevron: 'M9 5l7 7-7 7',
+    trash: 'M3 6h18 M9 6V3h6v3 M5 6l1 15h12l1-15 M10 10v7 M14 10v7',
     payment: 'M3 6h18v12H3z M3 10h18 M7 14h3',
     chat: 'M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z M7 10h10 M7 14h6',
     link: 'M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2 M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2',
@@ -6190,11 +6282,68 @@ function StudentActionIcon({ name }) {
     bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9 M10 21h4',
     check: 'M5 12l4 4L19 6'
   };
-  return <svg className="student-action-icon" width="17" height="17" viewBox="0 0 24 24"
+  return <svg className="app-icon" width="17" height="17" viewBox="0 0 24 24"
     fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
     strokeLinejoin="round" aria-hidden="true" focusable="false">
     <path d={paths[name] || paths.link} />
   </svg>;
+}
+
+
+function DialogClose({ onClose }) {
+  const ref = React.useRef(null);
+  const titleId = React.useId();
+  useEffect(() => {
+    const sheet = ref.current.closest('.sheet');
+    const previous = document.activeElement;
+    const heading = sheet.querySelector('h2');
+    if (heading) { heading.id = heading.id || titleId; sheet.setAttribute('aria-labelledby', heading.id); }
+    else sheet.setAttribute('aria-label', 'TutorTally details');
+    ref.current.focus({ preventScroll: true });
+    const focusables = () => [...sheet.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')].filter(el => el.getClientRects().length);
+    function onKey(e) {
+      const sheets = document.querySelectorAll('.overlay .sheet');
+      if (sheets[sheets.length - 1] !== sheet) return;
+      if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+      if (e.key === 'Tab') {
+        const list = focusables(), first = list[0], last = list[list.length - 1];
+        if (e.shiftKey && (document.activeElement === first || !sheet.contains(document.activeElement))) { e.preventDefault(); last?.focus(); }
+        else if (!e.shiftKey && (document.activeElement === last || !sheet.contains(document.activeElement))) { e.preventDefault(); first?.focus(); }
+      }
+    }
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('keydown', onKey); if (previous?.isConnected) previous.focus({ preventScroll: true }); };
+  }, [onClose, titleId]);
+  return <button ref={ref} type="button" className="sheet-close" aria-label="Close dialog" onClick={onClose}><AppIcon name="close" /></button>;
+}
+
+function CopyAction({ value, label, icon = 'link', walkthrough }) {
+  const [state, setState] = useState('idle');
+  const timer = React.useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  async function copy() {
+    clearTimeout(timer.current);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(value);
+      setState('copied');
+      timer.current = setTimeout(() => setState('idle'), 2200);
+    } catch {
+      setState('error');
+    }
+  }
+  return <>
+    <button type="button" className={`btn ${state === 'copied' ? 'copy-confirmed' : ''}`}
+      data-wt={walkthrough} onClick={copy} title={`Copy ${label.toLowerCase().replace(/^copy /, '')}`}>
+      <AppIcon name={state === 'copied' ? 'check' : icon} />
+      <span>{state === 'copied' ? 'Copied' : label}</span>
+      <span className="copy-status" role="status">{state === 'copied' ? label + ' copied to clipboard' : ''}</span>
+    </button>
+    {state === 'error' && <div className="copy-fallback" role="alert">
+      Your browser could not copy this link. Select it below to copy manually.
+      <input readOnly value={value} aria-label={label + ' to copy manually'} onFocus={e => e.target.select()} />
+    </div>}
+  </>;
 }
 
 function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, focused, session, onEdit, onDataChanged }) {
@@ -6352,8 +6501,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const bundleWaLink = null;
   const cardParentLink = new URL(`student.html?t=${student.public_token}`, window.location.href).toString();
   const cardPupilLink = new URL(`lessons.html?t=${student.student_token}`, window.location.href).toString();
-  const [parentLinkCopied, setParentLinkCopied] = useState(false);
-  const [cardPupilCopied, setCardPupilCopied] = useState(false);
   // Which "you haven't filled this in yet" explainer is open, if any.
   const [setupHint, setSetupHint] = useState(null);
 
@@ -6364,7 +6511,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
       className={`card${open ? ' is-open' : ''}${focused ? ' spotlit' : ''}`}
       id={'student-' + student.id}
     >
-      <div className="card-header" data-wt="card" onClick={() => setOpen(!open)}>
+      <div className="card-header" data-wt="card" role="button" tabIndex={0} aria-expanded={open} aria-controls={`student-body-${student.id}`} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(!open); } }} onClick={() => setOpen(!open)}>
         <div style={{minWidth:0}}>
           <div className="student-name">
             <span className={`dot ${balance > 0.005 ? 'warn' : nextLesson ? 'ok' : 'idle'}`} />
@@ -6399,8 +6546,25 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
         <span className={`chevron ${open ? 'open' : ''}`}>›</span>
       </div>
 
-      <div className={`card-body${open ? ' open' : ''}`}>
+      <div id={`student-body-${student.id}`} className={`card-body${open ? ' open' : ''}`}>
       <div className="card-body-inner">
+          <div className="actions" aria-label="Student actions">
+            {phone
+              ? (balance > 0 && <a className="btn action-primary" href={paymentWaLink} target="_blank" rel="noopener"><AppIcon name="payment" /><span>Request payment</span></a>)
+              : balance > 0 && <button className="btn needs-setup" onClick={() => setSetupHint('payment')}><AppIcon name="payment" /><span>Request payment</span></button>}
+            {phone
+              ? <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener"><AppIcon name="chat" /><span>WhatsApp</span></a>
+              : <button className="btn needs-setup" onClick={() => setSetupHint('whatsapp')}><AppIcon name="chat" /><span>WhatsApp</span></button>}
+            {student.is_zoom && student.zoom_link && <CopyAction value={student.zoom_link} label="Copy Zoom" icon="video" />}
+            <CopyAction value={cardParentLink} label="Parent link" walkthrough="parentlink" />
+            <CopyAction value={cardPupilLink} label="Student link" icon="student" />
+            {student.spreadsheet_url && <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener"><AppIcon name="chart" /><span>Progress sheet</span></a>}
+            <button className="btn" onClick={() => { setEditPayment(null); setShowCashModal(true); }}><AppIcon name="payment" /><span>Log payment</span></button>
+            <button className="btn edit action-muted" data-wt="edit" onClick={() => onEdit(student)}><AppIcon name="edit" /><span>Edit student</span></button>
+            <button className="btn more action-muted" data-wt="moretools" onClick={() => setShowMoreTools(true)}><AppIcon name="tools" /><span>More tools</span></button>
+            {student.general_notes && <button className="btn notes action-muted" aria-expanded={notesOpen} onClick={() => setNotesOpen(!notesOpen)}><AppIcon name="notes" /><span>{notesOpen ? 'Hide notes' : 'Notes'}</span></button>}
+          </div>
+
           {(student.school || displayYear || referredBy || referrals.length > 0) && (
             <React.Fragment>
               <div className="section-label">Details</div>
@@ -6475,8 +6639,8 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                       return (
                         <>
                           {!l.is_complimentary && (
-                            l.pre_settled ? <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>✓ settled</span>
-                            : st.settled  ? <span style={{fontSize:'0.7rem',color:'var(--accent)',marginRight:7}}>✓ paid</span>
+                            l.pre_settled ? <span style={{fontSize:'0.7rem',color:'var(--good)',marginRight:7}}>✓ settled</span>
+                            : st.settled  ? <span style={{fontSize:'0.7rem',color:'var(--good)',marginRight:7}}>✓ paid</span>
                             : st.partial  ? <span style={{fontSize:'0.7rem',color:'var(--gold)',marginRight:7}}>part paid</span>
                             : null
                           )}
@@ -6485,7 +6649,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                             // Green only once the money is actually in. A lesson
                             // that has happened but hasn't been paid for is money
                             // owed, not a job done, so it reads as a warning.
-                            : l.status === 'completed' ? {color: settled ? 'var(--accent)' : 'var(--warn)'}
+                            : l.status === 'completed' ? {color: settled ? 'var(--good)' : 'var(--warn)'}
                             : {}
                           }>
                             {l.is_complimentary ? 'free' : `${l.status} · ${M(rateForLesson(l, rateHistory), l.id + ':rate')}`}
@@ -6541,54 +6705,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
             </>
           )}
 
-          <div className="actions">
-            {phone
-              ? (balance > 0 && <a className="btn action-primary" href={paymentWaLink} target="_blank" rel="noopener"><StudentActionIcon name="payment" /><span>Request payment</span></a>)
-              : balance > 0 && (
-                <button className="btn needs-setup" onClick={() => setSetupHint('payment')}><StudentActionIcon name="payment" /><span>Request payment</span></button>
-              )}
-            {bundleWaLink && <a className="btn action-primary" href={bundleWaLink} target="_blank" rel="noopener"><StudentActionIcon name="bell" /><span>Bundle low</span></a>}
-            {phone
-              ? <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener"><StudentActionIcon name="chat" /><span>WhatsApp</span></a>
-              : <button className="btn needs-setup" onClick={() => setSetupHint('whatsapp')}><StudentActionIcon name="chat" /><span>WhatsApp</span></button>}
-            {/* Was buried in More tools, where nobody found it. */}
-            <button
-              className="btn"
-              data-wt="parentlink"
-              title="Copy the parent's private page link"
-              onClick={() => {
-                navigator.clipboard.writeText(cardParentLink).then(() => {
-                  setParentLinkCopied(true);
-                  setTimeout(() => setParentLinkCopied(false), 1800);
-                });
-              }}
-            ><StudentActionIcon name={parentLinkCopied ? 'check' : 'link'} /><span>{parentLinkCopied ? 'Copied' : 'Parent link'}</span></button>
-            {/* The pupil's own link. Same one tap, different audience: this one
-                is safe to give the child, since it carries no money at all. */}
-            <button
-              className="btn"
-              title="Copy the student's link, upcoming lessons only"
-              onClick={() => {
-                navigator.clipboard.writeText(cardPupilLink).then(() => {
-                  setCardPupilCopied(true);
-                  setTimeout(() => setCardPupilCopied(false), 1800);
-                });
-              }}
-            ><StudentActionIcon name={cardPupilCopied ? 'check' : 'student'} /><span>{cardPupilCopied ? 'Copied' : 'Student link'}</span></button>
-            {student.spreadsheet_url && (
-              <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener" title="Open the student's spreadsheet"><StudentActionIcon name="chart" /><span>Spreadsheet</span></a>
-            )}
-            {student.is_zoom && student.zoom_link && (
-              <a className="btn" href={student.zoom_link} target="_blank" rel="noopener" title="Join the student's Zoom lesson"><StudentActionIcon name="video" /><span>Join Zoom</span></a>
-            )}
-            <button className="btn edit" data-wt="edit" onClick={() => onEdit(student)}><StudentActionIcon name="edit" /><span>Edit</span></button>
-            <button className="btn more" data-wt="moretools" onClick={() => setShowMoreTools(true)}><StudentActionIcon name="tools" /><span>More tools</span></button>
-            {student.general_notes && (
-              <button className="btn notes" onClick={() => setNotesOpen(!notesOpen)}>
-                <StudentActionIcon name="notes" /><span>{notesOpen ? 'Hide notes' : 'Notes'}</span>
-              </button>
-            )}
-          </div>
 
           {student.general_notes && (
             <RichNote className={`notes-box ${notesOpen ? 'visible' : ''}`} text={student.general_notes} />
@@ -7183,7 +7299,6 @@ function App() {
   const [refreshing, setRefreshing] = useState(false);
   // Search is a button until it is wanted, and the order is remembered on
   // this device so the list comes back the way it was left.
-  const [searchOpen, setSearchOpen] = useState(false);
   const [sortBy, setSortBy] = useState(() => {
     try { return STUDENT_SORTS.some(([k]) => k === localStorage.getItem('tutortally_sort')) ? localStorage.getItem('tutortally_sort') : 'name'; }
     catch { return 'name'; }
@@ -7586,15 +7701,15 @@ function App() {
           <div className="header-right">
             <button className="refresh-btn" onClick={refreshEverything} disabled={refreshing || syncingAll}
                     aria-label="Sync calendar and refresh">
-              <span style={{display:'inline-block', animation: (refreshing || syncingAll) ? 'spin 0.8s linear infinite' : 'none'}}>↻</span>
+              <span style={{display:'inline-block', animation: (refreshing || syncingAll) ? 'spin 0.8s linear infinite' : 'none'}}><AppIcon name="refresh" /></span>
             </button>
             {(!walkthroughOpen || walkthroughPaused) && (
               <button className="header-settings-btn" data-wt="tools"
-                      onClick={() => setShowGlobalTools(true)}>⚙ Settings</button>
+                      onClick={() => setShowGlobalTools(true)}><AppIcon name="settings" /><span>Settings</span></button>
             )}
             <button className="add-btn" onClick={() =>
               (NEW_STUDENT_BLOCKED || WRITES_BLOCKED) ? setLimitPrompt(true) : setShowAddModal(true)
-            } data-wt="add">+ Add</button>
+            } data-wt="add"><AppIcon name="plus" /><span>Add</span></button>
           </div>
         </div>
         {/* The controls live in Tools; this is only a reminder that they're on,
@@ -7669,22 +7784,15 @@ function App() {
 
         {!loading && activeStudents.length > 1 && (
           <div className="list-tools">
-            {searchOpen || query ? (
-              <div className="search-wrap">
-                <span className="s-icon">⌕</span>
-                <input
-                  type="search" value={query} autoFocus
-                  onChange={e => { captureListPositions(); setQuery(e.target.value); }}
-                  onBlur={() => { if (!query) setSearchOpen(false); }}
-                  placeholder="Search students or schools…"
-                />
-                <button className="s-clear" aria-label="Close search"
-                  onMouseDown={e => e.preventDefault()}
-                  onClick={() => { captureListPositions(); setQuery(''); setSearchOpen(false); }}>✕</button>
-              </div>
-            ) : (
-              <button className="list-btn" onClick={() => setSearchOpen(true)}>⌕ Search</button>
-            )}
+            <div className="search-wrap">
+              <span className="s-icon"><AppIcon name="search" /></span>
+              <input type="search" value={query} aria-label="Search students or schools"
+                onChange={e => { captureListPositions(); setQuery(e.target.value); }}
+                placeholder="Find a student or school…" />
+              {query && <button className="s-clear" aria-label="Clear search"
+                onMouseDown={e => e.preventDefault()}
+                onClick={() => { captureListPositions(); setQuery(''); }}><AppIcon name="close" /></button>}
+            </div>
             <label className="sort-wrap">
               <span>Sort</span>
               <select value={sortBy} aria-label="Sort students by" onChange={e => {
@@ -7699,11 +7807,11 @@ function App() {
         )}
 
         {!loading && activeStudents.length === 0 && (
-          <div className="empty">No active students. Tap "+ Add" to get started.</div>
+          <div className="empty"><AppIcon name="student" /><strong>Your students, all in one place</strong>Add your first student to start tracking lessons and payments.</div>
         )}
 
         {!loading && activeStudents.length > 0 && shownStudents.length === 0 && (
-          <div className="empty">No one matches "{query}".</div>
+          <div className="empty"><AppIcon name="search" /><strong>No students found</strong>Try a different name or school.</div>
         )}
 
         <div ref={studentListRef}>
@@ -7716,7 +7824,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.22.0</div>}
+        {!loading && <div className="version-tag">v6.23.0 · Made for your teaching day</div>}
       </div>
 
       {showAddModal && (
@@ -7734,7 +7842,7 @@ function App() {
           they occupy the same space and the card offers its own way in. It
           comes straight back when they pause to look around. */}
       {(!walkthroughOpen || walkthroughPaused) && (
-        <button className="global-tools-btn" data-wt="tools" onClick={() => setShowGlobalTools(true)}>⚙ Settings</button>
+        <button className="global-tools-btn" data-wt="tools" onClick={() => setShowGlobalTools(true)}><AppIcon name="settings" /><span>Settings</span></button>
       )}
 
       {showGlobalTools && (
@@ -7791,12 +7899,6 @@ function App() {
     </PrivacyContext.Provider>
   );
 }
-
-// iOS Safari ignores user-scalable=no, so the pinch gesture has to be refused
-// directly. touch-action handles double-tap; these cover pinch.
-['gesturestart', 'gesturechange', 'gestureend'].forEach(evt =>
-  document.addEventListener(evt, e => e.preventDefault(), { passive: false })
-);
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>

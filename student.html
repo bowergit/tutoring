@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <!-- Replaced with "[first name]'s lessons" as soon as the data loads. This
      static value is only what a link-preview crawler sees, since it reads the
      raw HTML and never runs the script that knows whose page it is. -->
@@ -193,7 +193,21 @@
   .gbtable tbody tr.used td { background: var(--accent-light); color: var(--accent); font-weight: 650; }
   .gbtable tbody tr:last-child td { border-bottom: none; }
   .gb-foot { font-size: 0.7rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+  .wrap { max-width:580px; }
+  h1 { font-size:1.7rem; line-height:1.2; }
+  .sub { margin-top:7px; line-height:1.5; }
+  .row { min-height:58px; gap:12px; padding:16px; }
+  .detail { padding:0 16px 16px; line-height:1.6; }
+  .kpi { padding:14px 5px; }
+  .kpi span { font-size:.67rem; }
+  .section-label { margin-top:28px; }
+  .action-btn { justify-content:flex-start; padding:15px 17px; box-shadow:none; }
+  .action-btn .app-icon { color:var(--accent); }
+  .card { animation:tt-enter .3s ease both; }
+  @media (max-width:360px) { .kpis { grid-template-columns:repeat(2,1fr); } }
 </style>
+<link rel="stylesheet" href="ux.css?v=6.23.0">
 </head>
 <body>
 <div class="wrap" id="app">
@@ -757,7 +771,7 @@
     return `
       <div class="section-label">Book an extra session</div>
       <div class="actions">
-        <a class="action-btn" href="${esc(url)}" target="_blank" rel="noopener">\ud83d\udcc6 Book an extra session</a>
+        <a class="action-btn" href="${esc(url)}" target="_blank" rel="noopener"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2"/></svg> Book an extra session</a>
       </div>`;
   }
 
@@ -808,9 +822,9 @@
   }
 
   const actions = [
-    waLink ? `<a class="action-btn" href="${waLink}" target="_blank" rel="noopener">💬 Message ${esc(tutorName)} on WhatsApp</a>` : '',
-    mailLink ? `<a class="action-btn" href="${mailLink}">✉️ Email ${esc(tutorName)}</a>` : '',
-    data.spreadsheet_url ? `<a class="action-btn" href="${esc(data.spreadsheet_url)}" target="_blank" rel="noopener">📈 View ${esc(firstName)}'s progress</a>` : '',
+    waLink ? `<a class="action-btn" href="${waLink}" target="_blank" rel="noopener"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z M7 10h10 M7 14h6"/></svg> Message ${esc(tutorName)} on WhatsApp</a>` : '',
+    mailLink ? `<a class="action-btn" href="${mailLink}"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 5h18v14H3z M3 5l9 8 9-8"/></svg> Email ${esc(tutorName)}</a>` : '',
+    data.spreadsheet_url ? `<a class="action-btn" href="${esc(data.spreadsheet_url)}" target="_blank" rel="noopener"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 3v17h17 M8 15l4-5 4 3 4-7"/></svg> View ${esc(firstName)}'s progress</a>` : '',
   ].join('');
 
   portalData = data;
