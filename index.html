@@ -6272,9 +6272,8 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const parentFirstName = (student.parent_name || '').split(' ')[0];
   const greeting = parentFirstName ? `Hi ${parentFirstName}!` : 'Hi!';
   const phone = normaliseUKPhone(student.parent_phone);
-  const waMessage = balance > 0
-    ? `${greeting} Just a friendly reminder we have an outstanding balance of ${moneyText(balance)} for ${studentFirstName}'s lessons. Please could you settle this when you get the chance? Thanks!`
-    : `${greeting} Just checking in about ${studentFirstName}'s next lesson.`;
+  // General contact stays separate from the explicit payment reminder below.
+  const waMessage = `${greeting} Just checking in about ${studentFirstName}'s next lesson.`;
   const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}` : null;
   const paymentMsg = `${greeting} Just a note that we have ${unpaidCount} outstanding session${unpaidCount !== 1 ? 's' : ''} totalling ${moneyText(balance)}. Please could you settle this when you get the chance? Thanks!`;
   const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
