@@ -323,6 +323,7 @@
   .btn.edit  { background: var(--card-2); color: var(--ink);     border: 1px solid var(--line); }
 
 
+  .student-action-icon { flex-shrink: 0; display: block; }
   /* Student actions: brand-led hierarchy with comfortable mobile targets. */
   .actions {
     display: grid;
@@ -6174,6 +6175,28 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
   );
 }
 
+// Small decorative icons keep student actions easy to scan.
+function StudentActionIcon({ name }) {
+  const paths = {
+    payment: 'M3 6h18v12H3z M3 10h18 M7 14h3',
+    chat: 'M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z M7 10h10 M7 14h6',
+    link: 'M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2 M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2',
+    student: 'M3 9l9-5 9 5-9 5z M6 11v6c4 3 8 3 12 0v-6 M21 9v8',
+    chart: 'M4 3v17h17 M8 15l4-5 4 3 4-7',
+    video: 'M3 6h12v12H3z M15 10l6-3v10l-6-3',
+    edit: 'M15 4l5 5 M4 20l1-6L16 3a2 2 0 0 1 3 0l2 2a2 2 0 0 1 0 3L10 19z',
+    tools: 'M5 12h.01 M12 12h.01 M19 12h.01',
+    notes: 'M5 3h14v18H5z M8 7h8 M8 11h8 M8 15h5',
+    bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9 M10 21h4',
+    check: 'M5 12l4 4L19 6'
+  };
+  return <svg className="student-action-icon" width="17" height="17" viewBox="0 0 24 24"
+    fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"
+    strokeLinejoin="round" aria-hidden="true" focusable="false">
+    <path d={paths[name] || paths.link} />
+  </svg>;
+}
+
 function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, focused, session, onEdit, onDataChanged }) {
   const M = useMoney();
   const N = useNameDisplay();
@@ -6520,14 +6543,14 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
 
           <div className="actions">
             {phone
-              ? (balance > 0 && <a className="btn action-primary" href={paymentWaLink} target="_blank" rel="noopener">Request payment</a>)
+              ? (balance > 0 && <a className="btn action-primary" href={paymentWaLink} target="_blank" rel="noopener"><StudentActionIcon name="payment" /><span>Request payment</span></a>)
               : balance > 0 && (
-                <button className="btn needs-setup" onClick={() => setSetupHint('payment')}>Request payment</button>
+                <button className="btn needs-setup" onClick={() => setSetupHint('payment')}><StudentActionIcon name="payment" /><span>Request payment</span></button>
               )}
-            {bundleWaLink && <a className="btn action-primary" href={bundleWaLink} target="_blank" rel="noopener">Bundle low</a>}
+            {bundleWaLink && <a className="btn action-primary" href={bundleWaLink} target="_blank" rel="noopener"><StudentActionIcon name="bell" /><span>Bundle low</span></a>}
             {phone
-              ? <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener">WhatsApp</a>
-              : <button className="btn needs-setup" onClick={() => setSetupHint('whatsapp')}>WhatsApp</button>}
+              ? <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener"><StudentActionIcon name="chat" /><span>WhatsApp</span></a>
+              : <button className="btn needs-setup" onClick={() => setSetupHint('whatsapp')}><StudentActionIcon name="chat" /><span>WhatsApp</span></button>}
             {/* Was buried in More tools, where nobody found it. */}
             <button
               className="btn"
@@ -6539,7 +6562,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                   setTimeout(() => setParentLinkCopied(false), 1800);
                 });
               }}
-            >{parentLinkCopied ? '✓ Copied' : 'Parent link'}</button>
+            ><StudentActionIcon name={parentLinkCopied ? 'check' : 'link'} /><span>{parentLinkCopied ? 'Copied' : 'Parent link'}</span></button>
             {/* The pupil's own link. Same one tap, different audience: this one
                 is safe to give the child, since it carries no money at all. */}
             <button
@@ -6551,18 +6574,18 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                   setTimeout(() => setCardPupilCopied(false), 1800);
                 });
               }}
-            >{cardPupilCopied ? '✓ Copied' : 'Student link'}</button>
+            ><StudentActionIcon name={cardPupilCopied ? 'check' : 'student'} /><span>{cardPupilCopied ? 'Copied' : 'Student link'}</span></button>
             {student.spreadsheet_url && (
-              <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener" title="Open the student's spreadsheet">Spreadsheet</a>
+              <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener" title="Open the student's spreadsheet"><StudentActionIcon name="chart" /><span>Spreadsheet</span></a>
             )}
             {student.is_zoom && student.zoom_link && (
-              <a className="btn" href={student.zoom_link} target="_blank" rel="noopener" title="Join the student's Zoom lesson">Join Zoom</a>
+              <a className="btn" href={student.zoom_link} target="_blank" rel="noopener" title="Join the student's Zoom lesson"><StudentActionIcon name="video" /><span>Join Zoom</span></a>
             )}
-            <button className="btn edit" data-wt="edit" onClick={() => onEdit(student)}>Edit</button>
-            <button className="btn more" data-wt="moretools" onClick={() => setShowMoreTools(true)}>More tools</button>
+            <button className="btn edit" data-wt="edit" onClick={() => onEdit(student)}><StudentActionIcon name="edit" /><span>Edit</span></button>
+            <button className="btn more" data-wt="moretools" onClick={() => setShowMoreTools(true)}><StudentActionIcon name="tools" /><span>More tools</span></button>
             {student.general_notes && (
               <button className="btn notes" onClick={() => setNotesOpen(!notesOpen)}>
-                {notesOpen ? 'Hide notes' : 'Notes'}
+                <StudentActionIcon name="notes" /><span>{notesOpen ? 'Hide notes' : 'Notes'}</span>
               </button>
             )}
           </div>
