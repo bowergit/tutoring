@@ -934,7 +934,7 @@
   }
 
 </style>
-<link rel="stylesheet" href="ux.css?v=6.27.0">
+<link rel="stylesheet" href="ux.css?v=6.28.0">
 </head>
 <body>
 <div id="root"></div>
@@ -6181,7 +6181,7 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
           {weeklyPanel && <ToolsSection title="Weekly tuition">
             <ToolsRow
               title="Reserved weekly tuition"
-              subtitle={showWeekly ? 'Tap to hide' : 'Your account only. £80 a week, set up per student'}
+              subtitle={showWeekly ? 'Tap to hide' : 'Your account only. A fixed price every week, set up per student'}
               onClick={() => setShowWeekly(v => !v)}
               end="›"
             />
@@ -6468,10 +6468,10 @@ function CopyAction({ value, label, icon = 'link', walkthrough }) {
 }
 
 const WEEKLY_GUIDE = [
-  { title: 'What it is', body: '£80 a week for one lesson a week, charged every week including holidays and missed lessons. It is switched on per student, only on your account, and never changes existing students by itself.' },
+  { title: 'What it is', body: 'A fixed price a week (£80 by default, you can lower it) for one lesson a week, charged every week including holidays and missed lessons. It is switched on per student, only on your account, and never changes existing students by itself.' },
   { title: 'Set up', body: 'Tap Set up weekly tuition. Choose the first charge date, the reserved time (for example Wednesday 5pm, online, one hour) and the notice period. Create agreement makes a proposal only. Nothing is charged yet. Cancel setup backs out any time.' },
   { title: 'Send the agreement', body: 'Copy the agreement link and send it to the parent. They read the terms, type their name, tick the box and accept.' },
-  { title: 'Activate', body: 'Once the parent has accepted, Activate weekly charges becomes available. From the start date a £80 charge appears every week. Lessons inside the plan stop counting as separate charges, so you do not need to lower the £100 rate in Settings.' },
+  { title: 'Activate', body: 'Once the parent has accepted, Activate weekly charges becomes available. From the start date a charge at your chosen price appears every week. Lessons inside the plan stop counting as separate charges, so you do not need to lower the £100 rate in Settings.' },
   { title: 'Each week', body: 'Payments cover the oldest charge first. Future charges show as scheduled and are not counted as owed. If you cancel a lesson, choose its date and Waive weekly charge. Parent cancellations stay chargeable.' },
   { title: 'Ending', body: 'The parent can give notice from their page, and you will see it here. You can also record an agreed end date, or stop from today. Charges before the end date stay payable.' },
 ];
@@ -6485,6 +6485,7 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
   const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   const weekdayOf = iso => new Date(iso + 'T12:00:00Z').getUTCDay();
   const nextDate = dow => { const d = new Date(TTWeekly.today() + 'T12:00:00Z'); while (d.getUTCDay() !== dow) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+  const [fee, setFee] = useState('80');
   const [day, setDay] = useState(weekdayOf(TTWeekly.today()));
   const [time, setTime] = useState('17:00');
   const [format, setFormat] = useState('Online');
@@ -6516,8 +6517,8 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
   async function propose(e) {
     e.preventDefault();
     await run(() => supabase.from('tutoring_weekly_plans').insert({
-      student_id: student.id, owner_id: student.owner_id, starts_on: start,
-      lesson_slot: slot.trim(), notice_days: Number(notice), terms_text: '',
+      student_id: student.id, owner_id: student.owner_id, starts_on: start, weekly_fee: Number(fee),
+      lesson_slot: slot.trim(), weekly_fee: Number(fee), notice_days: Number(notice), terms_text: '',
     }));
   }
   const field = { display:'block', margin:'14px 0' };
@@ -6537,9 +6538,10 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
       </div>}
     </>}
     {!plan || plan.status === 'ended' ? <>
-      {!plan && <p>This student pays per lesson. You can switch them to £80 a week.</p>}
+      {!plan && <p>This student pays per lesson. You can switch them to a fixed weekly price.</p>}
       {!showSetup && btn('Set up weekly tuition', () => setShowSetup(true))}
       {showSetup && <form onSubmit={propose}>
+        <label style={field}>Price per week (£)<input type="number" required min="1" max="500" step="0.5" value={fee} disabled={readonly || busy} onChange={e => setFee(e.target.value)} /></label>
         <label style={field}>Lesson day<select value={day} disabled={readonly || busy} onChange={e => { const d = Number(e.target.value); setDay(d); setStart(nextDate(d)); }}>{[1,2,3,4,5,6,0].map(d => <option key={d} value={d}>{DAYS[d]}</option>)}</select></label>
         <label style={field}>Lesson time<input type="time" required step="900" value={time} disabled={readonly || busy} onChange={e => setTime(e.target.value)} /></label>
         <label style={field}>Where<select value={format} disabled={readonly || busy} onChange={e => setFormat(e.target.value)}><option>Online</option><option>In person</option></select></label>
@@ -6549,12 +6551,12 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
         <p>The parent accepts it first, then you activate it. Nothing changes until then.</p>
         <div className="btn-row">
           <button type="button" className="btn cancel" onClick={() => setShowSetup(false)}>Cancel setup</button>
-          <button className="btn save" disabled={busy || readonly}>Create agreement</button>
+          <button className="btn save" disabled={busy || readonly || !(Number(fee) > 0)}>Create agreement</button>
         </div>
       </form>}
     </> : null}
     {plan && <>
-      <p><b>{readonly ? 'Weekly arrangement' : '£80 every week, including holidays'}</b><br />{plan.status === 'ended' ? 'Ended' : plan.status === 'proposed' ? 'Awaiting activation' : plan.ends_before ? 'Ending' : 'Active'}{plan.ends_before && !readonly ? `, no new charges from ${plan.ends_before}` : ''}</p>
+      <p><b>{readonly ? 'Weekly arrangement' : `${moneyText(plan.weekly_fee)} every week, including holidays`}</b><br />{plan.status === 'ended' ? 'Ended' : plan.status === 'proposed' ? 'Awaiting activation' : plan.ends_before ? 'Ending' : 'Active'}{plan.ends_before && !readonly ? `, no new charges from ${plan.ends_before}` : ''}</p>
       {!readonly && <p>{plan.lesson_slot}<br />First charge: {plan.starts_on}. Notice: {plan.notice_days} days.</p>}
       {plan.review_required && <p role="alert">Cooling off cancellation requested. Review the proportionate final fee and refund or credit before marking this resolved.</p>}
       {!readonly && <CopyAction value={agreementUrl.toString()} label="Copy agreement link" />}
@@ -6726,7 +6728,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const referrals = danielOnly ? allStudents.filter(s => s.referred_by_student_id === student.id) : [];
   const lessonPills = studentLessonPills(student);
 
-  const currentRate = weeklyActive ? (PRIVACY_MONEY_MODE === 'dummy' ? dummyRateFor(student.id) : 80) : getCurrentRate(student.id, rateHistory);
+  const currentRate = weeklyActive ? (PRIVACY_MONEY_MODE === 'dummy' ? dummyRateFor(student.id) : Number(TTWeekly.plans(student.id).find(p => p.status !== 'proposed' && p.acceptance)?.weekly_fee ?? 80)) : getCurrentRate(student.id, rateHistory);
   const unpaidCount = balance > 0 && currentRate > 0 ? Math.ceil(balance / currentRate) : 0;
 
   const sixMonthsOut = new Date();
@@ -8090,7 +8092,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.27.0</div>}
+        {!loading && <div className="version-tag">v6.28.0</div>}
       </div>
 
       {showAddModal && (

@@ -1,5 +1,6 @@
 (function () {
   const esc = v => String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const short = v => '£'+Number(v).toFixed(2).replace(/\.00$/,'');
   const money = v => new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(Number(v));
   const day = d => new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   const button = (id,label) => `<button type="button" class="action-btn" id="${id}">${esc(label)}</button>`;
@@ -20,7 +21,7 @@
       @media print{body *{visibility:hidden}#weekly-agreement,#weekly-agreement *{visibility:visible}#weekly-agreement{position:absolute;left:0;top:0;width:95%;border:0;background:white;color:black}#weekly-agreement button,#weekly-agreement form{display:none}.weekly-terms{font-size:11pt} }
     </style>
     <section class="weekly-card" aria-label="Weekly tuition arrangement">
-      ${mini?`<details id="weekly-card-wrap" ${p.review_required?'open':''}><summary><b>£80 a week</b> · ${p.ends_before?'ending':'active'}</summary>`:'<h2>£80 a week</h2>'}
+      ${mini?`<details id="weekly-card-wrap" ${p.review_required?'open':''}><summary><b>${esc(short(p.weekly_fee))} a week</b> · ${p.ends_before?'ending':'active'}</summary>`:'<h2>${esc(short(p.weekly_fee))} a week</h2>'}
       <p>${esc(p.lesson_slot)}<br>First payment: ${esc(day(p.starts_on))}.</p>
       <p>${p.status==='proposed'?'Waiting for Daniel to start it. Nothing has been charged yet.':p.ends_before?`Weekly tuition ends. No charges from ${esc(day(p.ends_before))}.`:'Your weekly slot is booked. It is paid every week, even holidays.'}</p>
       ${p.review_required?'<p role="alert">Your cooling off cancellation has been recorded. Daniel will review any proportionate final charge and arrange a refund or credit where due. The balance below is awaiting that review.</p>':''}
@@ -37,7 +38,7 @@
       <details ${!a || location.hash==='#weekly-agreement'?'open':''} id="weekly-terms-details"><summary>Read the agreement</summary><pre class="weekly-terms">${esc(p.terms_text)}</pre></details>
       ${a?`<p><b>Accepted by ${esc(a.signer_name)}</b><br>${esc(new Date(a.accepted_at).toLocaleString('en-GB',{timeZone:'Europe/London'}))}, UK time</p>`:p.status==='proposed'?`
       <form id="weekly-accept-form"><label>Your full name<input type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name"></label>
-      <label><input type="checkbox" name="agree" required>I agree to the terms above: £80 a week, including holidays and missed lessons.</label>
+      <label><input type="checkbox" name="agree" required>I agree to the terms above: ${esc(short(p.weekly_fee))} a week, including holidays and missed lessons.</label>
       <button class="action-btn" type="submit">Accept weekly tuition agreement</button></form><p>Keep this page link private.</p>`:'<p>This proposal is no longer available to accept.</p>'}
       <p id="weekly-accept-message" class="weekly-message" role="status"></p><div class="actions">${button('weekly-print','Print or save agreement')}${button('weekly-download','Download agreement text')}</div>
       ${w.history?.length?`<details><summary>Previous agreements</summary>${w.history.map(h=>`<pre class="weekly-terms">${esc(h.terms_text)}</pre>${h.acceptance?`<p>Accepted by ${esc(h.acceptance.signer_name)} on ${esc(new Date(h.acceptance.accepted_at).toLocaleString('en-GB'))}</p>`:'<p>Not accepted.</p>'}`).join('')}</details>`:''}
