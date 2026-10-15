@@ -4517,6 +4517,9 @@ function CalendarCandidates({ session, students, atLimit, onDataChanged, onAdded
 }
 
 function NeedsAttention({ students, lessons, payments, allocations, rateHistory, onJump }) {
+  // Remembered per device. Storage can be blocked, so it is always guarded.
+  const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('tt_attn_collapsed') === '1'; } catch (e) { return false; } });
+  const toggleCollapsed = () => setCollapsed(c => { const n = !c; try { localStorage.setItem('tt_attn_collapsed', n ? '1' : '0'); } catch (e) {} return n; });
   const M = useMoney();
   const N = useNameDisplay();
   const today = new Date().toISOString().slice(0, 10);
@@ -4571,8 +4574,11 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
 
   return (
     <div className="attn">
-      <div className="attn-title"><AppIcon name="bell" />Needs attention · {items.length}</div>
-      {items.slice(0, 6).map(it => (
+      <button type="button" className="attn-title" aria-expanded={!collapsed} onClick={toggleCollapsed}
+        style={{display:'flex',alignItems:'center',gap:6,width:'100%',background:'none',border:0,padding:0,marginBottom:collapsed?0:8,cursor:'pointer',font:'inherit',fontSize:'0.68rem',textTransform:'uppercase',letterSpacing:'0.09em',fontWeight:700,color:'var(--warn)',textAlign:'left'}}>
+        <AppIcon name="bell" /><span style={{flex:1}}>Needs attention · {items.length}</span><span aria-hidden="true">{collapsed ? '▾' : '▴'}</span>
+      </button>
+      {!collapsed && items.slice(0, 6).map(it => (
         <div className="attn-item" key={it.id} onClick={() => onJump(it.studentId)}>
           <span>{N(it.name, it.studentId)}</span>
           <span className="attn-why">{it.why}</span>

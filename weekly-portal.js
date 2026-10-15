@@ -6,6 +6,7 @@
   window.renderWeekly = function (w) {
     if(!w) return '';
     const p=w.plan, a=w.acceptance;
+    const mini=!!a && p.status==='active';
     const cooling=a && Date.now()<new Date(a.accepted_at).getTime()+14*86400000;
     const rows=w.entries.map(c=>`<tr><td>${esc(day(c.date))}</td><td>${esc(c.kind)}${c.reason?`<br><small>${esc(c.reason)}</small>`:''}</td><td>${esc(money(c.amount))}</td><td>${c.waived?'Waived':c.paid>=c.amount-0.005?'Covered by payments':!c.due?'Scheduled':c.paid>0?'Part paid':'Due'}</td></tr>`).join('');
     return `<style>
@@ -19,7 +20,7 @@
       @media print{body *{visibility:hidden}#weekly-agreement,#weekly-agreement *{visibility:visible}#weekly-agreement{position:absolute;left:0;top:0;width:95%;border:0;background:white;color:black}#weekly-agreement button,#weekly-agreement form{display:none}.weekly-terms{font-size:11pt} }
     </style>
     <section class="weekly-card" aria-label="Weekly tuition arrangement">
-      <h2>£80 every week, including school holidays</h2>
+      ${mini?`<details id="weekly-card-wrap" ${p.review_required?'open':''}><summary><b>£80 every week, including school holidays</b> · ${p.ends_before?'ending':'active'}</summary>`:'<h2>£80 every week, including school holidays</h2>'}
       <p>${esc(p.lesson_slot)}<br>First weekly charge: ${esc(day(p.starts_on))}.</p>
       <p>${p.status==='proposed'?'Your agreement is awaiting activation by Daniel. Weekly charges have not started.':p.ends_before?`No new weekly charges from ${esc(day(p.ends_before))}.`:'Your weekly place is active. The fee continues when your child cannot attend.'}</p>
       ${p.review_required?'<p role="alert">Your cooling off cancellation has been recorded. Daniel will review any proportionate final charge and arrange a refund or credit where due. The balance below is awaiting that review.</p>':''}
@@ -29,6 +30,7 @@
       <p>You can set up a weekly bank standing order using the details Daniel supplies. Accepting this agreement does not set up an automatic payment.</p>
       ${a && p.status!=='ended' && !p.end_requested_at && !p.ends_before?`<div class="actions">${button('weekly-end',`Give ${p.notice_days} days' notice to end tuition`)}${cooling?button('weekly-cooling','Cancel within the 14 day cooling off period'):''}</div>`:''}
       <p class="weekly-message" id="weekly-action-message" role="status"></p>
+      ${mini?'</details>':''}
     </section>
     <section class="weekly-card" id="weekly-agreement">
       ${a?`<details id="weekly-agreement-wrap" ${location.hash==='#weekly-agreement'?'open':''}><summary>Your tuition agreement · accepted ${esc(new Date(a.accepted_at).toLocaleDateString('en-GB',{timeZone:'Europe/London'}))}</summary>`:'<h2>Your tuition agreement</h2>'}
