@@ -516,12 +516,12 @@
     if (a.owed > 0) {
       cls = 'owing'; mark = '•'; fig = money(a.owed);
       head = 'Outstanding';
-      sub = \`${a.unpaid_lessons} lesson${a.unpaid_lessons === 1 ? '' : 's'} not yet paid for.\`;
+      sub = `${a.unpaid_lessons} lesson${a.unpaid_lessons === 1 ? '' : 's'} not yet paid for.`;
     } else if (a.credit > 0) {
       cls = 'credit'; mark = '✓'; fig = money(a.credit);
       head = 'In credit';
       sub = a.credit_covers > 0
-        ? \`Paid ahead. That covers the next ${a.credit_covers} lesson${a.credit_covers === 1 ? '' : 's'}, and comes down as each one happens.\`
+        ? `Paid ahead. That covers the next ${a.credit_covers} lesson${a.credit_covers === 1 ? '' : 's'}, and comes down as each one happens.`
         : 'Paid ahead. This comes down as lessons happen.';
     } else {
       cls = 'settled'; mark = '✓'; fig = '£0';
@@ -533,20 +533,20 @@
     let settleUp = '';
     if (canSettleUp && amount > 0.005) {
       const firstName = String(studentName || '').trim().split(/\s+/)[0] || 'student';
-      const paymentUrl = new URL(\`https://monzo.me/danielbower1/${amount.toFixed(2)}\`);
+      const paymentUrl = new URL(`https://monzo.me/danielbower1/${amount.toFixed(2)}`);
       paymentUrl.searchParams.set('h', 'h1cHMY');
-      paymentUrl.searchParams.set('d', \`Maths lesson ${firstName}\`);
+      paymentUrl.searchParams.set('d', `Maths lesson ${firstName}`);
       paymentUrl.searchParams.set('account_type', 'personal');
-      settleUp = \`
+      settleUp = `
         <div class="actions settle-actions">
           <a class="action-btn settle-btn" href="${esc(paymentUrl.toString())}" target="_blank" rel="noopener">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17 17 7M8 7h9v9"/></svg>
             Settle up · ${esc(money(amount))}
           </a>
-        </div>\`;
+        </div>`;
     }
 
-    return \`
+    return `
       <div class="section-label">Account</div>
       <div class="card acct ${cls}">
         <div class="acct-mark">${mark}</div>
@@ -556,7 +556,7 @@
           <span>${esc(sub)}</span>
         </div>
       </div>
-      ${settleUp}\`;
+      ${settleUp}`;
   }
   function renderGrade(g) {
     if (!g || !g.boundaries.length) return '';
