@@ -14,7 +14,7 @@
     const details=`
       <p class="wk-line">${esc(p.lesson_slot)}<br>First payment: ${esc(day(p.starts_on))}</p>
       ${p.status==='ended'&&p.ends_before?`<p class="wk-line">Weekly tuition has ended. No charges from ${esc(day(p.ends_before))}.</p>`:''}
-      ${w.entries.length?`<details class="wk-more"><summary>Weekly charges</summary><div class="wk-body" style="overflow-x:auto"><table class="wk-table"><thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></details>`:''}
+      ${w.entries.length?`<details class="wk-more"><summary>Charges</summary><div class="wk-body" style="overflow-x:auto"><table class="wk-table"><thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></details>`:''}
       <details class="wk-more"><summary>Payments received</summary><div class="wk-body">${w.payments.length?w.payments.map(r=>`<p class="wk-line">${esc(day(r.date_paid))}: ${esc(money(r.amount))}</p>`).join(''):'<p class="wk-line">No payments yet.</p>'}</div></details>
       <details class="wk-more"><summary>The agreement</summary><div class="wk-body"><pre class="wk-terms">${esc(p.terms_text)}</pre>${a?`<p class="wk-line">Agreed by ${esc(a.signer_name)} on ${esc(new Date(a.accepted_at).toLocaleDateString('en-GB',{timeZone:'Europe/London'}))}.</p>`:''}</div></details>`;
     const style=`<style>
