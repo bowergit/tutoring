@@ -4,6 +4,26 @@
   const money = v => new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(Number(v));
   const day = d => new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
   const button = (id,label) => `<button type="button" class="action-btn" id="${id}">${esc(label)}</button>`;
+  // A branded confirm box in place of the browser's own window.confirm().
+  function ask(title, body, okLabel, cancelLabel) {
+    return new Promise(resolve => {
+      const back=document.createElement('div');
+      back.setAttribute('role','presentation');
+      back.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(10,18,16,.55)';
+      const box=document.createElement('div');
+      box.setAttribute('role','alertdialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-labelledby','wk-ask-title');
+      box.style.cssText='max-width:380px;width:100%;box-sizing:border-box;padding:22px;border-radius:var(--r-xl,24px);background:var(--card,#fff);color:var(--ink,#15211f);border:1px solid var(--line,#dfe7e3);box-shadow:0 18px 50px rgba(0,0,0,.28);font:inherit';
+      const btn='padding:12px 16px;border-radius:var(--r-md,13px);font:inherit;font-weight:650;font-size:.9rem;cursor:pointer;flex:1;';
+      box.innerHTML='<h3 id="wk-ask-title" style="margin:0 0 8px;font-size:1.15rem">'+esc(title)+'</h3><p style="margin:0 0 18px;line-height:1.55;color:var(--ink-dim,#596965)">'+esc(body)+'</p><div style="display:flex;gap:10px"><button type="button" data-no style="'+btn+'background:var(--card-2,#f5f7f6);color:var(--ink,#15211f);border:1px solid var(--line,#dfe7e3)">'+esc(cancelLabel||'Cancel')+'</button><button type="button" data-yes style="'+btn+'background:var(--accent-fill,#ffa500);color:var(--on-accent,#15211f);border:0">'+esc(okLabel||'OK')+'</button></div>';
+      back.appendChild(box);document.body.appendChild(back);
+      const done=v=>{document.removeEventListener('keydown',key);back.remove();resolve(v)};
+      const key=e=>{if(e.key==='Escape')done(false)};
+      document.addEventListener('keydown',key);
+      back.addEventListener('click',e=>{if(e.target===back)done(false)});
+      box.querySelector('[data-no]').addEventListener('click',()=>done(false));
+      const yes=box.querySelector('[data-yes]');yes.addEventListener('click',()=>done(true));yes.focus();
+    });
+  }
   window.renderWeekly = function (w) {
     if(!w) return '';
     const p=w.plan, a=w.acceptance;
@@ -65,11 +85,8 @@
       e.preventDefault(); const f=new FormData(e.currentTarget);
       action({action:'accept',terms_version:p.terms_version,signer_name:f.get('signer_name'),agree:f.has('agree')},'weekly-accept-message');
     });
-    document.getElementById('weekly-end')?.addEventListener('click',()=>{
-      if(confirm(`Stop weekly tuition? You give ${p.notice_days} days' notice and pay up to the end date.`)) action({action:'end'},'weekly-action-message');
-    });
-    document.getElementById('weekly-cooling')?.addEventListener('click',()=>{
-      if(confirm('Cancel your agreement under the 14 day cooling off right? Daniel will review any proportionate charge for services already supplied and arrange any refund due.')) action({action:'cooling_off'},'weekly-action-message');
+    document.getElementById('weekly-end')?.addEventListener('click',async()=>{
+      if(await ask('Stop weekly tuition?',`You give ${p.notice_days} days' notice and pay up to the end date. Nothing is charged after that.`,'Yes, stop','Keep going')) action({action:'end'},'weekly-action-message');
     });
     document.getElementById('weekly-print')?.addEventListener('click',()=>{document.getElementById('weekly-terms-details').open=true;const wrap=document.getElementById('weekly-agreement-wrap');if(wrap)wrap.open=true;window.print()});
     document.getElementById('weekly-download')?.addEventListener('click',()=>{
