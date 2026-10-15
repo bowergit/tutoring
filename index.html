@@ -934,7 +934,7 @@
   }
 
 </style>
-<link rel="stylesheet" href="ux.css?v=6.24.0">
+<link rel="stylesheet" href="ux.css?v=6.25.0">
 </head>
 <body>
 <div id="root"></div>
@@ -6482,7 +6482,14 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
   const allPlans = TTWeekly.plans(student.id);
   const plan = allPlans.find(p => p.status !== 'ended') || allPlans[allPlans.length - 1];
   const [start, setStart] = useState(TTWeekly.today());
-  const [slot, setSlot] = useState('');
+  const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const weekdayOf = iso => new Date(iso + 'T12:00:00Z').getUTCDay();
+  const nextDate = dow => { const d = new Date(TTWeekly.today() + 'T12:00:00Z'); while (d.getUTCDay() !== dow) d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
+  const [day, setDay] = useState(weekdayOf(TTWeekly.today()));
+  const [time, setTime] = useState('17:00');
+  const [format, setFormat] = useState('Online');
+  const niceTime = t => { const [hh, mm] = t.split(':').map(Number); return `${hh % 12 || 12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${hh < 12 ? 'am' : 'pm'}`; };
+  const slot = `${DAYS[day]} ${niceTime(time)}, ${format.toLowerCase()}, one hour`;
   const [notice, setNotice] = useState('7');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -6513,9 +6520,10 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
       lesson_slot: slot.trim(), notice_days: Number(notice), terms_text: '',
     }));
   }
-  const field = { display:'block', margin:'10px 0' };
+  const field = { display:'block', margin:'14px 0' };
   const btn = (label, fn, disabled=false) => <button type="button" className="btn edit" style={{margin:'4px 8px 4px 0'}} disabled={busy || readonly || disabled} onClick={fn}>{label}</button>;
-  return <section style={{margin:'18px 0',padding:16,border:'1px solid var(--border)',borderRadius:12}}>
+  return <section className="wk-panel" style={{margin:'12px 0',padding:16,border:'1px solid var(--border)',borderRadius:12}}>
+    <style>{`.wk-panel label{font-weight:600;font-size:.88rem}.wk-panel label input,.wk-panel label select{display:block;width:100%;box-sizing:border-box;margin-top:6px;padding:11px 12px;font:inherit;font-weight:400;border:1px solid var(--line,#ccc);border-radius:10px;background:var(--card,#fff);color:var(--ink,#222)}.wk-panel p{margin:10px 0;line-height:1.5}.wk-panel .btn-row{display:flex;gap:8px;flex-wrap:wrap}`}</style>
     <div className="section-label" style={{marginTop:0}}>Weekly tuition</div>
     {!readonly && <>
       {btn(showGuide ? 'Close walkthrough' : 'How does this work?', () => { setShowGuide(!showGuide); setGuideStep(0); })}
@@ -6529,13 +6537,16 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
       </div>}
     </>}
     {!plan || plan.status === 'ended' ? <>
-      {!plan && <p>Individual lesson billing. You can propose £80 every week, including school holidays.</p>}
+      {!plan && <p>This student pays per lesson. You can switch them to £80 a week.</p>}
       {!showSetup && btn('Set up weekly tuition', () => setShowSetup(true))}
       {showSetup && <form onSubmit={propose}>
-        <label style={field}>First weekly charge<input type="date" required min={TTWeekly.today()} value={start} disabled={readonly || busy} onChange={e => setStart(e.target.value)} /></label>
-        <label style={field}>Reserved lesson time and format<input required minLength={3} maxLength={200} placeholder="For example, Wednesday 5pm, online, one hour" value={readonly ? '' : slot} disabled={readonly || busy} onChange={e => setSlot(e.target.value)} /></label>
-        <label style={field}>Notice to end tuition, in calendar days<input type="number" required min="1" max="28" value={notice} disabled={readonly || busy} onChange={e => setNotice(e.target.value)} /></label>
-        <p>The parent must accept the agreement before you activate charges. No existing lessons or rates are changed by a proposal.</p>
+        <label style={field}>Lesson day<select value={day} disabled={readonly || busy} onChange={e => { const d = Number(e.target.value); setDay(d); setStart(nextDate(d)); }}>{[1,2,3,4,5,6,0].map(d => <option key={d} value={d}>{DAYS[d]}</option>)}</select></label>
+        <label style={field}>Lesson time<input type="time" required step="900" value={time} disabled={readonly || busy} onChange={e => setTime(e.target.value)} /></label>
+        <label style={field}>Where<select value={format} disabled={readonly || busy} onChange={e => setFormat(e.target.value)}><option>Online</option><option>In person</option></select></label>
+        <label style={field}>First payment<input type="date" required min={TTWeekly.today()} value={start} disabled={readonly || busy} onChange={e => { setStart(e.target.value); if (e.target.value) setDay(weekdayOf(e.target.value)); }} /></label>
+        <p>Pays every {DAYS[day]} from the first payment. Shown to the parent as: {slot}.</p>
+        <label style={field}>Days' notice to stop<input type="number" required min="1" max="28" value={notice} disabled={readonly || busy} onChange={e => setNotice(e.target.value)} /></label>
+        <p>The parent accepts it first, then you activate it. Nothing changes until then.</p>
         <div className="btn-row">
           <button type="button" className="btn cancel" onClick={() => setShowSetup(false)}>Cancel setup</button>
           <button className="btn save" disabled={busy || readonly}>Create agreement</button>
@@ -8079,7 +8090,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.24.0</div>}
+        {!loading && <div className="version-tag">v6.25.0</div>}
       </div>
 
       {showAddModal && (
