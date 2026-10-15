@@ -6514,7 +6514,7 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
     }));
   }
   const field = { display:'block', margin:'10px 0' };
-  const btn = (label, fn, disabled=false) => <button type="button" className="btn" disabled={busy || readonly || disabled} onClick={fn}>{label}</button>;
+  const btn = (label, fn, disabled=false) => <button type="button" className="btn edit" style={{margin:'4px 8px 4px 0'}} disabled={busy || readonly || disabled} onClick={fn}>{label}</button>;
   return <section style={{margin:'18px 0',padding:16,border:'1px solid var(--border)',borderRadius:12}}>
     <div className="section-label" style={{marginTop:0}}>Weekly tuition</div>
     {!readonly && <>
