@@ -19,7 +19,7 @@
       @media print{body *{visibility:hidden}#weekly-agreement,#weekly-agreement *{visibility:visible}#weekly-agreement{position:absolute;left:0;top:0;width:95%;border:0;background:white;color:black}#weekly-agreement button,#weekly-agreement form{display:none}.weekly-terms{font-size:11pt} }
     </style>
     <section class="weekly-card" aria-label="Weekly tuition arrangement">
-      <h2>�80 every week, including school holidays</h2>
+      <h2>£80 every week, including school holidays</h2>
       <p>${esc(p.lesson_slot)}<br>First weekly charge: ${esc(day(p.starts_on))}.</p>
       <p>${p.status==='proposed'?'Your agreement is awaiting activation by Daniel. Weekly charges have not started.':p.ends_before?`No new weekly charges from ${esc(day(p.ends_before))}.`:'Your weekly place is active. The fee continues when your child cannot attend.'}</p>
       ${p.review_required?'<p role="alert">Your cooling off cancellation has been recorded. Daniel will review any proportionate final charge and arrange a refund or credit where due. The balance below is awaiting that review.</p>':''}
@@ -35,7 +35,7 @@
       <details ${!a || location.hash==='#weekly-agreement'?'open':''} id="weekly-terms-details"><summary>Read the full agreement</summary><pre class="weekly-terms">${esc(p.terms_text)}</pre></details>
       ${a?`<p><b>Accepted by ${esc(a.signer_name)}</b><br>${esc(new Date(a.accepted_at).toLocaleString('en-GB',{timeZone:'Europe/London'}))}, UK time<br>Terms version ${esc(a.terms_version)}${a.start_early?'<br>Early start expressly requested.':''}</p>`:p.status==='proposed'?`
       <form id="weekly-accept-form"><label>Your full name, as the parent or guardian responsible for payment<input type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name"></label>
-      <label><input type="checkbox" name="agree" required>I have read and accept this agreement, including �80 every week during school holidays and when my child cannot attend.</label>
+      <label><input type="checkbox" name="agree" required>I have read and accept this agreement, including £80 every week during school holidays and when my child cannot attend.</label>
       <label><input type="checkbox" name="start_early">If tuition starts within 14 days of my acceptance, I expressly request that early start. I understand I may need to pay a proportionate amount for services supplied if I cancel during the cooling off period.</label>
       <button class="action-btn" type="submit">Accept weekly tuition agreement</button></form><p>This records your name, the time and the exact agreement accepted. Keep your parent link private, as anyone with it can access your account.</p>`:'<p>This proposal is no longer available to accept.</p>'}
       <p id="weekly-accept-message" class="weekly-message" role="status"></p><div class="actions">${button('weekly-print','Print or save agreement')}${button('weekly-download','Download agreement text')}</div>
@@ -50,11 +50,11 @@
       if(busy) return; busy=true;
       const message=document.getElementById(target);
       document.querySelectorAll('#weekly-agreement button,#weekly-end,#weekly-cooling').forEach(b=>b.disabled=true);
-      message.textContent='Saving.';
+      message.textContent='Saving…';
       try {
         const res=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,plan_id:p.id})});
         const result=await res.json(); if(!res.ok || !result.ok) throw new Error(result.problem || 'Could not save. Please try again.');
-        message.textContent=body.action==='accept'?'Agreement accepted. Refreshing your record.':'Notice recorded. Refreshing your record.';
+        message.textContent=body.action==='accept'?'Agreement accepted. Refreshing your record…':'Notice recorded. Refreshing your record…';
         location.reload();
       } catch(e) {message.textContent=e.message; document.querySelectorAll('#weekly-agreement button,#weekly-end,#weekly-cooling').forEach(b=>b.disabled=false); busy=false;}
     }

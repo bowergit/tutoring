@@ -83,12 +83,12 @@ const PROGRESS_OWNERS = new Set([
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
 const round1 = (n: number) => Math.round(n * 10) / 10
 
-// ��� Grade boundaries ����������������������������������������������
+// ─── Grade boundaries ──────────────────────────────────────────────
 //
 // The tracker records a percentage per paper. Boundaries are published as raw
 // marks for a whole set. Those meet in the middle because every paper in a
-// set carries the same maximum (2 � 100 for International GCSE, 3 � 80 for
-// most GCSEs, 3 � 100 for OCR), so the set percentage is the mean of the
+// set carries the same maximum (2 × 100 for International GCSE, 3 × 80 for
+// most GCSEs, 3 × 100 for OCR), so the set percentage is the mean of the
 // paper percentages, and a boundary converts to a percentage by dividing by
 // the set's maximum. That works whether the sheet holds raw marks or
 // percentages, which is the whole point: some do, some don't.
@@ -99,7 +99,7 @@ const MONTHS: Record<string, number> = {
   nov: 11, november: 11, oct: 11, autumn: 11, winter: 11,
 }
 
-/** "June 2024", "Nov 2020", "Jan 2019", "2024 June"  { year, month }. */
+/** "June 2024", "Nov 2020", "Jan 2019", "2024 June" → { year, month }. */
 function parseSeries(setName: string): { year: number; month: number } | null {
   const s = String(setName || '').toLowerCase()
   const year = s.match(/(20\d{2})/)
@@ -330,7 +330,7 @@ function buildProgress(papers: any[], student: any) {
   const board = [student.exam_board, student.exam_tier]
     .filter(Boolean)
     .map((s: string) => String(s).trim())
-    .join(' � ')
+    .join(' · ')
 
   return {
     exam_label: board || null,
@@ -658,3 +658,4 @@ Deno.serve(async (req) => {
     },
   })
 })
+
