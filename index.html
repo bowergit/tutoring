@@ -4894,6 +4894,13 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
                     Useful to whoever maintains this, noise to a tutor. */}
                 {danielOnly && (
                   <ToolsRow
+                    title="Parent dashboard activity"
+                    subtitle="Which families have opened their page"
+                    onClick={() => setTool('parentactivity')}
+                  />
+                )}
+                {danielOnly && (
+                  <ToolsRow
                     title="About & data sources"
                     subtitle="What TutorTally stores and where it comes from"
                     onClick={() => setTool('info')}
@@ -5089,6 +5096,15 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
           <>
             {groupHeader('deletedpay')}
             <DeletedPayments students={students} onDataChanged={onDataChanged} />
+          </>
+        )}
+        {tool === 'parentactivity' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:16}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Parent dashboard activity</h2>
+            </div>
+            <ParentPageActivity students={students} session={session} />
           </>
         )}
         {tool === 'info' && (
@@ -7996,7 +8012,6 @@ function App() {
         )}
 
         {!loading && <SummaryWidget students={students} rateHistory={rateHistory} />}
-        {!loading && <ParentPageActivity students={students} session={session} />}
 
         {!loading && (
           <CalendarCandidates
