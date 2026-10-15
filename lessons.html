@@ -88,6 +88,7 @@
     background: var(--card); color: var(--ink); font-size: 0.88rem; font-weight: 600;
     text-decoration: none; font-family: inherit; box-shadow: var(--sh-2);
   }
+  .action-btn.settle-btn { background: var(--accent-fill); color: var(--on-accent); border-color: transparent; }
 
   /* ── Progress ── */
   .prog { padding: 16px 15px 12px; }
@@ -207,7 +208,7 @@
   .card { animation:tt-enter .3s ease both; }
   @media (max-width:360px) { .kpis { grid-template-columns:repeat(2,1fr); } }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.23.0">
+<link rel="stylesheet" href="ux.css?v=6.24.0">
 </head>
 <body>
 <div class="wrap" id="app">
@@ -552,6 +553,23 @@
       </div>`;
   }
 
+  function renderSettleUp(data) {
+    const amount = Number(data.account?.owed || 0);
+    if (!data.can_settle_up || amount <= 0.005) return '';
+    const firstName = String(data.name || '').trim().split(/\\s+/)[0] || 'student';
+    const paymentUrl = new URL(`https://monzo.me/danielbower1/${amount.toFixed(2)}`);
+    paymentUrl.searchParams.set('h', 'h1cHMY');
+    paymentUrl.searchParams.set('d', `Maths lesson ${firstName}`);
+    paymentUrl.searchParams.set('account_type', 'personal');
+    return `
+      <div class="actions" style="margin-top:10px">
+        <a class="action-btn settle-btn" href="${esc(paymentUrl.toString())}" target="_blank" rel="noopener">
+          <svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          Settle up · ${esc(money(amount))}
+        </a>
+      </div>`;
+  }
+
   function renderGrade(g) {
     if (!g || !g.boundaries.length) return '';
 
@@ -853,6 +871,7 @@
       ? (data.progress ? 'Your lessons and how your papers are going' : 'Your lessons')
       : 'Progress, lessons and payment status'}</div>
     ${pupilView ? '' : renderAccount(data.account)}
+    ${pupilView ? '' : renderSettleUp(data)}
     ${renderProgress(data.progress)}
     ${renderGrade(data.grade)}
     ${pupilView || !actions ? '' : `<div class="actions" style="margin-top:18px">${actions}</div>`}
