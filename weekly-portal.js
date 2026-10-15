@@ -72,7 +72,7 @@
     });
     document.getElementById('weekly-print')?.addEventListener('click',()=>{document.getElementById('weekly-terms-details').open=true;const wrap=document.getElementById('weekly-agreement-wrap');if(wrap)wrap.open=true;window.print()});
     document.getElementById('weekly-download')?.addEventListener('click',()=>{
-      const a=w.acceptance;const text=p.terms_text+(a?`\n\nAccepted by: ${a.signer_name}\nAccepted at: ${a.accepted_at}\nEarly start requested: ${a.start_early?'Yes':'No'}`:'\n\nNot yet accepted.');
+      const a=w.acceptance;const text=p.terms_text+(a?`\n\nAccepted by: ${a.signer_name}\nAccepted at: ${a.accepted_at}`:'\n\nNot yet accepted.');
       const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='Bower-Maths-weekly-agreement.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
     });
   };
