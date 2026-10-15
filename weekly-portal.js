@@ -35,10 +35,9 @@
     <section class="weekly-card" id="weekly-agreement">
       ${a?`<details id="weekly-agreement-wrap" ${location.hash==='#weekly-agreement'?'open':''}><summary>Your tuition agreement · accepted ${esc(new Date(a.accepted_at).toLocaleDateString('en-GB',{timeZone:'Europe/London'}))}</summary>`:'<h2>Your tuition agreement</h2>'}
       <details ${!a || location.hash==='#weekly-agreement'?'open':''} id="weekly-terms-details"><summary>Read the agreement</summary><pre class="weekly-terms">${esc(p.terms_text)}</pre></details>
-      ${a?`<p><b>Accepted by ${esc(a.signer_name)}</b><br>${esc(new Date(a.accepted_at).toLocaleString('en-GB',{timeZone:'Europe/London'}))}, UK time<br>Terms version ${esc(a.terms_version)}${a.start_early?'<br>Early start expressly requested.':''}</p>`:p.status==='proposed'?`
+      ${a?`<p><b>Accepted by ${esc(a.signer_name)}</b><br>${esc(new Date(a.accepted_at).toLocaleString('en-GB',{timeZone:'Europe/London'}))}, UK time</p>`:p.status==='proposed'?`
       <form id="weekly-accept-form"><label>Your full name<input type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name"></label>
       <label><input type="checkbox" name="agree" required>I agree to the terms above: £80 a week, including holidays and missed lessons.</label>
-      <label><input type="checkbox" name="start_early">If tuition starts within 14 days of my acceptance, I expressly request that early start. I understand I may need to pay a proportionate amount for services supplied if I cancel during the cooling off period.</label>
       <button class="action-btn" type="submit">Accept weekly tuition agreement</button></form><p>Keep this page link private.</p>`:'<p>This proposal is no longer available to accept.</p>'}
       <p id="weekly-accept-message" class="weekly-message" role="status"></p><div class="actions">${button('weekly-print','Print or save agreement')}${button('weekly-download','Download agreement text')}</div>
       ${w.history?.length?`<details><summary>Previous agreements</summary>${w.history.map(h=>`<pre class="weekly-terms">${esc(h.terms_text)}</pre>${h.acceptance?`<p>Accepted by ${esc(h.acceptance.signer_name)} on ${esc(new Date(h.acceptance.accepted_at).toLocaleString('en-GB'))}</p>`:'<p>Not accepted.</p>'}`).join('')}</details>`:''}
@@ -63,7 +62,7 @@
     }
     document.getElementById('weekly-accept-form')?.addEventListener('submit',e=>{
       e.preventDefault(); const f=new FormData(e.currentTarget);
-      action({action:'accept',terms_version:p.terms_version,signer_name:f.get('signer_name'),agree:f.has('agree'),start_early:f.has('start_early')},'weekly-accept-message');
+      action({action:'accept',terms_version:p.terms_version,signer_name:f.get('signer_name'),agree:f.has('agree')},'weekly-accept-message');
     });
     document.getElementById('weekly-end')?.addEventListener('click',()=>{
       if(confirm(`Stop weekly tuition? You give ${p.notice_days} days' notice and pay up to the end date.`)) action({action:'end'},'weekly-action-message');
