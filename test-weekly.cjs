@@ -31,7 +31,7 @@ const html=fs.readFileSync(__dirname+'/student.html','utf8');
 for(const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) new vm.Script(match[1]);
 const portalContext={window:{},location:{hash:''}};
 vm.runInNewContext(fs.readFileSync(__dirname+'/weekly-portal.js','utf8'),portalContext);
-const rendered=portalContext.window.renderWeekly({plan:{...plan,terms_text:'<script>unsafe</script>',lesson_slot:'Wednesday <img>',weekly_fee:80,notice_days:7,terms_version:'test'},acceptance:null,entries:[],payments:[]});
+const rendered=portalContext.window.renderWeekly({plan:{...plan,status:'proposed',terms_text:'<script>unsafe</script>',lesson_slot:'Wednesday <img>',weekly_fee:80,notice_days:7,terms_version:'test'},acceptance:null,entries:[],payments:[]});
 assert(rendered.includes('&lt;script&gt;unsafe&lt;/script&gt;'),'Terms are escaped');
 assert(!rendered.includes('<img>'),'Tutor supplied slot is escaped');
 assert(rendered.includes('£80 a week') && !rendered.includes('${'),'Price renders as text, never as a raw template');

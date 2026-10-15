@@ -3,95 +3,75 @@
   const short = v => '£'+Number(v).toFixed(2).replace(/\.00$/,'');
   const money = v => new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(Number(v));
   const day = d => new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
-  const button = (id,label) => `<button type="button" class="action-btn" id="${id}">${esc(label)}</button>`;
-  // A branded confirm box in place of the browser's own window.confirm().
-  function ask(title, body, okLabel, cancelLabel) {
-    return new Promise(resolve => {
-      const back=document.createElement('div');
-      back.setAttribute('role','presentation');
-      back.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(10,18,16,.55)';
-      const box=document.createElement('div');
-      box.setAttribute('role','alertdialog');box.setAttribute('aria-modal','true');box.setAttribute('aria-labelledby','wk-ask-title');
-      box.style.cssText='max-width:380px;width:100%;box-sizing:border-box;padding:22px;border-radius:var(--r-xl,24px);background:var(--card,#fff);color:var(--ink,#15211f);border:1px solid var(--line,#dfe7e3);box-shadow:0 18px 50px rgba(0,0,0,.28);font:inherit';
-      const btn='padding:12px 16px;border-radius:var(--r-md,13px);font:inherit;font-weight:650;font-size:.9rem;cursor:pointer;flex:1;';
-      box.innerHTML='<h3 id="wk-ask-title" style="margin:0 0 8px;font-size:1.15rem">'+esc(title)+'</h3><p style="margin:0 0 18px;line-height:1.55;color:var(--ink-dim,#596965)">'+esc(body)+'</p><div style="display:flex;gap:10px"><button type="button" data-no style="'+btn+'background:var(--card-2,#f5f7f6);color:var(--ink,#15211f);border:1px solid var(--line,#dfe7e3)">'+esc(cancelLabel||'Cancel')+'</button><button type="button" data-yes style="'+btn+'background:var(--accent-fill,#ffa500);color:var(--on-accent,#15211f);border:0">'+esc(okLabel||'OK')+'</button></div>';
-      back.appendChild(box);document.body.appendChild(back);
-      const done=v=>{document.removeEventListener('keydown',key);back.remove();resolve(v)};
-      const key=e=>{if(e.key==='Escape')done(false)};
-      document.addEventListener('keydown',key);
-      back.addEventListener('click',e=>{if(e.target===back)done(false)});
-      box.querySelector('[data-no]').addEventListener('click',()=>done(false));
-      const yes=box.querySelector('[data-yes]');yes.addEventListener('click',()=>done(true));yes.focus();
-    });
-  }
+
+  // One card, styled with the same tokens as the rest of the parent page.
   window.renderWeekly = function (w) {
     if(!w) return '';
     const p=w.plan, a=w.acceptance;
-    const mini=!!a && p.status==='active';
-    const cooling=a && Date.now()<new Date(a.accepted_at).getTime()+14*86400000;
-    const rows=w.entries.map(c=>`<tr><td>${esc(day(c.date))}</td><td>${esc(c.kind)}${c.reason?`<br><small>${esc(c.reason)}</small>`:''}</td><td>${esc(money(c.amount))}</td><td>${c.waived?'Waived':c.paid>=c.amount-0.005?'Covered by payments':!c.due?'Scheduled':c.paid>0?'Part paid':'Due'}</td></tr>`).join('');
-    return `<style>
-      .weekly-card{padding:22px;margin:18px 0;background:var(--card,#fff);border:1px solid var(--border,#ddd);border-radius:16px;line-height:1.6}
-      .weekly-card h2{margin:0 0 10px;font-size:1.3rem}.weekly-card p{margin:10px 0}.weekly-card label{display:block;margin:14px 0}
-      .weekly-card input[type=text]{box-sizing:border-box;width:100%;padding:12px;border:1px solid #999;border-radius:8px;font:inherit}
-      .weekly-card input[type=checkbox]{width:20px;height:20px;vertical-align:middle;margin-right:8px}
-      .weekly-terms{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.9rem;line-height:1.7}
-      .weekly-card table{border-collapse:collapse;width:100%;font-size:.85rem;text-align:left}.weekly-card td,.weekly-card th{padding:10px 8px;border-bottom:1px solid #ddd}
-      .weekly-card summary{cursor:pointer;font-weight:650}.weekly-card .actions{margin:14px 0}.weekly-message{color:#a03024}
-      @media print{body *{visibility:hidden}#weekly-agreement,#weekly-agreement *{visibility:visible}#weekly-agreement{position:absolute;left:0;top:0;width:95%;border:0;background:white;color:black}#weekly-agreement button,#weekly-agreement form{display:none}.weekly-terms{font-size:11pt} }
-    </style>
-    <section class="weekly-card" aria-label="Weekly tuition arrangement">
-      ${mini?`<details id="weekly-card-wrap" ${p.review_required?'open':''}><summary><b>${esc(short(p.weekly_fee))} a week</b> · ${p.ends_before?'ending':'active'}</summary>`:`<h2>${esc(short(p.weekly_fee))} a week</h2>`}
-      <p>${esc(p.lesson_slot)}<br>First payment: ${esc(day(p.starts_on))}.</p>
-      <p>${p.status==='proposed'?'Waiting for Daniel to start it. Nothing has been charged yet.':p.ends_before?`Weekly tuition ends. No charges from ${esc(day(p.ends_before))}.`:'Your weekly slot is booked. It is paid every week, even holidays.'}</p>
-      ${p.review_required?'<p role="alert">Your cooling off cancellation has been recorded. Daniel will review any proportionate final charge and arrange a refund or credit where due. The balance below is awaiting that review.</p>':''}
-      <p>If Daniel cancels and you cannot rearrange, that week is free.</p>
-      ${w.entries.length?`<details><summary>Weekly charges</summary><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Charge</th><th>Amount</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></details>`:''}
-      <details style="margin-top:18px"><summary>Payments received</summary>${w.payments.length?w.payments.map(r=>`<p>${esc(day(r.date_paid))}: ${esc(money(r.amount))}</p>`).join(''):'<p>No payments recorded yet.</p>'}</details>
-      <p>Pay by bank transfer or standing order. Nothing is taken automatically.</p>
-      ${a && p.status!=='ended' && !p.end_requested_at && !p.ends_before?`<div class="actions">${button('weekly-end',`Stop weekly tuition (${p.notice_days} days' notice)`)}</div>`:''}
-      <p class="weekly-message" id="weekly-action-message" role="status"></p>
-      ${mini?'</details>':''}
-    </section>
-    <section class="weekly-card" id="weekly-agreement">
-      ${a?`<details id="weekly-agreement-wrap" ${location.hash==='#weekly-agreement'?'open':''}><summary>Your tuition agreement · accepted ${esc(new Date(a.accepted_at).toLocaleDateString('en-GB',{timeZone:'Europe/London'}))}</summary>`:'<h2>Your tuition agreement</h2>'}
-      <details ${!a || location.hash==='#weekly-agreement'?'open':''} id="weekly-terms-details"><summary>Read the agreement</summary><pre class="weekly-terms">${esc(p.terms_text)}</pre></details>
-      ${a?`<p><b>Accepted by ${esc(a.signer_name)}</b><br>${esc(new Date(a.accepted_at).toLocaleString('en-GB',{timeZone:'Europe/London'}))}, UK time</p>`:p.status==='proposed'?`
-      <form id="weekly-accept-form"><label>Your full name<input type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name"></label>
-      <label><input type="checkbox" name="agree" required>I agree to the terms above: ${esc(short(p.weekly_fee))} a week, including holidays and missed lessons.</label>
-      <button class="action-btn" type="submit">Accept weekly tuition agreement</button></form><p>Keep this page link private.</p>`:'<p>This proposal is no longer available to accept.</p>'}
-      <p id="weekly-accept-message" class="weekly-message" role="status"></p><div class="actions">${button('weekly-print','Print or save agreement')}${button('weekly-download','Download agreement text')}</div>
-      ${w.history?.length?`<details><summary>Previous agreements</summary>${w.history.map(h=>`<pre class="weekly-terms">${esc(h.terms_text)}</pre>${h.acceptance?`<p>Accepted by ${esc(h.acceptance.signer_name)} on ${esc(new Date(h.acceptance.accepted_at).toLocaleString('en-GB'))}</p>`:'<p>Not accepted.</p>'}`).join('')}</details>`:''}
-      ${a?'</details>':''}
-    </section>`;
+    const price=esc(short(p.weekly_fee));
+    const state=p.status==='ended'?'ended':p.status==='proposed'?'waiting to start':'active';
+    const rows=w.entries.map(c=>`<tr><td>${esc(day(c.date))}</td><td>${esc(money(c.amount))}</td><td>${c.waived?'Waived':c.paid>=c.amount-0.005?'Paid':!c.due?'Scheduled':c.paid>0?'Part paid':'Due'}</td></tr>`).join('');
+    const details=`
+      <p class="wk-line">${esc(p.lesson_slot)}<br>First payment: ${esc(day(p.starts_on))}</p>
+      ${p.status==='ended'&&p.ends_before?`<p class="wk-line">Weekly tuition has ended. No charges from ${esc(day(p.ends_before))}.</p>`:''}
+      ${w.entries.length?`<details class="wk-more"><summary>Weekly charges</summary><div class="wk-body" style="overflow-x:auto"><table class="wk-table"><thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></details>`:''}
+      <details class="wk-more"><summary>Payments received</summary><div class="wk-body">${w.payments.length?w.payments.map(r=>`<p class="wk-line">${esc(day(r.date_paid))}: ${esc(money(r.amount))}</p>`).join(''):'<p class="wk-line">No payments yet.</p>'}</div></details>
+      <details class="wk-more"><summary>The agreement</summary><div class="wk-body"><pre class="wk-terms">${esc(p.terms_text)}</pre>${a?`<p class="wk-line">Agreed by ${esc(a.signer_name)} on ${esc(new Date(a.accepted_at).toLocaleDateString('en-GB',{timeZone:'Europe/London'}))}.</p>`:''}</div></details>`;
+    const style=`<style>
+      .wk-card{padding:0;margin:18px 0}
+      .wk-card summary{list-style:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+      .wk-card summary::-webkit-details-marker{display:none}
+      .wk-card .wk-main>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 18px;font-size:1rem;font-weight:700;transition:background .18s var(--ease,ease)}
+      .wk-card .wk-main>summary:active{background:var(--card-2)}
+      .wk-card .wk-main>summary small{font-weight:600;color:var(--ink-dim);font-size:.8rem;margin-left:6px}
+      .wk-card summary .wk-chev{font-size:1rem;color:var(--muted);transition:transform .25s cubic-bezier(.4,0,.2,1)}
+      .wk-card details[open]>summary .wk-chev{transform:rotate(90deg)}
+      .wk-inner{padding:0 18px 16px}
+      .wk-head{padding:16px 18px 0}.wk-head h2{margin:0;font-size:1.2rem;font-weight:750;letter-spacing:-.02em}
+      .wk-line{margin:8px 0;font-size:.88rem;line-height:1.55;color:var(--ink-dim)}
+      .wk-more{border-top:1px solid var(--line);margin-top:12px}
+      .wk-more>summary{display:flex;align-items:center;justify-content:space-between;padding:12px 0;font-size:.86rem;font-weight:650;color:var(--ink)}
+      .wk-more>summary::after{content:'›';font-size:1rem;color:var(--muted);transition:transform .25s cubic-bezier(.4,0,.2,1)}
+      .wk-more[open]>summary::after{transform:rotate(90deg)}
+      .wk-card details[open]>.wk-body,.wk-card details[open]>.wk-inner{animation:wkIn .24s ease both}
+      @keyframes wkIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+      .wk-terms{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;font-size:.86rem;line-height:1.65;margin:4px 0 8px;color:var(--ink)}
+      .wk-table{border-collapse:collapse;width:100%;font-size:.82rem;text-align:left}.wk-table th{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:6px 4px;border-bottom:1px solid var(--line)}.wk-table td{padding:9px 4px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+      .wk-form{margin-top:14px}.wk-form label{display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;font-weight:600;color:var(--muted);margin-bottom:5px}
+      .wk-form input[type=text]{width:100%;padding:11px 13px;border:1px solid var(--line);border-radius:var(--r-md);font:inherit;font-size:.95rem;background:var(--card-2);color:var(--ink);transition:border-color .18s,box-shadow .18s,background .18s}
+      .wk-form input[type=text]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,165,0,.28);background:var(--card)}
+      .wk-check{display:flex;align-items:center;gap:10px;margin:14px 0;font-size:.88rem;line-height:1.45;color:var(--ink);text-transform:none;letter-spacing:0;font-weight:500}
+      .wk-check input{width:20px;height:20px;flex:none;accent-color:var(--accent)}
+      .wk-msg{color:var(--warn);font-size:.84rem;margin:10px 0 0}
+      @media (prefers-reduced-motion:reduce){.wk-card *{animation:none!important;transition:none!important}}
+    </style>`;
+    if(a) return `${style}<section class="card wk-card" aria-label="Weekly tuition">
+      <details class="wk-main" id="weekly-card-wrap"><summary><span>${price} a week<small>${state}</small></span><span class="wk-chev" aria-hidden="true">›</span></summary>
+      <div class="wk-inner">${details}</div></details></section>`;
+    if(p.status==='proposed') return `${style}<section class="card wk-card" id="weekly-agreement" aria-label="Weekly tuition">
+      <div class="wk-head"><h2>${price} a week</h2></div>
+      <div class="wk-inner"><p class="wk-line">${esc(p.lesson_slot)}<br>First payment: ${esc(day(p.starts_on))}</p>
+      <pre class="wk-terms">${esc(p.terms_text)}</pre>
+      <form class="wk-form" id="weekly-accept-form"><label for="wk-name">Your full name</label><input id="wk-name" type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name">
+      <label class="wk-check"><input type="checkbox" name="agree" required><span>I agree to this, ${price} a week.</span></label>
+      <button class="action-btn settle-btn" type="submit" style="width:100%">Agree</button></form>
+      <p class="wk-msg" id="weekly-accept-message" role="status"></p></div></section>`;
+    return '';
   };
+
   window.wireWeekly = function(w, endpoint) {
     if(!w) return;
     const p=w.plan;
     let busy=false;
-    async function action(body,target) {
-      if(busy) return; busy=true;
-      const message=document.getElementById(target);
-      document.querySelectorAll('#weekly-agreement button,#weekly-end,#weekly-cooling').forEach(b=>b.disabled=true);
-      message.textContent='Saving…';
+    document.getElementById('weekly-accept-form')?.addEventListener('submit',async e=>{
+      e.preventDefault(); if(busy) return; busy=true;
+      const f=new FormData(e.currentTarget), message=document.getElementById('weekly-accept-message');
+      const btn=e.currentTarget.querySelector('button'); btn.disabled=true; message.textContent='Saving…';
       try {
-        const res=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,plan_id:p.id})});
+        const res=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'accept',plan_id:p.id,terms_version:p.terms_version,signer_name:f.get('signer_name'),agree:f.has('agree')})});
         const result=await res.json(); if(!res.ok || !result.ok) throw new Error(result.problem || 'Could not save. Please try again.');
-        message.textContent=body.action==='accept'?'Agreement accepted. Refreshing your record…':'Notice recorded. Refreshing your record…';
         location.reload();
-      } catch(e) {message.textContent=e.message; document.querySelectorAll('#weekly-agreement button,#weekly-end,#weekly-cooling').forEach(b=>b.disabled=false); busy=false;}
-    }
-    document.getElementById('weekly-accept-form')?.addEventListener('submit',e=>{
-      e.preventDefault(); const f=new FormData(e.currentTarget);
-      action({action:'accept',terms_version:p.terms_version,signer_name:f.get('signer_name'),agree:f.has('agree')},'weekly-accept-message');
-    });
-    document.getElementById('weekly-end')?.addEventListener('click',async()=>{
-      if(await ask('Stop weekly tuition?',`You give ${p.notice_days} days' notice and pay up to the end date. Nothing is charged after that.`,'Yes, stop','Keep going')) action({action:'end'},'weekly-action-message');
-    });
-    document.getElementById('weekly-print')?.addEventListener('click',()=>{document.getElementById('weekly-terms-details').open=true;const wrap=document.getElementById('weekly-agreement-wrap');if(wrap)wrap.open=true;window.print()});
-    document.getElementById('weekly-download')?.addEventListener('click',()=>{
-      const a=w.acceptance;const text=p.terms_text+(a?`\n\nAccepted by: ${a.signer_name}\nAccepted at: ${a.accepted_at}`:'\n\nNot yet accepted.');
-      const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='Bower-Maths-weekly-agreement.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      } catch(err) { message.textContent=err.message; btn.disabled=false; busy=false; }
     });
   };
 })();
