@@ -138,6 +138,8 @@
     transition: background .18s var(--ease), transform .18s var(--ease);
   }
   .refresh-btn:active { transform: scale(.92); background: var(--card-3); }
+  .refresh-icon { width: 20px; height: 20px; display: grid; place-items: center; line-height: 0; transform-origin: 50% 50%; }
+  .refresh-icon .app-icon { display: block; }
   .add-btn {
     background: var(--accent-fill); color: var(--on-accent); border: none;
     border-radius: var(--r-sm); padding: 9px 15px; font-size: 0.82rem;
@@ -6584,6 +6586,10 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
             </React.Fragment>
           )}
 
+          {student.general_notes && (
+            <RichNote className={`notes-box ${notesOpen ? 'visible' : ''}`} text={student.general_notes} />
+          )}
+
           {upcomingNext6.length > 0 && (
             <>
               <div className="section-label">Upcoming</div>
@@ -6706,9 +6712,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           )}
 
 
-          {student.general_notes && (
-            <RichNote className={`notes-box ${notesOpen ? 'visible' : ''}`} text={student.general_notes} />
-          )}
         </div>
       </div>
 
@@ -7701,7 +7704,7 @@ function App() {
           <div className="header-right">
             <button className="refresh-btn" onClick={refreshEverything} disabled={refreshing || syncingAll}
                     aria-label="Sync calendar and refresh">
-              <span style={{display:'inline-block', animation: (refreshing || syncingAll) ? 'spin 0.8s linear infinite' : 'none'}}><AppIcon name="refresh" /></span>
+              <span className="refresh-icon" style={{animation: (refreshing || syncingAll) ? 'spin 0.8s linear infinite' : 'none'}}><AppIcon name="refresh" /></span>
             </button>
             {(!walkthroughOpen || walkthroughPaused) && (
               <button className="header-settings-btn" data-wt="tools"

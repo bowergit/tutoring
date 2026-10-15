@@ -2,22 +2,870 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="robots" content="noindex">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- Replaced with "[first name]'s lessons" as soon as the data loads. This
+     static value is only what a link-preview crawler sees, since it reads the
+     raw HTML and never runs the script that knows whose page it is. -->
 <title>Lessons</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <meta name="theme-color" content="#ffa500">
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f8f4; --card: #ffffff; --card-2: #f5f7f6; --line: #dfe7e3;
+    --ink: #15211f; --ink-dim: #596965; --accent: #a15c00; --accent-fill: #ffa500; --on-accent: #15211f; --accent-light: #fff1d9;
+    --good: #0f7a35; --good-light: #e3f7e9; --warn: #c0362c; --warn-light: #fdecea; --muted: #87938f; --gold: #b7791f; --gold-light: #fff4d8;
+    --r-sm: 9px; --r-md: 13px; --r-lg: 17px; --r-xl: 24px;
+    --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101716; --card: #182321; --card-2: #1e2a27; --line: #30413d;
+      --ink: #eef8f5; --ink-dim: #a5b7b1; --accent: #ffa500; --accent-fill: #ffa500; --on-accent: #15211f; --accent-light: #3a2604;
+      --good: #4ade80; --good-light: #0f2e1a; --warn: #ff8a63; --warn-light: #351d15; --muted: #7f918c; --gold: #e6bd62; --gold-light: #302612;
+      --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    /* Kept identical to the dashboard's stack on purpose. */
+    font-family: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased; padding: 24px 16px 60px;
+    /* Without this, mobile browsers inflate text on their own and the page
+       renders at different sizes to the dashboard, which reads as a
+       completely different font. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  .wrap { max-width: 460px; margin: 0 auto; }
+  h1 { font-size: 1.3rem; font-weight: 750; letter-spacing: -0.02em; margin: 0 0 2px; }
+  .sub { color: var(--muted); font-size: 0.85rem; margin-bottom: 22px; }
+  .section-label {
+    font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); margin: 22px 0 8px;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
+    box-shadow: var(--sh-2); overflow: hidden;
+  }
+  .lesson { border-bottom: 1px solid var(--line); }
+  .lesson:last-child { border-bottom: none; }
+  .row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 13px 15px; font-size: 0.9rem; cursor: pointer;
+  }
+  .row .time { color: var(--muted); font-size: 0.82rem; }
+  .detail { padding: 0 15px 13px; color: var(--muted); font-size: 0.82rem; }
+  .paid-line {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: 12px; padding: 3px 0;
+  }
+  .paid-line span:first-child { font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .paid-when { color: var(--muted); }
+  .paid-total { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 6px; }
+  .paid-left span:first-child { color: var(--warn); }
+  .pill {
+    font-size: 0.72rem; font-weight: 650; padding: 4px 10px; border-radius: 100px; flex-shrink: 0;
+  }
+  .pill.paid      { background: var(--good-light); color: var(--good); }
+  .pill.partial   { background: var(--gold-light); color: var(--gold); }
+  .pill.unpaid    { background: var(--warn-light); color: var(--warn); }
+  .pill.scheduled { background: var(--card-2); color: var(--ink-dim); border: 1px solid var(--line); }
+  .showmore {
+    display: block; width: 100%; text-align: center; padding: 11px 0; margin-top: 8px;
+    background: none; border: none; color: var(--muted); font-size: 0.82rem;
+    font-family: inherit; cursor: pointer;
+  }
+  .empty { text-align: center; color: var(--muted); padding: 30px 20px; font-size: 0.88rem; }
+  .state { text-align: center; color: var(--muted); padding: 60px 20px; font-size: 0.9rem; line-height: 1.6; }
+  .actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px; }
+  .action-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 12px 16px; border-radius: var(--r-md); border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); font-size: 0.88rem; font-weight: 600;
+    text-decoration: none; font-family: inherit; box-shadow: var(--sh-2);
+  }
+
+  /* ── Progress ── */
+  .prog { padding: 16px 15px 12px; }
+  .prog-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
+  .prog-exam { font-size: 0.74rem; color: var(--muted); margin-left: auto; text-align: right; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 6px; }
+  .kpi { text-align: center; padding: 9px 4px; background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r-md); }
+  .kpi b { display: block; font-size: 1.18rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1.15; }
+  .kpi span { display: block; font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 3px; }
+  .kpi.hero b { color: var(--accent); }
+  .trend {
+    display: inline-flex; align-items: center; gap: 5px; margin: 12px 0 2px;
+    font-size: 0.78rem; font-weight: 600; padding: 5px 10px; border-radius: 100px;
+  }
+  .trend.up   { background: var(--good-light); color: var(--good); }
+  .trend.down { background: var(--warn-light); color: var(--warn); }
+  .trend.flat { background: var(--card-2); color: var(--ink-dim); }
+  .trend small { font-weight: 500; opacity: .8; }
+  .chart-wrap { margin-top: 10px; }
+  .chart-wrap svg { width: 100%; height: auto; display: block; touch-action: pan-y; }
+  .chart-cap {
+    font-size: 0.78rem; color: var(--ink-dim); text-align: center;
+    margin-top: 6px; min-height: 1.2em;
+  }
+  .papers-toggle {
+    display: block; width: 100%; text-align: center; padding: 10px 0 2px;
+    background: none; border: none; color: var(--muted); font-size: 0.8rem;
+    font-family: inherit; cursor: pointer;
+  }
+  .ptable { width: 100%; border-collapse: collapse; margin-top: 6px; font-size: 0.82rem; }
+  .ptable th {
+    text-align: left; font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); font-weight: 700; padding: 6px 4px; border-bottom: 1px solid var(--line);
+  }
+  .ptable td { padding: 7px 4px; border-bottom: 1px solid var(--line); }
+  .ptable tr:last-child td { border-bottom: none; }
+  .ptable .num { text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
+
+  /* ── Account balance ── */
+  .acct { padding: 15px; display: flex; align-items: center; gap: 14px; }
+  .acct-fig { font-size: 1.6rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1.1; }
+  .acct.settled .acct-fig, .acct.credit .acct-fig { color: var(--good); }
+  .acct.owing  .acct-fig { color: var(--warn); }
+  .acct-say { flex: 1; min-width: 0; }
+  .acct-say b { display: block; font-size: 0.88rem; font-weight: 700; }
+  .acct-say span { display: block; font-size: 0.78rem; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+  .acct-mark {
+    flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; font-size: 1.25rem;
+  }
+  .acct.settled .acct-mark, .acct.credit .acct-mark { background: var(--good-light); }
+  .acct.owing  .acct-mark { background: var(--warn-light); }
+
+  /* ── Grade estimate ── */
+  .grade { padding: 16px 15px 12px; }
+  .grade-top { display: flex; align-items: center; gap: 12px; }
+  .grade-badge {
+    flex-shrink: 0; width: 54px; height: 54px; border-radius: var(--r-md);
+    background: var(--accent-light); color: var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.65rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1;
+  }
+  .grade-badge.none { background: var(--card-2); color: var(--muted); font-size: 1.35rem; }
+  .grade-say { flex: 1; min-width: 0; }
+  .grade-say b { display: block; font-size: 0.92rem; font-weight: 700; line-height: 1.3; }
+  .grade-say span { display: block; font-size: 0.78rem; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+  .info-btn {
+    flex-shrink: 0; align-self: flex-start; width: 26px; height: 26px; border-radius: 50%;
+    border: 1px solid var(--line); background: var(--card-2); color: var(--muted);
+    font-family: inherit; font-size: 0.8rem; font-weight: 700; cursor: pointer; padding: 0;
+  }
+  .info-btn[aria-expanded="true"] { background: var(--accent-light); color: var(--accent); border-color: transparent; }
+  .grade-note {
+    margin-top: 12px; padding: 11px 12px; border-radius: var(--r-md);
+    background: var(--card-2); color: var(--ink-dim); font-size: 0.78rem; line-height: 1.55;
+  }
+  .grade-note p { margin: 0 0 8px; }
+  .grade-note p:last-child { margin-bottom: 0; }
+  .gb-head { display: flex; align-items: center; gap: 8px; margin: 18px 0 4px; }
+  .gb-head h3 {
+    margin: 0; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--muted); font-weight: 700;
+  }
+  .gb-switch { margin-left: auto; display: flex; border: 1px solid var(--line); border-radius: 100px; overflow: hidden; }
+  .gb-switch button {
+    border: none; background: none; font-family: inherit; font-size: 0.68rem; font-weight: 650;
+    color: var(--muted); padding: 4px 11px; cursor: pointer;
+  }
+  .gb-switch button[aria-pressed="true"] { background: var(--accent-fill); color: var(--on-accent); }
+  /* The boundary grid is wider than a phone. It scrolls inside its own box so
+     the page itself never gets a sideways scrollbar. */
+  .gb-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .gbtable { border-collapse: collapse; font-size: 0.76rem; min-width: 100%; }
+  .gbtable th, .gbtable td {
+    padding: 6px 7px; border-bottom: 1px solid var(--line);
+    white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .gbtable th:first-child, .gbtable td:first-child { text-align: left; }
+  .gbtable thead th {
+    font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--muted); font-weight: 700;
+  }
+  .gbtable tbody tr.used td { background: var(--accent-light); color: var(--accent); font-weight: 650; }
+  .gbtable tbody tr:last-child td { border-bottom: none; }
+  .gb-foot { font-size: 0.7rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+
+  .wrap { max-width:580px; }
+  h1 { font-size:1.7rem; line-height:1.2; }
+  .sub { margin-top:7px; line-height:1.5; }
+  .row { min-height:58px; gap:12px; padding:16px; }
+  .detail { padding:0 16px 16px; line-height:1.6; }
+  .kpi { padding:14px 5px; }
+  .kpi span { font-size:.67rem; }
+  .section-label { margin-top:28px; }
+  .action-btn { justify-content:flex-start; padding:15px 17px; box-shadow:none; }
+  .action-btn .app-icon { color:var(--accent); }
+  .card { animation:tt-enter .3s ease both; }
+  @media (max-width:360px) { .kpis { grid-template-columns:repeat(2,1fr); } }
+</style>
+<link rel="stylesheet" href="ux.css?v=6.23.0">
 </head>
 <body>
-<!--
-  The address a pupil is given. The page itself is student.html, which renders
-  the same lessons and progress with the money left out when the token is a
-  pupil's. One implementation, rather than two copies of a chart and a boundary
-  table drifting apart. The server decides what a pupil may see; this only
-  decides where they land.
--->
+<div class="wrap" id="app">
+  <div class="state">Loading your lessons…</div>
+</div>
 <script>
-  window.location.replace('student.html' + window.location.search);
+(async function () {
+  const FN_BASE = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
+  const UPCOMING_SHOWN = 8;
+  const app = document.getElementById('app');
+  const token = new URLSearchParams(window.location.search).get('t');
+
+  let portalData = null;
+  let upcomingExpanded = false;
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function fmtDate(d) {
+    const dt = new Date(d + 'T12:00:00');
+    return dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+  const money = n => '\u00a3' + (Math.round(Number(n) * 100) % 100 === 0
+    ? Math.round(Number(n))
+    : Number(n).toFixed(2));
+
+  function fmtPaidDate(d) {
+    if (!d) return null;
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  function pillHTML(l, scheduled) {
+    if (scheduled) return '<span class="pill scheduled">Scheduled</span>';
+    // A pupil is told the lesson happened, not whether it was paid for.
+    if (window.__pupilView) {
+      return `<span class="pill scheduled">${l.status === 'missed' ? 'Missed' : 'Done'}</span>`;
+    }
+    const label = l.pay_status === 'paid' ? 'Paid' : l.pay_status === 'partial' ? 'Partly paid' : 'Not yet paid';
+    return `<span class="pill ${l.pay_status}">${label}</span>`;
+  }
+  // A lesson is often settled by more than one payment: a few pounds left over
+  // from last time, then the rest on the day. Naming only the dates left the
+  // parent unable to tell which of their payments went where, which is exactly
+  // the question they open this for.
+  function detailHTML(l, scheduled) {
+    const parts = (l.paid_dates || []).filter(p => Number(p.amount) > 0.005);
+
+    if (l.free) return '<div>Free lesson, nothing to pay.</div>';
+    if (l.pre_settled && !parts.length) return '<div>Already settled.</div>';
+    if (!parts.length) {
+      if (!(l.rate > 0)) return '<div>Nothing to pay on this one.</div>';
+      // A lesson that has not happened yet is not owed yet - the balance only
+      // ever counts lessons actually taught. Calling it "due" three weeks out
+      // reads as a demand for money the parent does not owe.
+      if (scheduled) return `<div>${esc(money(l.rate))} once this one has happened.</div>`;
+      return `<div>Nothing paid against this one yet. ${esc(money(l.rate))} due.</div>`;
+    }
+
+    const lines = parts
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+      .map(p => `<div class="paid-line"><span>${esc(money(p.amount))}</span>`
+        + `<span class="paid-when">${p.date ? esc(fmtPaidDate(p.date)) : 'date not recorded'}</span></div>`);
+
+    const paid = parts.reduce((t, p) => t + Number(p.amount), 0);
+    const left = Math.round((Number(l.rate || 0) - paid) * 100) / 100;
+
+    // Only worth a total when more than one payment went into it, otherwise the
+    // line just repeats itself.
+    if (parts.length > 1) {
+      lines.push(`<div class="paid-line paid-total"><span>${esc(money(paid))}</span>`
+        + `<span class="paid-when">total</span></div>`);
+    }
+    if (left > 0.005) {
+      lines.push(`<div class="paid-line paid-left"><span>${esc(money(left))}</span>`
+        + `<span class="paid-when">still to pay</span></div>`);
+    }
+    return lines.join('');
+  }
+  function renderList(lessons, prefix, scheduled) {
+    if (!lessons.length) return '<div class="empty">Nothing here.</div>';
+    return '<div class="card">' + lessons.map((l, i) => {
+      const key = prefix + i;
+      // Nothing to expand on a pupil's row: the detail is only ever which
+      // payment covered it.
+      const expandable = !window.__pupilView;
+      return `
+        <div class="lesson">
+          <div class="row"${expandable ? ` data-detail="${key}"` : ' style="cursor:default"'}>
+            <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}</span>
+            ${pillHTML(l, scheduled)}
+          </div>
+          ${expandable ? `<div class="detail" id="detail-${key}" hidden>${detailHTML(l, scheduled)}</div>` : ''}
+        </div>
+      `;
+    }).join('') + '</div>';
+  }
+
+  function renderGroupedHistory(lessons) {
+    if (!lessons.length) return '<div class="empty">Nothing here.</div>';
+    const groups = new Map();
+    lessons.forEach(l => {
+      const key = String(l.date || '').slice(0, 7);
+      if (!groups.has(key)) {
+        const d = new Date(key + '-01T12:00:00');
+        groups.set(key, { key, label: d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }), lessons: [] });
+      }
+      groups.get(key).lessons.push(l);
+    });
+    return [...groups.values()].map(group =>
+      '<div class="section-label" style="margin-top:16px">' + esc(group.label)
+        + '<span style="font-weight:500;text-transform:none;letter-spacing:0;margin-left:7px">· '
+        + group.lessons.length + ' lesson' + (group.lessons.length === 1 ? '' : 's') + '</span></div>'
+        + renderList(group.lessons, 'rec-' + group.key + '-', false)
+    ).join('');
+  }
+
+  function renderUpcoming() {
+    const container = document.getElementById('upcoming-section');
+    const all = portalData.upcoming;
+    const shown = upcomingExpanded ? all : all.slice(0, UPCOMING_SHOWN);
+    let html = renderList(shown, 'up-', true);
+    if (all.length > UPCOMING_SHOWN) {
+      html += `<button class="showmore" id="upcoming-toggle">${
+        upcomingExpanded ? 'Show fewer' : `Show ${all.length - UPCOMING_SHOWN} more`
+      }</button>`;
+    }
+    container.innerHTML = html;
+    const toggle = document.getElementById('upcoming-toggle');
+    if (toggle) toggle.addEventListener('click', () => { upcomingExpanded = !upcomingExpanded; renderUpcoming(); });
+  }
+
+  // ── Progress ──────────────────────────────────────────────────────────
+  // One series over time, so: a line, one hue, no legend. The y axis is fixed
+  // at 0-100 rather than fitted to the data, because a percentage axis that
+  // starts at 35 turns an ordinary term into a vertical climb.
+  const CH = { w: 440, h: 200, l: 30, r: 10, t: 14, b: 28 };
+
+  function scoreText(p) {
+    return p.max ? `${p.raw} / ${p.max} · ${p.pct}%` : `${p.pct}%`;
+  }
+  function shortDate(d) {
+    return new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  }
+
+  function chartSVG(papers) {
+    const x0 = CH.l, x1 = CH.w - CH.r, y0 = CH.t, y1 = CH.h - CH.b;
+    const yOf = pct => y1 - (pct / 100) * (y1 - y0);
+
+    const times = papers.map(p => new Date(p.date + 'T12:00:00').getTime());
+    const tMin = Math.min(...times), tMax = Math.max(...times);
+    // A single paper has no span to spread across, so it sits centred rather
+    // than collapsing onto the axis.
+    const xOf = t => (tMax === tMin) ? (x0 + x1) / 2 : x0 + ((t - tMin) / (tMax - tMin)) * (x1 - x0);
+
+    const pts = papers.map((p, i) => ({ ...p, x: xOf(times[i]), y: yOf(p.pct) }));
+
+    const grid = [0, 25, 50, 75, 100].map(v => `
+      <line x1="${x0}" y1="${yOf(v)}" x2="${x1}" y2="${yOf(v)}"
+            stroke="var(--line)" stroke-width="1" />
+      <text x="${x0 - 6}" y="${yOf(v) + 3.5}" text-anchor="end"
+            font-size="9" fill="var(--muted)">${v}</text>`).join('');
+
+    const line = pts.length > 1
+      ? `<polyline fill="none" stroke="var(--accent)" stroke-width="2"
+           stroke-linejoin="round" stroke-linecap="round"
+           points="${pts.map(p => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')}" />`
+      : '';
+    const area = pts.length > 1
+      ? `<path d="M${pts[0].x.toFixed(1)},${y1} ${pts.map(p => `L${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ')} L${pts[pts.length-1].x.toFixed(1)},${y1} Z"
+           fill="var(--accent)" opacity="0.10" />`
+      : '';
+
+    // A 2px ring in the surface colour keeps points that land close together
+    // from merging into one blob.
+    const dots = pts.map((p, i) => `
+      <circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${i === pts.length - 1 ? 5 : 3.5}"
+              fill="var(--accent)" stroke="var(--card)" stroke-width="2" data-i="${i}" />`).join('');
+
+    const last = pts[pts.length - 1];
+    // Labelled selectively: the most recent score only. A number on every
+    // point turns the line into a table nobody reads.
+    const lastLabel = `<text x="${Math.min(last.x, x1 - 14).toFixed(1)}" y="${(last.y - 11).toFixed(1)}"
+        text-anchor="middle" font-size="11" font-weight="700" fill="var(--accent)">${last.pct}%</text>`;
+
+    const xLabels = (pts.length > 1 ? [pts[0], pts[pts.length - 1]] : [pts[0]])
+      .map((p, i) => `<text x="${p.x.toFixed(1)}" y="${CH.h - 8}"
+            text-anchor="${pts.length > 1 ? (i === 0 ? 'start' : 'end') : 'middle'}"
+            font-size="9" fill="var(--muted)">${shortDate(p.date)}</text>`).join('');
+
+    return {
+      svg: `<svg viewBox="0 0 ${CH.w} ${CH.h}" role="img"
+              aria-label="Past paper scores over time, ${pts.length} papers, most recent ${last.pct} percent">
+        ${grid}${area}${line}
+        <line id="chair" x1="0" y1="${y0}" x2="0" y2="${y1}" stroke="var(--accent)"
+              stroke-width="1" opacity="0" />
+        ${dots}${lastLabel}${xLabels}
+        <rect id="hit" x="${x0}" y="${y0}" width="${x1 - x0}" height="${y1 - y0}" fill="transparent" />
+      </svg>`,
+      pts
+    };
+  }
+
+  function renderProgress(pr) {
+    if (!pr) return '';
+    const { svg } = chartSVG(pr.papers);
+    const t = pr.trend;
+    const trendCls = t == null ? 'flat' : t > 0.5 ? 'up' : t < -0.5 ? 'down' : 'flat';
+    const trendTxt = t == null
+      ? 'First paper recorded'
+      : `${t > 0 ? '▲' : t < 0 ? '▼' : '■'} ${t > 0 ? '+' : ''}${t} points <small>${esc(pr.trend_basis)}</small>`;
+    // Separator normalised here rather than trusted from the API, where it has
+    // been a hyphen in some deploys. A dash is not house style.
+    const tier = pr.exam_label
+      ? esc(pr.exam_label.replace(/\s[-–—]\s/g, ' · ').replace(/\b\w/g, c => c.toUpperCase()))
+      : '';
+
+    return `
+      <div class="section-label">Progress</div>
+      <div class="card prog">
+        <div class="prog-head">
+          <div style="font-weight:700;font-size:.95rem">Past papers</div>
+          <div class="prog-exam">${tier}</div>
+        </div>
+        <div class="kpis">
+          <div class="kpi hero"><b>${pr.latest.pct}%</b><span>Latest</span></div>
+          <div class="kpi"><b>${pr.average}%</b><span>Average</span></div>
+          <div class="kpi"><b>${pr.best.pct}%</b><span>Best</span></div>
+          <div class="kpi"><b>${pr.count}</b><span>Papers</span></div>
+        </div>
+        <div class="trend ${trendCls}">${trendTxt}</div>
+        <div class="chart-wrap">${svg}</div>
+        <div class="chart-cap" id="chartCap">${esc(pr.latest.label)} · ${shortDate(pr.latest.date)} · ${pr.latest.pct}%</div>
+        <button class="papers-toggle" id="papersToggle">Show every paper</button>
+        <div id="papersTable" hidden>
+          <table class="ptable">
+            <thead><tr><th>Paper</th><th>Date</th><th style="text-align:right">Score</th></tr></thead>
+            <tbody>
+              ${pr.papers.slice().reverse().map(p => `
+                <tr><td>${esc(p.label)}</td><td>${shortDate(p.date)}</td>
+                <td class="num">${esc(scoreText(p))}</td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
+  }
+
+  // Crosshair + caption. A tooltip that follows the finger is unreadable under
+  // it on a phone, so the reading appears in a fixed line beneath the chart.
+  function wireChart(pr) {
+    if (!pr) return;
+    const svg = app.querySelector('.chart-wrap svg');
+    const hit = svg && svg.querySelector('#hit');
+    const chair = svg && svg.querySelector('#chair');
+    const cap = app.querySelector('#chartCap');
+    if (!hit || !cap) return;
+
+    const { pts } = chartSVG(pr.papers);
+    const show = i => {
+      const p = pts[i];
+      chair.setAttribute('x1', p.x); chair.setAttribute('x2', p.x);
+      chair.setAttribute('opacity', '0.45');
+      svg.querySelectorAll('circle[data-i]').forEach(c => {
+        c.setAttribute('r', +c.dataset.i === i ? 6 : (+c.dataset.i === pts.length - 1 ? 5 : 3.5));
+      });
+      cap.textContent = `${p.label} · ${shortDate(p.date)} · ${scoreText(p)}`;
+    };
+    const locate = ev => {
+      const r = svg.getBoundingClientRect();
+      const x = ((ev.clientX - r.left) / r.width) * CH.w;
+      let best = 0, bd = Infinity;
+      pts.forEach((p, i) => { const d = Math.abs(p.x - x); if (d < bd) { bd = d; best = i; } });
+      show(best);
+    };
+    svg.addEventListener('pointermove', locate);
+    svg.addEventListener('pointerdown', locate);
+    svg.addEventListener('pointerleave', () => {
+      chair.setAttribute('opacity', '0');
+      svg.querySelectorAll('circle[data-i]').forEach(c => {
+        c.setAttribute('r', +c.dataset.i === pts.length - 1 ? 5 : 3.5);
+      });
+      cap.textContent = `${pr.latest.label} · ${shortDate(pr.latest.date)} · ${pr.latest.pct}%`;
+    });
+
+    const toggle = app.querySelector('#papersToggle');
+    const table = app.querySelector('#papersTable');
+    if (toggle && table) toggle.addEventListener('click', () => {
+      table.hidden = !table.hidden;
+      toggle.textContent = table.hidden ? 'Show every paper' : 'Hide papers';
+    });
+  }
+
+  // ── Grade estimate ──────────────────────────────────────────────────────
+  // A grade only appears once a whole series has been sat, because a single
+  // paper out of two or three says nothing about the grade: boundaries are
+  // published for the set, not per paper.
+
+  const GRADE_ORDER = ['9', '8', '7', '6', '5', '4', '3', '2', '1'];
+  const gradesIn = g => GRADE_ORDER.filter(k => g.boundaries.length && g.boundaries[0].grades[k] != null);
+
+  function boundaryBody(g, mode) {
+    const cols = gradesIn(g);
+    // Only the series this student has actually been marked against get the
+    // highlight, so the table reads as theirs rather than as a data dump.
+    const used = new Set(g.sets.filter(s => s.complete && s.exact_series).map(s => s.series_used));
+    return g.boundaries.map(b => `
+      <tr class="${used.has(b.label) ? 'used' : ''}">
+        <td>${esc(b.label)}</td>
+        ${cols.map(k => `<td>${mode === 'pct' ? b.pcts[k] + '%' : b.grades[k]}</td>`).join('')}
+      </tr>`).join('');
+  }
+
+  // Money in one line. Nothing owing is the normal state and should look like
+  // good news rather than an absence, so it gets the same weight as a balance.
+  function renderAccount(a) {
+    if (!a) return '';
+
+    let cls, mark, fig, head, sub;
+    if (a.owed > 0) {
+      cls = 'owing'; mark = '•'; fig = money(a.owed);
+      head = 'Outstanding';
+      sub = `${a.unpaid_lessons} lesson${a.unpaid_lessons === 1 ? '' : 's'} not yet paid for.`;
+    } else if (a.credit > 0) {
+      cls = 'credit'; mark = '✓'; fig = money(a.credit);
+      head = 'In credit';
+      sub = a.credit_covers > 0
+        ? `Paid ahead. That covers the next ${a.credit_covers} lesson${a.credit_covers === 1 ? '' : 's'}, and comes down as each one happens.`
+        : 'Paid ahead. This comes down as lessons happen.';
+    } else {
+      cls = 'settled'; mark = '✓'; fig = '£0';
+      head = 'All settled';
+      sub = 'Nothing outstanding. Anything paid ahead shows here and comes down as lessons happen.';
+    }
+
+    return `
+      <div class="section-label">Account</div>
+      <div class="card acct ${cls}">
+        <div class="acct-mark">${mark}</div>
+        <div class="acct-say">
+          <div class="acct-fig">${fig}</div>
+          <b>${head}</b>
+          <span>${esc(sub)}</span>
+        </div>
+      </div>`;
+  }
+
+  function renderGrade(g) {
+    if (!g || !g.boundaries.length) return '';
+
+    const cols = gradesIn(g);
+    const done = g.sets.filter(s => s.complete);
+    const latest = g.latest;
+    const partial = g.sets.filter(s => !s.complete).slice(-1)[0];
+
+    let badge, head, sub;
+    if (latest) {
+      badge = `<div class="grade-badge">${esc(latest.grade)}</div>`;
+      head = `Grade ${esc(latest.grade)} on the ${esc(latest.set)} papers`;
+      const bits = [`${latest.total_marks} out of ${latest.max_mark}`, `${latest.mean_pct}%`];
+      if (latest.next_grade) {
+        bits.push(`${latest.marks_to_next} mark${latest.marks_to_next === 1 ? '' : 's'} off a grade ${latest.next_grade}`);
+      }
+      sub = bits.join(' · ') + (latest.exact_series
+        ? ''
+        : `. No boundaries were published for ${esc(latest.set)}, so this uses the average of every other series.`);
+    } else {
+      badge = `<div class="grade-badge none">?</div>`;
+      head = 'No full set finished yet';
+      sub = partial
+        ? `${esc(partial.set)} is ${partial.papers_done} of ${partial.papers_needed} papers in. A grade appears as soon as a whole series is done.`
+        : `A grade appears once all ${g.papers_per_set} papers from one series are done.`;
+    }
+
+    const setsTable = done.length ? `
+      <div class="gb-head"><h3>Every completed set</h3></div>
+      <table class="ptable">
+        <thead><tr><th>Series</th><th style="text-align:right">Marks</th><th style="text-align:right">Grade</th></tr></thead>
+        <tbody>
+          ${done.slice().reverse().map(s => `
+            <tr>
+              <td>${esc(s.set)}${s.exact_series ? '' : ' <span style="color:var(--muted)">(typical)</span>'}</td>
+              <td class="num">${s.total_marks}/${s.max_mark}</td>
+              <td class="num">${esc(s.grade)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>` : '';
+
+    return `
+      <div class="section-label">Grade estimate</div>
+      <div class="card grade">
+        <div class="grade-top">
+          ${badge}
+          <div class="grade-say"><b>${head}</b><span>${sub}</span></div>
+          <button class="info-btn" id="gradeInfo" aria-expanded="false"
+                  aria-label="How grade boundaries work">i</button>
+        </div>
+
+        <div class="grade-note" id="gradeNote" hidden>
+          <p>Grade boundaries move every year. They are set after everyone has
+          sat the paper, so that a grade means the same thing whether that
+          year's paper turned out hard or easy. A harder paper gets lower
+          boundaries.</p>
+          <p>Each set below is marked against the boundaries published for that
+          exact paper, so the grade is the one those marks really would have
+          earned that summer. Treat it as a good guide rather than a promise:
+          next year's boundaries are not out yet.</p>
+        </div>
+
+        ${setsTable}
+
+        <button class="papers-toggle" id="gradeToggle">Show the boundaries</button>
+        <div id="gradeDetail" hidden>
+          <div class="gb-head">
+            <h3>${esc(g.board)} ${esc(g.qualification)} ${esc(g.spec_code)} · ${esc(g.tier)}</h3>
+            <div class="gb-switch">
+              <button data-mode="marks" aria-pressed="true">Marks</button>
+              <button data-mode="pct" aria-pressed="false">%</button>
+            </div>
+          </div>
+          <div class="gb-scroll">
+            <table class="gbtable">
+              <thead><tr><th>Series</th>${cols.map(k => `<th>${k}</th>`).join('')}</tr></thead>
+              <tbody id="gbBody">${boundaryBody(g, 'marks')}</tbody>
+            </table>
+          </div>
+          <div class="gb-foot">
+            Marks are out of ${g.max_mark} for the whole set of ${g.papers_per_set} papers.
+            Published by the exam board after each series.
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function wireGrade(g) {
+    if (!g || !g.boundaries.length) return;
+
+    const info = app.querySelector('#gradeInfo');
+    const note = app.querySelector('#gradeNote');
+    if (info && note) info.addEventListener('click', () => {
+      note.hidden = !note.hidden;
+      info.setAttribute('aria-expanded', String(!note.hidden));
+    });
+
+    const toggle = app.querySelector('#gradeToggle');
+    const detail = app.querySelector('#gradeDetail');
+    if (toggle && detail) toggle.addEventListener('click', () => {
+      detail.hidden = !detail.hidden;
+      toggle.textContent = detail.hidden ? 'Show the boundaries' : 'Hide the boundaries';
+    });
+
+    const body = app.querySelector('#gbBody');
+    app.querySelectorAll('.gb-switch button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        app.querySelectorAll('.gb-switch button').forEach(b => {
+          b.setAttribute('aria-pressed', String(b === btn));
+        });
+        body.innerHTML = boundaryBody(g, btn.dataset.mode);
+      });
+    });
+  }
+
+  // One delegated listener handles every row, including ones added later by
+  // "Show more" - no need to re-bind click handlers on every re-render.
+  app.addEventListener('click', e => {
+    const row = e.target.closest('[data-detail]');
+    if (!row) return;
+    const detail = document.getElementById('detail-' + row.dataset.detail);
+    if (detail) detail.hidden = !detail.hidden;
+  });
+
+
+  // ---------- Demo parent page ----------
+  // Reached from the app demo at /?demo=1, whose students carry demo- tokens.
+  // Built here rather than server-side so the demo never touches the database.
+  function demoPortalData(tok) {
+    const spec = {
+      'demo-amira':  { name: 'Amira Khan',   weekday: 2, time: '16:00', owed: 0 },
+      'demo-joe':    { name: 'Joe Fletcher', weekday: 3, time: '17:30', owed: 3 },
+      'demo-priya':  { name: 'Priya Shah',   weekday: 4, time: '18:00', owed: 0 },
+      'demo-tom':    { name: 'Tom Bennett',  weekday: 1, time: '17:00', owed: 2 },
+      'demo-layla':  { name: 'Layla Ahmed',  weekday: 5, time: '16:30', owed: 0 },
+      'demo-ben':    { name: 'Ben Carter',   weekday: 6, time: '10:00', owed: 1 },
+      'demo-sofia':  { name: 'Sofia Rossi',  weekday: 2, time: '18:15', owed: 0 },
+    };
+    const s = spec[tok] || spec['demo-amira'];
+    const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    const todayStr = iso(new Date());
+    const offset = (s.weekday - new Date().getDay() + 7) % 7;
+
+    const all = [];
+    for (let w = 0; w < 12; w++) {
+      const d = new Date();
+      d.setDate(d.getDate() + offset - 63 + w * 7);
+      all.push({ date: iso(d), time: s.time });
+    }
+    const past = all.filter(l => l.date < todayStr);
+    const upcoming = all.filter(l => l.date >= todayStr);
+    const unpaidFrom = past.length - s.owed;
+
+    const recent = past.map((l, i) => i < unpaidFrom
+      ? { ...l, pay_status: 'paid', paid_dates: [{ date: l.date }] }
+      : { ...l, pay_status: 'unpaid', paid_dates: [] }
+    ).reverse();
+
+    return {
+      ok: true,
+      name: s.name,
+      tutor: { name: 'Sam', phone: '447700900100', email: 'sam@example.com' },
+      spreadsheet_url: null,
+      progress: null,
+      upcoming: upcoming.map(l => ({ ...l, pay_status: 'unpaid', paid_dates: [] })),
+      recent,
+    };
+  }
+
+  if (!token) {
+    app.innerHTML = '<div class="state">This link is missing something - ask your tutor for the correct one.</div>';
+    return;
+  }
+
+  let data;
+  if (token.startsWith('demo-')) {
+    data = demoPortalData(token);
+  } else {
+    try {
+      const res = await fetch(`${FN_BASE}/student-portal?t=${encodeURIComponent(token)}`);
+      data = await res.json();
+    } catch (e) {
+      app.innerHTML = '<div class="state">Couldn\'t load your lessons right now - try again shortly.</div>';
+      return;
+    }
+  }
+
+  if (!data.ok) {
+    app.innerHTML = '<div class="state">This link doesn\'t look right - ask your tutor for a fresh one.</div>';
+    return;
+  }
+
+  // The pupil's link renders this same page with the money left out, rather
+  // than a second copy of the chart and the boundary table quietly drifting
+  // away from this one. The server has already withheld the balance and the
+  // payment states, so this only decides what to draw, never what is safe to
+  // show.
+  const pupilView = data.view === 'student';
+  window.__pupilView = pupilView;
+
+  const tutor = data.tutor || {};
+  const tutorName = tutor.name || 'your tutor';
+  const firstName = data.name.trim().split(/\s+/)[0];
+  document.title = `${firstName}'s lessons`;
+  const waMessage = `Hi ${tutorName}, I'm messaging about ${firstName}'s lessons.`;
+  const waLink = tutor.phone
+    ? `https://wa.me/${tutor.phone}?text=${encodeURIComponent(waMessage)}` : null;
+  const mailLink = tutor.email
+    ? `mailto:${tutor.email}?subject=${encodeURIComponent(firstName + "'s lessons")}` : null;
+
+  // cal.com's own inline embed, driven by whatever link the tutor saved, so the
+  // calendar appears on the page rather than sending a parent off to another
+  // site. Anything that is not cal.com gets a plain button: there is no generic
+  // way to embed an arbitrary booking page, and a button that works beats an
+  // iframe that might not.
+  function calLinkFrom(url) {
+    try {
+      const u = new URL(url);
+      if (!/(^|\.)cal\.com$/i.test(u.hostname)) return null;
+      const path = u.pathname.replace(/^\/+|\/+$/g, '');
+      // A bare cal.com homepage link has nothing to book.
+      return path ? path : null;
+    } catch { return null; }
+  }
+
+  function renderBooking(url) {
+    if (!url) return '';
+    const calLink = calLinkFrom(url);
+    if (calLink) {
+      return `
+        <div class="section-label">Book an extra session</div>
+        <div class="card" style="padding:6px">
+          <div id="cal-inline" style="width:100%;min-height:560px;overflow:auto"></div>
+        </div>`;
+    }
+    return `
+      <div class="section-label">Book an extra session</div>
+      <div class="actions">
+        <a class="action-btn" href="${esc(url)}" target="_blank" rel="noopener"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2"/></svg> Book an extra session</a>
+      </div>`;
+  }
+
+  function wireBooking(url) {
+    const calLink = calLinkFrom(url);
+    const holder = document.getElementById('cal-inline');
+    if (!calLink || !holder) return;
+    // cal.com's published loader, verbatim apart from being handed our own
+    // element and link.
+    (function (C, A, L) {
+      let p = function (a, ar) { a.q.push(ar); };
+      let d = C.document;
+      C.Cal = C.Cal || function () {
+        let cal = C.Cal; let ar = arguments;
+        if (!cal.loaded) { cal.ns = {}; cal.q = cal.q || []; d.head.appendChild(d.createElement('script')).src = A; cal.loaded = true; }
+        if (ar[0] === L) {
+          const api = function () { p(api, arguments); };
+          const namespace = ar[1];
+          api.q = api.q || [];
+          if (typeof namespace === 'string') { cal.ns[namespace] = cal.ns[namespace] || api; p(cal.ns[namespace], ar); p(cal, ['initNamespace', namespace]); }
+          else p(cal, ar);
+          return;
+        }
+        p(cal, ar);
+      };
+    })(window, 'https://app.cal.com/embed/embed.js', 'init');
+
+    const ns = 'tutortally';
+    Cal('init', ns, { origin: 'https://app.cal.com' });
+    // forwardQueryParams is deliberately NOT set. The only query parameter this
+    // page ever carries is ?t=, the token that is the entire credential for
+    // this family's lesson and payment history. Forwarding it would hand that
+    // token to a third party in an iframe URL and bury it in their logs.
+    Cal.ns[ns]('inline', {
+      elementOrSelector: '#cal-inline',
+      calLink,
+      // Slots rather than a month grid on a narrow screen. Almost every parent
+      // opens this on a phone, where the grid is too small to read.
+      config: { layout: 'month_view', useSlotsViewOnSmallScreen: 'true' },
+    });
+    Cal.ns[ns]('ui', {
+      // The page's own accent in each theme, so the calendar does not arrive
+      // looking like a different product bolted onto the bottom.
+      cssVarsPerTheme: { light: { 'cal-brand': '#a15c00' }, dark: { 'cal-brand': '#ffa500' } },
+      hideEventTypeDetails: false,
+      layout: 'month_view',
+    });
+  }
+
+  const actions = [
+    waLink ? `<a class="action-btn" href="${waLink}" target="_blank" rel="noopener"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z M7 10h10 M7 14h6"/></svg> Message ${esc(tutorName)} on WhatsApp</a>` : '',
+    mailLink ? `<a class="action-btn" href="${mailLink}"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 5h18v14H3z M3 5l9 8 9-8"/></svg> Email ${esc(tutorName)}</a>` : '',
+    data.spreadsheet_url ? `<a class="action-btn" href="${esc(data.spreadsheet_url)}" target="_blank" rel="noopener"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 3v17h17 M8 15l4-5 4 3 4-7"/></svg> View ${esc(firstName)}'s progress</a>` : '',
+  ].join('');
+
+  portalData = data;
+  app.innerHTML = `
+    <h1>${esc(data.name)}</h1>
+    <div class="sub">${pupilView
+      ? (data.progress ? 'Your lessons and how your papers are going' : 'Your lessons')
+      : 'Progress, lessons and payment status'}</div>
+    ${pupilView ? '' : renderAccount(data.account)}
+    ${renderProgress(data.progress)}
+    ${renderGrade(data.grade)}
+    ${pupilView || !actions ? '' : `<div class="actions" style="margin-top:18px">${actions}</div>`}
+    ${pupilView ? '<div class="section-label">Upcoming</div><div id="upcoming-section"></div>' : ''}
+    <div class="section-label">${pupilView ? 'Lessons so far' : 'Past lessons'}</div>
+    ${pupilView ? renderList(data.recent || [], 'rec-', false) : renderGroupedHistory(data.recent || [])}
+    ${pupilView ? '' : renderBooking(data.tutor?.booking_url)}
+  `;
+  if (pupilView) renderUpcoming();
+  wireChart(data.progress);
+  wireGrade(data.grade);
+  if (!pupilView) wireBooking(data.tutor?.booking_url);
+})();
 </script>
-<noscript><a href="student.html">Open your lessons</a></noscript>
 </body>
 </html>
