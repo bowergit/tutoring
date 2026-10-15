@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <!-- Replaced with "[first name]'s lessons" as soon as the data loads. This
      static value is only what a link-preview crawler sees, since it reads the
@@ -97,7 +98,7 @@
   .settle-btn:hover { transform: translateY(-1px); box-shadow: var(--sh-3); }
   .settle-btn:focus-visible { outline: none; box-shadow: var(--ring), var(--sh-2); }
 
-  /* ── Progress ── */
+  /* �� Progress �� */
   .prog { padding: 16px 15px 12px; }
   .prog-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
   .prog-exam { font-size: 0.74rem; color: var(--muted); margin-left: auto; text-align: right; }
@@ -134,7 +135,7 @@
   .ptable tr:last-child td { border-bottom: none; }
   .ptable .num { text-align: right; font-weight: 650; font-variant-numeric: tabular-nums; }
 
-  /* ── Account balance ── */
+  /* �� Account balance �� */
   .acct { padding: 15px; display: flex; align-items: center; gap: 14px; }
   .acct-fig { font-size: 1.6rem; font-weight: 750; letter-spacing: -0.03em; line-height: 1.1; }
   .acct.settled .acct-fig, .acct.credit .acct-fig { color: var(--good); }
@@ -149,7 +150,7 @@
   .acct.settled .acct-mark, .acct.credit .acct-mark { background: var(--good-light); }
   .acct.owing  .acct-mark { background: var(--warn-light); }
 
-  /* ── Grade estimate ── */
+  /* �� Grade estimate �� */
   .grade { padding: 16px 15px 12px; }
   .grade-top { display: flex; align-items: center; gap: 12px; }
   .grade-badge {
@@ -219,8 +220,9 @@
 </head>
 <body>
 <div class="wrap" id="app">
-  <div class="state">Loading your lessons…</div>
+  <div class="state">Loading your lessons.</div>
 </div>
+<script src="weekly-portal.js"></script>
 <script>
 (async function () {
   const FN_BASE = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1';
@@ -252,6 +254,7 @@
     if (window.__pupilView) {
       return `<span class="pill scheduled">${l.status === 'missed' ? 'Missed' : 'Done'}</span>`;
     }
+    if (l.weekly_included) return '<span class="pill scheduled">Included in weekly tuition</span>';
     const label = l.pay_status === 'paid' ? 'Paid' : l.pay_status === 'partial' ? 'Partly paid' : 'Not yet paid';
     return `<span class="pill ${l.pay_status}">${label}</span>`;
   }
@@ -260,6 +263,7 @@
   // parent unable to tell which of their payments went where, which is exactly
   // the question they open this for.
   function detailHTML(l, scheduled) {
+    if (l.weekly_included) return '<div>This lesson is included in your weekly place. See the weekly statement for charges and payments.</div>';
     const parts = (l.paid_dates || []).filter(p => Number(p.amount) > 0.005);
 
     if (l.free) return '<div>Free lesson, nothing to pay.</div>';
@@ -303,7 +307,7 @@
       return `
         <div class="lesson">
           <div class="row"${expandable ? ` data-detail="${key}"` : ' style="cursor:default"'}>
-            <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}</span>
+            <span>${fmtDate(l.date)}${l.time ? `<span class="time"> � ${esc(l.time)}</span>` : ''}</span>
             ${pillHTML(l, scheduled)}
           </div>
           ${expandable ? `<div class="detail" id="detail-${key}" hidden>${detailHTML(l, scheduled)}</div>` : ''}
@@ -327,14 +331,14 @@
     if (toggle) toggle.addEventListener('click', () => { upcomingExpanded = !upcomingExpanded; renderUpcoming(); });
   }
 
-  // ── Progress ──────────────────────────────────────────────────────────
+  // �� Progress ����������������������������������������������������������
   // One series over time, so: a line, one hue, no legend. The y axis is fixed
   // at 0-100 rather than fitted to the data, because a percentage axis that
   // starts at 35 turns an ordinary term into a vertical climb.
   const CH = { w: 440, h: 200, l: 30, r: 10, t: 14, b: 28 };
 
   function scoreText(p) {
-    return p.max ? `${p.raw} / ${p.max} · ${p.pct}%` : `${p.pct}%`;
+    return p.max ? `${p.raw} / ${p.max} � ${p.pct}%` : `${p.pct}%`;
   }
   function shortDate(d) {
     return new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
@@ -405,11 +409,11 @@
     const trendCls = t == null ? 'flat' : t > 0.5 ? 'up' : t < -0.5 ? 'down' : 'flat';
     const trendTxt = t == null
       ? 'First paper recorded'
-      : `${t > 0 ? '▲' : t < 0 ? '▼' : '■'} ${t > 0 ? '+' : ''}${t} points <small>${esc(pr.trend_basis)}</small>`;
+      : `${t > 0 ? '' : t < 0 ? '' : '�'} ${t > 0 ? '+' : ''}${t} points <small>${esc(pr.trend_basis)}</small>`;
     // Separator normalised here rather than trusted from the API, where it has
     // been a hyphen in some deploys. A dash is not house style.
     const tier = pr.exam_label
-      ? esc(pr.exam_label.replace(/\s[-–—]\s/g, ' · ').replace(/\b\w/g, c => c.toUpperCase()))
+      ? esc(pr.exam_label.replace(/\s[---]\s/g, ' � ').replace(/\b\w/g, c => c.toUpperCase()))
       : '';
 
     return `
@@ -427,7 +431,7 @@
         </div>
         <div class="trend ${trendCls}">${trendTxt}</div>
         <div class="chart-wrap">${svg}</div>
-        <div class="chart-cap" id="chartCap">${esc(pr.latest.label)} · ${shortDate(pr.latest.date)} · ${pr.latest.pct}%</div>
+        <div class="chart-cap" id="chartCap">${esc(pr.latest.label)} � ${shortDate(pr.latest.date)} � ${pr.latest.pct}%</div>
         <button class="papers-toggle" id="papersToggle">Show every paper</button>
         <div id="papersTable" hidden>
           <table class="ptable">
@@ -460,7 +464,7 @@
       svg.querySelectorAll('circle[data-i]').forEach(c => {
         c.setAttribute('r', +c.dataset.i === i ? 6 : (+c.dataset.i === pts.length - 1 ? 5 : 3.5));
       });
-      cap.textContent = `${p.label} · ${shortDate(p.date)} · ${scoreText(p)}`;
+      cap.textContent = `${p.label} � ${shortDate(p.date)} � ${scoreText(p)}`;
     };
     const locate = ev => {
       const r = svg.getBoundingClientRect();
@@ -476,7 +480,7 @@
       svg.querySelectorAll('circle[data-i]').forEach(c => {
         c.setAttribute('r', +c.dataset.i === pts.length - 1 ? 5 : 3.5);
       });
-      cap.textContent = `${pr.latest.label} · ${shortDate(pr.latest.date)} · ${pr.latest.pct}%`;
+      cap.textContent = `${pr.latest.label} � ${shortDate(pr.latest.date)} � ${pr.latest.pct}%`;
     });
 
     const toggle = app.querySelector('#papersToggle');
@@ -487,7 +491,7 @@
     });
   }
 
-  // ── Grade estimate ──────────────────────────────────────────────────────
+  // �� Grade estimate ������������������������������������������������������
   // A grade only appears once a whole series has been sat, because a single
   // paper out of two or three says nothing about the grade: boundaries are
   // published for the set, not per paper.
@@ -509,26 +513,30 @@
 
   // Money in one line. Nothing owing is the normal state and should look like
   // good news rather than an absence, so it gets the same weight as a balance.
-  function renderAccount(a, canSettleUp, studentName) {
+  function renderAccount(a, canSettleUp, studentName, weekly) {
     if (!a) return '';
 
     let cls, mark, fig, head, sub;
     if (a.owed > 0) {
-      cls = 'owing'; mark = '•'; fig = money(a.owed);
+      cls = 'owing'; mark = ''; fig = money(a.owed);
       head = 'Outstanding';
       sub = `${a.unpaid_lessons} lesson${a.unpaid_lessons === 1 ? '' : 's'} not yet paid for.`;
     } else if (a.credit > 0) {
-      cls = 'credit'; mark = '✓'; fig = money(a.credit);
+      cls = 'credit'; mark = 'V'; fig = money(a.credit);
       head = 'In credit';
       sub = a.credit_covers > 0
         ? `Paid ahead. That covers the next ${a.credit_covers} lesson${a.credit_covers === 1 ? '' : 's'}, and comes down as each one happens.`
         : 'Paid ahead. This comes down as lessons happen.';
     } else {
-      cls = 'settled'; mark = '✓'; fig = '£0';
+      cls = 'settled'; mark = 'V'; fig = '�0';
       head = 'All settled';
       sub = 'Nothing outstanding. Anything paid ahead shows here and comes down as lessons happen.';
     }
 
+    if (weekly && weekly.plan.status !== 'proposed') {
+      sub = a.owed > 0 ? 'Charges due so far, less payments received. Future weekly charges are shown separately.' : a.credit > 0 ? 'Paid ahead towards your tuition account.' : 'All charges due so far are covered.';
+      if(weekly.plan.review_required) { head='Final balance under review'; sub='Daniel will confirm any proportionate charge and refund following your cooling off cancellation.'; }
+    }
     const amount = Number(a.owed || 0);
     let settleUp = '';
     if (canSettleUp && amount > 0.005) {
@@ -541,7 +549,7 @@
         <div class="actions settle-actions">
           <a class="action-btn settle-btn" href="${esc(paymentUrl.toString())}" target="_blank" rel="noopener">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17 17 7M8 7h9v9"/></svg>
-            Settle up · ${esc(money(amount))}
+            Settle up � ${esc(money(amount))}
           </a>
         </div>`;
     }
@@ -574,7 +582,7 @@
       if (latest.next_grade) {
         bits.push(`${latest.marks_to_next} mark${latest.marks_to_next === 1 ? '' : 's'} off a grade ${latest.next_grade}`);
       }
-      sub = bits.join(' · ') + (latest.exact_series
+      sub = bits.join(' � ') + (latest.exact_series
         ? ''
         : `. No boundaries were published for ${esc(latest.set)}, so this uses the average of every other series.`);
     } else {
@@ -625,7 +633,7 @@
         <button class="papers-toggle" id="gradeToggle">Show the boundaries</button>
         <div id="gradeDetail" hidden>
           <div class="gb-head">
-            <h3>${esc(g.board)} ${esc(g.qualification)} ${esc(g.spec_code)} · ${esc(g.tier)}</h3>
+            <h3>${esc(g.board)} ${esc(g.qualification)} ${esc(g.spec_code)} � ${esc(g.tier)}</h3>
             <div class="gb-switch">
               <button data-mode="marks" aria-pressed="true">Marks</button>
               <button data-mode="pct" aria-pressed="false">%</button>
@@ -858,7 +866,8 @@
     <div class="sub">${pupilView
       ? (data.progress ? 'Your lessons and how your papers are going' : 'Your lessons')
       : 'Progress, lessons and payment status'}</div>
-    ${pupilView ? '' : renderAccount(data.account, data.can_settle_up, data.name)}
+    ${pupilView ? '' : renderAccount(data.account, data.can_settle_up, data.name, data.weekly)}
+    ${pupilView ? '' : renderWeekly(data.weekly)}
     ${renderProgress(data.progress)}
     ${renderGrade(data.grade)}
     ${pupilView || !actions ? '' : `<div class="actions" style="margin-top:18px">${actions}</div>`}
@@ -869,6 +878,7 @@
     ${pupilView ? '' : renderBooking(data.tutor?.booking_url)}
   `;
   renderUpcoming();
+  if (!pupilView) wireWeekly(data.weekly, `${FN_BASE}/student-portal?t=${encodeURIComponent(token)}`);
   wireChart(data.progress);
   wireGrade(data.grade);
   if (!pupilView) wireBooking(data.tutor?.booking_url);

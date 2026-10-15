@@ -8,7 +8,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'content-type, authorization, apikey',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
 // No login system: security is the token itself being unguessable (a v4
@@ -83,12 +83,12 @@ const PROGRESS_OWNERS = new Set([
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length
 const round1 = (n: number) => Math.round(n * 10) / 10
 
-// ─── Grade boundaries ──────────────────────────────────────────────
+// ��� Grade boundaries ����������������������������������������������
 //
 // The tracker records a percentage per paper. Boundaries are published as raw
 // marks for a whole set. Those meet in the middle because every paper in a
-// set carries the same maximum (2 × 100 for International GCSE, 3 × 80 for
-// most GCSEs, 3 × 100 for OCR), so the set percentage is the mean of the
+// set carries the same maximum (2 � 100 for International GCSE, 3 � 80 for
+// most GCSEs, 3 � 100 for OCR), so the set percentage is the mean of the
 // paper percentages, and a boundary converts to a percentage by dividing by
 // the set's maximum. That works whether the sheet holds raw marks or
 // percentages, which is the whole point: some do, some don't.
@@ -99,7 +99,7 @@ const MONTHS: Record<string, number> = {
   nov: 11, november: 11, oct: 11, autumn: 11, winter: 11,
 }
 
-/** "June 2024", "Nov 2020", "Jan 2019", "2024 June" → { year, month }. */
+/** "June 2024", "Nov 2020", "Jan 2019", "2024 June"  { year, month }. */
 function parseSeries(setName: string): { year: number; month: number } | null {
   const s = String(setName || '').toLowerCase()
   const year = s.match(/(20\d{2})/)
@@ -330,7 +330,7 @@ function buildProgress(papers: any[], student: any) {
   const board = [student.exam_board, student.exam_tier]
     .filter(Boolean)
     .map((s: string) => String(s).trim())
-    .join(' · ')
+    .join(' � ')
 
   return {
     exam_label: board || null,
@@ -400,7 +400,7 @@ async function loadProgress(student: any) {
 
 Deno.serve(async (req) => {
   const json = (b: any, s = 200) =>
-    new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json' } })
+    new Response(JSON.stringify(b), { status: s, headers: { ...CORS, 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } })
 
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -426,6 +426,40 @@ Deno.serve(async (req) => {
   if (studentErr || !student) return json({ ok: false, problem: 'not_found' }, 404)
 
   const pupilView = student.student_token === token
+  if (!['GET','POST'].includes(req.method)) return json({ok:false,problem:'method_not_allowed'},405)
+  if (req.method === 'POST') {
+    if (pupilView || student.owner_id !== MONZO_SETTLE_OWNER) return json({ok:false,problem:'forbidden'},403)
+    if (Number(req.headers.get('content-length') || 0) > 8000) return json({ok:false,problem:'too_large'},413)
+    let body: any
+    try { const raw=await req.text(); if(raw.length>8000) return json({ok:false,problem:'too_large'},413); body=JSON.parse(raw) }
+    catch { return json({ok:false,problem:'invalid_request'},400) }
+    if (!body || typeof body!=='object' || typeof body.plan_id!=='string') return json({ok:false,problem:'invalid_request'},400)
+    const {data:plan,error:planErr}=await supabase.from('tutoring_weekly_plans').select('*').eq('id',body.plan_id).eq('student_id',student.id).eq('owner_id',student.owner_id).maybeSingle()
+    if(planErr || !plan) return json({ok:false,problem:'agreement_not_found'},404)
+    if(body.action==='accept') {
+      if(plan.status!=='proposed' || body.terms_version!==plan.terms_version || body.agree!==true || typeof body.signer_name!=='string' || body.signer_name.trim().length<2 || body.signer_name.trim().length>150) return json({ok:false,problem:'Please read and accept the current agreement.'},400)
+      const {error}=await supabase.from('tutoring_weekly_acceptances').insert({plan_id:plan.id,owner_id:student.owner_id,signer_name:body.signer_name.trim(),terms_version:plan.terms_version,terms_text:plan.terms_text,start_early:body.start_early===true})
+      if(error) return json({ok:false,problem:error.code==='23505'?'This agreement has already been accepted. Refresh to see the record.':'Could not accept the agreement. Check the early start request or ask Daniel for help.'},400)
+      return json({ok:true})
+    }
+    if(body.action==='end' || body.action==='cooling_off') {
+      const {data:acceptance}=await supabase.from('tutoring_weekly_acceptances').select('accepted_at').eq('plan_id',plan.id).maybeSingle()
+      if(!acceptance || plan.status==='ended' || plan.end_requested_at) return json({ok:false,problem:'This arrangement cannot receive another notice request. Contact Daniel.'},400)
+      const day=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/London',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
+      const withinCoolingOff=Date.now()<new Date(acceptance.accepted_at).getTime()+14*86400000
+      if(body.action==='cooling_off' && !withinCoolingOff) return json({ok:false,problem:'The cooling off period has ended. Please use ordinary notice or contact Daniel.'},400)
+      const end=new Date(day+'T12:00:00Z'); end.setUTCDate(end.getUTCDate()+(body.action==='end'?plan.notice_days:0))
+      const endsBefore=[end.toISOString().slice(0,10),plan.starts_on].sort().pop()!
+      const changes:any={ends_before:plan.ends_before && plan.ends_before<endsBefore ? plan.ends_before : endsBefore,end_requested_at:new Date().toISOString()}
+      if(body.action==='cooling_off') { changes.review_required=true; changes.status='ended' }
+      // If the tutor has not activated yet, an end request simply withdraws the proposal.
+      if(plan.status==='proposed') { changes.status='ended'; changes.ends_before=plan.starts_on }
+      const {error}=await supabase.from('tutoring_weekly_plans').update(changes).eq('id',plan.id)
+      if(error) return json({ok:false,problem:'Could not record notice. Contact Daniel to give notice directly.'},400)
+      return json({ok:true,ends_before:changes.ends_before,review_required:!!changes.review_required})
+    }
+    return json({ok:false,problem:'invalid_action'},400)
+  }
 
   // Built and returned before anything else is even fetched. Filtering a full
   // payload down in the browser would still have sent the balance and the
@@ -463,7 +497,7 @@ Deno.serve(async (req) => {
     })
   }
 
-  const [{ data: lessons }, { data: rateHistoryRaw }, { data: ownerUser }] = await Promise.all([
+  const accountReads = await Promise.all([
     supabase.from('tutoring_lessons')
       .select('id,lesson_date,start_time,status,is_complimentary,pre_settled,rate_charged')
       .eq('student_id', student.id)
@@ -476,6 +510,23 @@ Deno.serve(async (req) => {
     supabase.auth.admin.getUserById(student.owner_id),
   ])
 
+  if(accountReads.some(r=>r.error)) return json({ok:false,problem:'Could not load your account. Please try again.'},503)
+  const [{data:lessons},{data:rateHistoryRaw},{data:ownerUser}]=accountReads
+  let weeklyPlans:any[] = [], weeklyCharges:any[] = [], weeklyAcceptances:any[] = []
+  if(student.owner_id===MONZO_SETTLE_OWNER) {
+    const results=await Promise.all([
+      supabase.from('tutoring_weekly_plans').select('*').eq('student_id',student.id).eq('owner_id',student.owner_id).order('created_at'),
+      supabase.from('tutoring_weekly_charges').select('*').eq('student_id',student.id).eq('owner_id',student.owner_id).order('charge_date'),
+    ])
+    if(results.some(r=>r.error)) return json({ok:false,problem:'Could not load the weekly account. Please try again.'},503)
+    weeklyPlans=results[0].data || []; weeklyCharges=results[1].data || []
+    if(weeklyPlans.length) {
+      const {data,error}=await supabase.from('tutoring_weekly_acceptances').select('plan_id,signer_name,accepted_at,start_early,terms_version,terms_text').in('plan_id',weeklyPlans.map(p=>p.id))
+      if(error) return json({ok:false,problem:'Could not load your agreement.'},503)
+      weeklyAcceptances=data || []
+    }
+  }
+  const covered=(l:any)=>weeklyPlans.some(p=>p.status!=='proposed' && weeklyAcceptances.some(a=>a.plan_id===p.id) && l.lesson_date>=p.starts_on && (!p.ends_before || l.lesson_date < new Date(new Date(p.starts_on+'T12:00:00Z').getTime()+Math.ceil((new Date(p.ends_before+'T12:00:00Z').getTime()-new Date(p.starts_on+'T12:00:00Z').getTime())/604800000)*604800000).toISOString().slice(0,10)))
   const { progress, grade } = await loadProgress(student)
 
   const rateHistory = rateHistoryRaw ?? []
@@ -485,10 +536,12 @@ Deno.serve(async (req) => {
     ? await supabase.from('tutoring_payment_allocations').select('lesson_id,amount,payment_id').in('lesson_id', lessonIds)
     : { data: [] as any[] }
 
-  const { data: payments } = await supabase.from('tutoring_payments')
+  const paymentRead = await supabase.from('tutoring_payments')
     .select('id,date_paid,amount')
     .eq('student_id', student.id)
     .is('deleted_at', null)
+  if(paymentRead.error) return json({ok:false,problem:'Could not load payments.'},503)
+  const payments=paymentRead.data
   const dateByPaymentId = new Map((payments ?? []).map((p: any) => [p.id, p.date_paid]))
 
   const paidByLesson = new Map<string, number>()
@@ -500,7 +553,7 @@ Deno.serve(async (req) => {
     datesByLesson.set(a.lesson_id, list)
   }
 
-  const todayStr = new Date().toISOString().slice(0, 10)
+  const todayStr = new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/London',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date())
   const sixMonthsOutStr = new Date(Date.now() + 183 * 86400000).toISOString().slice(0, 10)
 
   function payStatus(l: any): string {
@@ -512,6 +565,7 @@ Deno.serve(async (req) => {
   }
 
   const shape = (l: any) => ({
+    weekly_included: covered(l),
     date: l.lesson_date,
     time: l.start_time,
     status: l.status,
@@ -542,9 +596,10 @@ Deno.serve(async (req) => {
   // reset are declared settled and free lessons were never chargeable, so
   // neither counts. A negative balance is money paid ahead, which is why the
   // page can say "in credit" rather than only ever nagging.
-  const charged = (lessons ?? [])
-    .filter((l: any) => l.status === 'completed' && !l.is_complimentary && !l.pre_settled)
+  const individualCharged = (lessons ?? [])
+    .filter((l: any) => l.status === 'completed' && !l.is_complimentary && !l.pre_settled && !covered(l))
     .reduce((sum: number, l: any) => sum + rateForLesson(l, rateHistory), 0)
+  const charged=individualCharged+weeklyCharges.filter(c=>c.charge_date<=todayStr).reduce((sum,c)=>sum+Number(c.amount),0)
   const paidTotal = (payments ?? []).reduce((sum: number, p: any) => sum + Number(p.amount), 0)
   const balance = Math.round((charged - paidTotal) * 100) / 100
 
@@ -558,10 +613,20 @@ Deno.serve(async (req) => {
     // Only meaningful while they are ahead, and only as a rough count.
     credit_covers: balance < -0.005 && nextRate > 0 ? Math.floor(-balance / nextRate) : 0,
     unpaid_lessons: (lessons ?? []).filter((l: any) =>
-      l.status === 'completed' && !l.is_complimentary && !l.pre_settled &&
+      l.status === 'completed' && !l.is_complimentary && !l.pre_settled && !covered(l) &&
       (paidByLesson.get(l.id) ?? 0) < rateForLesson(l, rateHistory) - 0.005).length,
   }
 
+  const weekly=weeklyPlans.length ? (()=>{
+    let remaining=Math.round(paidTotal*100)
+    const entries=[...(lessons || []).filter((l:any)=>!covered(l) && !l.pre_settled && !l.is_complimentary && l.status!=='cancelled').map((l:any)=>({date:l.lesson_date,kind:'Individual lesson',amount:rateForLesson(l,rateHistory),waived:false,reason:null})),
+      ...weeklyCharges.map(c=>({date:c.charge_date,kind:'Weekly place',amount:Number(c.amount),waived:c.waived,reason:c.reason}))]
+      .sort((a,b)=>a.date.localeCompare(b.date)).map(c=>{const paid=Math.min(Math.max(remaining,0),Math.round(c.amount*100));remaining-=paid;return {...c,paid:paid/100,due:c.date<=todayStr}})
+    const plan=weeklyPlans.find(p=>p.status!=='ended') || weeklyPlans[weeklyPlans.length-1]
+    const acceptance=weeklyAcceptances.find(a=>a.plan_id===plan.id) || null
+    return {plan:{id:plan.id,starts_on:plan.starts_on,ends_before:plan.ends_before,weekly_fee:plan.weekly_fee,lesson_slot:plan.lesson_slot,notice_days:plan.notice_days,status:plan.status,terms_version:plan.terms_version,terms_text:plan.terms_text,end_requested_at:plan.end_requested_at,review_required:plan.review_required},acceptance,
+      history:weeklyPlans.filter(p=>p.id!==plan.id).map(p=>({terms_text:p.terms_text,acceptance:weeklyAcceptances.find(a=>a.plan_id===p.id)||null})),entries,payments:payments || []}
+  })():null
   const tutor = ownerUser?.user
   const tutorMeta = tutor?.user_metadata ?? {}
 
@@ -575,9 +640,10 @@ Deno.serve(async (req) => {
     progress,
     grade,
     account,
+    weekly,
     // Monzo settle up is deliberately limited to Daniel's own tutoring account.
     // Cash students never get a bank transfer button.
-    can_settle_up: student.owner_id === MONZO_SETTLE_OWNER && !student.pays_in_cash,
+    can_settle_up: student.owner_id === MONZO_SETTLE_OWNER && !student.pays_in_cash && !weeklyPlans.some(p=>p.review_required),
     // Still sent when there is no progress view, so those students keep the
     // plain link to their tracker rather than losing it.
     spreadsheet_url: progress ? null : (student.spreadsheet_url || null),
