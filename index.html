@@ -934,7 +934,7 @@
   }
 
 </style>
-<link rel="stylesheet" href="ux.css?v=6.28.2">
+<link rel="stylesheet" href="ux.css?v=6.28.3">
 </head>
 <body>
 <div id="root"></div>
@@ -6500,7 +6500,6 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
   const [showGuide, setShowGuide] = useState(false);
   const [guideStep, setGuideStep] = useState(0);
   const [waiverDate, setWaiverDate] = useState('');
-  const [refund, setRefund] = useState('');
   const [reason, setReason] = useState('Daniel unavailable, no replacement agreed');
   const entries = TTWeekly.ledger(lessons, payments, student.id, l => rateForLesson(l, rateHistory));
   const dates = TTWeekly.charges(student.id).filter(c => c.plan_id === plan?.id);
@@ -6572,9 +6571,7 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
           <label style={field}>Weekly charge to waive<select value={waiverDate} onChange={e => setWaiverDate(e.target.value)}><option value="">Choose a date</option>{dates.map(c => <option key={c.charge_date} value={c.charge_date}>{c.charge_date}{c.waived ? ' (already waived)' : ''}</option>)}</select></label>
           <label style={field}>Reason<input value={reason} maxLength={250} onChange={e => setReason(e.target.value)} /></label>
           {btn('Waive weekly charge', () => run(() => supabase.from('tutoring_weekly_waivers').insert({plan_id:plan.id,charge_date:waiverDate,owner_id:student.owner_id,reason:reason.trim()})), !waiverDate || reason.trim().length<3 || dates.find(c=>c.charge_date===waiverDate)?.waived)}
-          <p>If you waive a week the parent has already paid for, you can refund it or leave it as credit towards later weeks. Credit needs nothing recording. If you refund, send the money back first, then enter the amount below so their balance stays right.</p>
-          <label style={field}>Refund returned (£)<input type="number" min="0.01" step="0.01" value={refund} onChange={e=>setRefund(e.target.value)} /></label>
-          {btn('Record refund already returned',()=>run(()=>supabase.from('tutoring_payments').insert({student_id:student.id,owner_id:student.owner_id,amount:-Number(refund),date_paid:TTWeekly.today(),method:'bank_transfer'})),!(Number(refund)>0))}
+          <p>If you waive a week the parent has already paid for, it simply counts towards their next week.</p>
           {!plan.ends_before && <><label style={field}>No new charges from<input type="date" min={TTWeekly.today()} value={end} onChange={e=>setEnd(e.target.value)} /></label>{btn('Record agreed end date',()=>run(()=>supabase.from('tutoring_weekly_plans').update({ends_before:end}).eq('id',plan.id)),!end)}</>}
           {plan.status==='active' && !plan.ends_before && btn('Stop weekly tuition from today',()=>run(()=>supabase.from('tutoring_weekly_plans').update({ends_before:TTWeekly.today()}).eq('id',plan.id)))}
           {plan.status==='active' && plan.ends_before && plan.ends_before<=TTWeekly.today() && btn('Close ended arrangement',()=>run(()=>supabase.from('tutoring_weekly_plans').update({status:'ended'}).eq('id',plan.id)))}
@@ -8092,7 +8089,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.28.2</div>}
+        {!loading && <div className="version-tag">v6.28.3</div>}
       </div>
 
       {showAddModal && (

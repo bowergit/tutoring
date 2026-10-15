@@ -29,7 +29,7 @@
       ${w.entries.length?`<details><summary>Weekly charges</summary><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Charge</th><th>Amount</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></details>`:''}
       <details style="margin-top:18px"><summary>Payments received</summary>${w.payments.length?w.payments.map(r=>`<p>${esc(day(r.date_paid))}: ${esc(money(r.amount))}</p>`).join(''):'<p>No payments recorded yet.</p>'}</details>
       <p>Pay by bank transfer or standing order. Nothing is taken automatically.</p>
-      ${a && p.status!=='ended' && !p.end_requested_at && !p.ends_before?`<div class="actions">${button('weekly-end',`Stop weekly tuition (${p.notice_days} days' notice)`)}${cooling?button('weekly-cooling','Cancel within 14 days of agreeing'):''}</div>`:''}
+      ${a && p.status!=='ended' && !p.end_requested_at && !p.ends_before?`<div class="actions">${button('weekly-end',`Stop weekly tuition (${p.notice_days} days' notice)`)}</div>`:''}
       <p class="weekly-message" id="weekly-action-message" role="status"></p>
       ${mini?'</details>':''}
     </section>
