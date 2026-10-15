@@ -916,10 +916,14 @@
   .status-row { gap: 6px; margin-top: 9px; }
   .pill { font-size: .7rem; padding: 4px 9px; font-weight: 600; }
   .dot.ok { background:var(--good); box-shadow:0 0 0 3px var(--good-light); }
-  .card-body { display:none; max-height:none; }
-  .card-body.open { display:block; max-height:none; }
-  .card-body.open .card-body-inner { animation:tt-enter .22s var(--ease); }
-  .card-body-inner { padding: 0 18px 20px; }
+  /* Opens by growing, not by popping in: a grid row going 0fr to 1fr animates to the
+     content's real height, which max-height and display:none cannot do. */
+  .card-body { display:grid; grid-template-rows:0fr; max-height:none; overflow:visible; transition:grid-template-rows .38s cubic-bezier(0.4,0,0.2,1); }
+  .card-body.open { grid-template-rows:1fr; max-height:none; }
+  .card-body-inner { min-height:0; overflow:hidden; padding: 0 18px 20px; transition:padding-bottom .38s cubic-bezier(0.4,0,0.2,1), opacity .3s var(--ease), visibility 0s; }
+  .card-body:not(.open) .card-body-inner { padding-bottom:0; border-top-color:transparent; opacity:0; visibility:hidden; transition:padding-bottom .38s cubic-bezier(0.4,0,0.2,1), opacity .2s var(--ease), visibility 0s .38s; }
+  .card-body .card-body-inner { animation:none; }
+  .card-body.open .card-body-inner { opacity:1; }
   .actions { margin: 18px 0 24px; gap: 9px; padding-bottom:20px; border-bottom:1px solid var(--line); }
   .actions .btn { font-size:.82rem; min-height:48px; }
   .actions .btn.copy-confirmed { background:var(--good-light); border-color:var(--good); color:var(--good); }
@@ -965,7 +969,7 @@
   }
 
 </style>
-<link rel="stylesheet" href="ux.css?v=6.29.0">
+<link rel="stylesheet" href="ux.css?v=6.29.1">
 </head>
 <body>
 <div id="root"></div>
@@ -8176,7 +8180,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.29.0</div>}
+        {!loading && <div className="version-tag">v6.29.1</div>}
       </div>
 
       {showAddModal && (
