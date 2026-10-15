@@ -34,4 +34,7 @@ vm.runInNewContext(fs.readFileSync(__dirname+'/weekly-portal.js','utf8'),portalC
 const rendered=portalContext.window.renderWeekly({plan:{...plan,terms_text:'<script>unsafe</script>',lesson_slot:'Wednesday <img>',weekly_fee:80,notice_days:7,terms_version:'test'},acceptance:null,entries:[],payments:[]});
 assert(rendered.includes('&lt;script&gt;unsafe&lt;/script&gt;'),'Terms are escaped');
 assert(!rendered.includes('<img>'),'Tutor supplied slot is escaped');
-console.log('14 weekly billing assertions, portal escaping, parent page syntax and edge TypeScript syntax passed.');
+assert(rendered.includes('£80 a week') && !rendered.includes('${'),'Price renders as text, never as a raw template');
+const renderedAccepted=portalContext.window.renderWeekly({plan:{...plan,status:'active',terms_text:'x',lesson_slot:'Thu',weekly_fee:62.5,notice_days:7,terms_version:'t'},acceptance:{signer_name:'A',accepted_at:new Date().toISOString(),terms_version:'t'},entries:[],payments:[]});
+assert(renderedAccepted.includes('£62.50 a week') && !renderedAccepted.includes('${'),'Accepted card shows the chosen price');
+console.log('16 weekly billing assertions, portal escaping, parent page syntax and edge TypeScript syntax passed.');
