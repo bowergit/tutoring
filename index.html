@@ -6106,8 +6106,9 @@ function StatementSheet({ student, lessons, payments, allocations, payState, sca
 }
 
 // ---------- More Tools Sheet ----------
-function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive, onDelete }) {
+function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive, onDelete, weeklyPanel }) {
   const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const [showWeekly, setShowWeekly] = useState(false);
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -6154,6 +6155,16 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
               onClick={onStatement}
             />
           </ToolsSection>
+
+          {weeklyPanel && <ToolsSection title="Weekly tuition">
+            <ToolsRow
+              title="Reserved weekly tuition"
+              subtitle={showWeekly ? 'Tap to hide' : 'Your account only. £80 a week, set up per student'}
+              onClick={() => setShowWeekly(v => !v)}
+              end="›"
+            />
+            {showWeekly && <div style={{padding:'0 14px 14px'}}>{weeklyPanel}</div>}
+          </ToolsSection>}
 
           <ToolsSection title="Parent page">
             <div className="tools-split-row">
@@ -6434,6 +6445,15 @@ function CopyAction({ value, label, icon = 'link', walkthrough }) {
   </>;
 }
 
+const WEEKLY_GUIDE = [
+  { title: 'What it is', body: 'A reserved weekly place at £80 a week, charged every seven days including holidays and cancellations. It covers one lesson a week. It is switched on per student, only on your account, and never changes existing students by itself.' },
+  { title: 'Set up', body: 'Tap Set up weekly tuition. Choose the first charge date, the reserved time (for example Wednesday 5pm, online, one hour) and the notice period. Create agreement makes a proposal only. Nothing is charged yet. Cancel setup backs out any time.' },
+  { title: 'Send the agreement', body: 'Copy the agreement link and send it to the parent. They read the terms, type their name, tick the boxes and accept. If the start date is under 14 days away they also confirm an early start.' },
+  { title: 'Activate', body: 'Once the parent has accepted, Activate weekly charges becomes available. From the start date a £80 charge appears every week. Lessons inside the plan stop counting as separate charges, so you do not need to lower the £100 rate in Settings.' },
+  { title: 'Each week', body: 'Payments cover the oldest charge first. Future charges show as scheduled and are not counted as owed. If you cancel a lesson, choose its date and Waive weekly charge. Parent cancellations stay chargeable.' },
+  { title: 'Ending', body: 'The parent can give notice from their page, and you will see it here. You can also record an agreed end date, or stop from today. Charges before the end date stay payable.' },
+];
+
 function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged }) {
   const { moneyMode, nameMode } = usePrivacy();
   const readonly = moneyMode !== 'normal' || nameMode !== 'normal';
@@ -6447,6 +6467,8 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
   const [end, setEnd] = useState('');
   const [showSetup, setShowSetup] = useState(false);
   const [showLedger, setShowLedger] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
+  const [guideStep, setGuideStep] = useState(0);
   const [waiverDate, setWaiverDate] = useState('');
   const [refund, setRefund] = useState('');
   const [reason, setReason] = useState('Daniel unavailable, no replacement agreed');
@@ -6473,15 +6495,29 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
   const btn = (label, fn, disabled=false) => <button type="button" className="btn" disabled={busy || readonly || disabled} onClick={fn}>{label}</button>;
   return <section style={{margin:'18px 0',padding:16,border:'1px solid var(--border)',borderRadius:12}}>
     <div className="section-label" style={{marginTop:0}}>Weekly tuition</div>
+    {!readonly && <>
+      {btn(showGuide ? 'Close walkthrough' : 'How does this work?', () => { setShowGuide(!showGuide); setGuideStep(0); })}
+      {showGuide && <div style={{margin:'12px 0',padding:14,border:'1px dashed var(--border)',borderRadius:10}}>
+        <p><b>Step {guideStep + 1} of {WEEKLY_GUIDE.length}: {WEEKLY_GUIDE[guideStep].title}</b></p>
+        <p>{WEEKLY_GUIDE[guideStep].body}</p>
+        <div className="btn-row">
+          {guideStep > 0 && btn('Back', () => setGuideStep(guideStep - 1))}
+          {guideStep < WEEKLY_GUIDE.length - 1 ? btn('Next', () => setGuideStep(guideStep + 1)) : btn('Done', () => setShowGuide(false))}
+        </div>
+      </div>}
+    </>}
     {!plan || plan.status === 'ended' ? <>
       {!plan && <p>Individual lesson billing. You can propose £80 every week, including school holidays.</p>}
-      {btn(showSetup ? 'Hide setup' : 'Set up weekly tuition', () => setShowSetup(!showSetup))}
+      {!showSetup && btn('Set up weekly tuition', () => setShowSetup(true))}
       {showSetup && <form onSubmit={propose}>
         <label style={field}>First weekly charge<input type="date" required min={TTWeekly.today()} value={start} disabled={readonly || busy} onChange={e => setStart(e.target.value)} /></label>
         <label style={field}>Reserved lesson time and format<input required minLength={3} maxLength={200} placeholder="For example, Wednesday 5pm, online, one hour" value={readonly ? '' : slot} disabled={readonly || busy} onChange={e => setSlot(e.target.value)} /></label>
         <label style={field}>Notice to end tuition, in calendar days<input type="number" required min="1" max="28" value={notice} disabled={readonly || busy} onChange={e => setNotice(e.target.value)} /></label>
         <p>The parent must accept the agreement before you activate charges. No existing lessons or rates are changed by a proposal.</p>
-        <button className="btn save" disabled={busy || readonly}>Create agreement</button>
+        <div className="btn-row">
+          <button type="button" className="btn cancel" onClick={() => setShowSetup(false)}>Cancel setup</button>
+          <button className="btn save" disabled={busy || readonly}>Create agreement</button>
+        </div>
       </form>}
     </> : null}
     {plan && <>
@@ -6492,7 +6528,7 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
       <p>{plan.acceptance ? (readonly ? 'Agreement accepted' : `Accepted by ${plan.acceptance.signer_name} on ${new Date(plan.acceptance.accepted_at).toLocaleString('en-GB')}`) : 'The parent has not accepted yet.'}</p>
       {plan.status === 'proposed' && <>
         {btn('Activate weekly charges', () => run(() => supabase.from('tutoring_weekly_plans').update({status:'active'}).eq('id',plan.id)), !plan.acceptance)}
-        {btn('Withdraw proposal', () => run(() => supabase.from('tutoring_weekly_plans').update({status:'ended',ends_before:plan.starts_on}).eq('id',plan.id)))}
+        {btn('Cancel this setup', () => run(() => supabase.from('tutoring_weekly_plans').update({status:'ended',ends_before:plan.starts_on}).eq('id',plan.id)))}
       </>}
       {plan.status !== 'proposed' && <>
         {btn(showLedger ? 'Hide weekly statement' : 'Weekly statement', () => setShowLedger(!showLedger))}
@@ -6501,10 +6537,11 @@ function WeeklyTuitionPanel({ student, lessons, payments, rateHistory, onChanged
           <label style={field}>Weekly charge to waive<select value={waiverDate} onChange={e => setWaiverDate(e.target.value)}><option value="">Choose a date</option>{dates.map(c => <option key={c.charge_date} value={c.charge_date}>{c.charge_date}{c.waived ? ' (already waived)' : ''}</option>)}</select></label>
           <label style={field}>Reason<input value={reason} maxLength={250} onChange={e => setReason(e.target.value)} /></label>
           {btn('Waive weekly charge', () => run(() => supabase.from('tutoring_weekly_waivers').insert({plan_id:plan.id,charge_date:waiverDate,owner_id:student.owner_id,reason:reason.trim()})), !waiverDate || reason.trim().length<3 || dates.find(c=>c.charge_date===waiverDate)?.waived)}
-          <p>Already paid? Agree a refund or credit with the parent. Only record a refund after you have actually returned the money.</p>
+          <p>If you waive a week the parent has already paid for, you can refund it or leave it as credit towards later weeks. Credit needs nothing recording. If you refund, send the money back first, then enter the amount below so their balance stays right.</p>
           <label style={field}>Refund returned (£)<input type="number" min="0.01" step="0.01" value={refund} onChange={e=>setRefund(e.target.value)} /></label>
           {btn('Record refund already returned',()=>run(()=>supabase.from('tutoring_payments').insert({student_id:student.id,owner_id:student.owner_id,amount:-Number(refund),date_paid:TTWeekly.today(),method:'bank_transfer'})),!(Number(refund)>0))}
           {!plan.ends_before && <><label style={field}>No new charges from<input type="date" min={TTWeekly.today()} value={end} onChange={e=>setEnd(e.target.value)} /></label>{btn('Record agreed end date',()=>run(()=>supabase.from('tutoring_weekly_plans').update({ends_before:end}).eq('id',plan.id)),!end)}</>}
+          {plan.status==='active' && !plan.ends_before && btn('Stop weekly tuition from today',()=>run(()=>supabase.from('tutoring_weekly_plans').update({ends_before:TTWeekly.today()}).eq('id',plan.id)))}
           {plan.status==='active' && plan.ends_before && plan.ends_before<=TTWeekly.today() && btn('Close ended arrangement',()=>run(()=>supabase.from('tutoring_weekly_plans').update({status:'ended'}).eq('id',plan.id)))}
           {plan.review_required && btn('Final fee reviewed',()=>run(()=>supabase.from('tutoring_weekly_plans').update({review_required:false}).eq('id',plan.id)))}
         </>}
@@ -6729,7 +6766,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
 
       <div id={`student-body-${student.id}`} className={`card-body${open ? ' open' : ''}`}>
       <div className="card-body-inner">
-          {danielOnly && student.owner_id === 'babb06b5-b5e0-4436-8b72-bc5556814956' && <WeeklyTuitionPanel student={student} lessons={studentLessons} payments={studentPayments} rateHistory={rateHistory} onChanged={onDataChanged} />}
           <div className="actions" aria-label="Student actions">
             {phone
               ? (balance > 0 && <a className="btn action-primary" href={paymentWaLink} target="_blank" rel="noopener"><AppIcon name="payment" /><span>Request payment</span></a>)
@@ -6931,6 +6967,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           onStatement={() => { setShowMoreTools(false); setShowStatement(true); }}
           onArchive={archiveStudent}
           onDelete={deleteStudent}
+          weeklyPanel={danielOnly && student.owner_id === 'babb06b5-b5e0-4436-8b72-bc5556814956' ? <WeeklyTuitionPanel student={student} lessons={studentLessons} payments={studentPayments} rateHistory={rateHistory} onChanged={onDataChanged} /> : null}
         />, document.body
       )}
 

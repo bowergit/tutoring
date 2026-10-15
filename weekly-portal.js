@@ -31,7 +31,7 @@
       <p class="weekly-message" id="weekly-action-message" role="status"></p>
     </section>
     <section class="weekly-card" id="weekly-agreement">
-      <h2>Your tuition agreement</h2>
+      ${a?`<details id="weekly-agreement-wrap" ${location.hash==='#weekly-agreement'?'open':''}><summary>Your tuition agreement · accepted ${esc(new Date(a.accepted_at).toLocaleDateString('en-GB',{timeZone:'Europe/London'}))}</summary>`:'<h2>Your tuition agreement</h2>'}
       <details ${!a || location.hash==='#weekly-agreement'?'open':''} id="weekly-terms-details"><summary>Read the full agreement</summary><pre class="weekly-terms">${esc(p.terms_text)}</pre></details>
       ${a?`<p><b>Accepted by ${esc(a.signer_name)}</b><br>${esc(new Date(a.accepted_at).toLocaleString('en-GB',{timeZone:'Europe/London'}))}, UK time<br>Terms version ${esc(a.terms_version)}${a.start_early?'<br>Early start expressly requested.':''}</p>`:p.status==='proposed'?`
       <form id="weekly-accept-form"><label>Your full name, as the parent or guardian responsible for payment<input type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name"></label>
@@ -40,6 +40,7 @@
       <button class="action-btn" type="submit">Accept weekly tuition agreement</button></form><p>This records your name, the time and the exact agreement accepted. Keep your parent link private, as anyone with it can access your account.</p>`:'<p>This proposal is no longer available to accept.</p>'}
       <p id="weekly-accept-message" class="weekly-message" role="status"></p><div class="actions">${button('weekly-print','Print or save agreement')}${button('weekly-download','Download agreement text')}</div>
       ${w.history?.length?`<details><summary>Previous agreements</summary>${w.history.map(h=>`<pre class="weekly-terms">${esc(h.terms_text)}</pre>${h.acceptance?`<p>Accepted by ${esc(h.acceptance.signer_name)} on ${esc(new Date(h.acceptance.accepted_at).toLocaleString('en-GB'))}</p>`:'<p>Not accepted.</p>'}`).join('')}</details>`:''}
+      ${a?'</details>':''}
     </section>`;
   };
   window.wireWeekly = function(w, endpoint) {
@@ -68,7 +69,7 @@
     document.getElementById('weekly-cooling')?.addEventListener('click',()=>{
       if(confirm('Cancel your agreement under the 14 day cooling off right? Daniel will review any proportionate charge for services already supplied and arrange any refund due.')) action({action:'cooling_off'},'weekly-action-message');
     });
-    document.getElementById('weekly-print')?.addEventListener('click',()=>{document.getElementById('weekly-terms-details').open=true;window.print()});
+    document.getElementById('weekly-print')?.addEventListener('click',()=>{document.getElementById('weekly-terms-details').open=true;const wrap=document.getElementById('weekly-agreement-wrap');if(wrap)wrap.open=true;window.print()});
     document.getElementById('weekly-download')?.addEventListener('click',()=>{
       const a=w.acceptance;const text=p.terms_text+(a?`\n\nAccepted by: ${a.signer_name}\nAccepted at: ${a.accepted_at}\nEarly start requested: ${a.start_early?'Yes':'No'}`:'\n\nNot yet accepted.');
       const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));const link=document.createElement('a');link.href=url;link.download='Bower-Maths-weekly-agreement.txt';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
