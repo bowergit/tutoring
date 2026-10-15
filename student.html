@@ -89,6 +89,14 @@
     text-decoration: none; font-family: inherit; box-shadow: var(--sh-2);
   }
 
+  .settle-actions { margin: 10px 0 0; }
+  .settle-btn {
+    background: var(--accent-fill); color: var(--on-accent); border-color: transparent;
+    font-weight: 700; box-shadow: var(--sh-2); transition: transform .18s var(--ease), box-shadow .18s var(--ease);
+  }
+  .settle-btn:hover { transform: translateY(-1px); box-shadow: var(--sh-3); }
+  .settle-btn:focus-visible { outline: none; box-shadow: var(--ring), var(--sh-2); }
+
   /* ── Progress ── */
   .prog { padding: 16px 15px 12px; }
   .prog-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 14px; }
@@ -501,19 +509,19 @@
 
   // Money in one line. Nothing owing is the normal state and should look like
   // good news rather than an absence, so it gets the same weight as a balance.
-  function renderAccount(a) {
+  function renderAccount(a, canSettleUp, studentName) {
     if (!a) return '';
 
     let cls, mark, fig, head, sub;
     if (a.owed > 0) {
       cls = 'owing'; mark = '•'; fig = money(a.owed);
       head = 'Outstanding';
-      sub = `${a.unpaid_lessons} lesson${a.unpaid_lessons === 1 ? '' : 's'} not yet paid for.`;
+      sub = \`${a.unpaid_lessons} lesson${a.unpaid_lessons === 1 ? '' : 's'} not yet paid for.\`;
     } else if (a.credit > 0) {
       cls = 'credit'; mark = '✓'; fig = money(a.credit);
       head = 'In credit';
       sub = a.credit_covers > 0
-        ? `Paid ahead. That covers the next ${a.credit_covers} lesson${a.credit_covers === 1 ? '' : 's'}, and comes down as each one happens.`
+        ? \`Paid ahead. That covers the next ${a.credit_covers} lesson${a.credit_covers === 1 ? '' : 's'}, and comes down as each one happens.\`
         : 'Paid ahead. This comes down as lessons happen.';
     } else {
       cls = 'settled'; mark = '✓'; fig = '£0';
@@ -521,7 +529,24 @@
       sub = 'Nothing outstanding. Anything paid ahead shows here and comes down as lessons happen.';
     }
 
-    return `
+    const amount = Number(a.owed || 0);
+    let settleUp = '';
+    if (canSettleUp && amount > 0.005) {
+      const firstName = String(studentName || '').trim().split(/\s+/)[0] || 'student';
+      const paymentUrl = new URL(\`https://monzo.me/danielbower1/${amount.toFixed(2)}\`);
+      paymentUrl.searchParams.set('h', 'h1cHMY');
+      paymentUrl.searchParams.set('d', \`Maths lesson ${firstName}\`);
+      paymentUrl.searchParams.set('account_type', 'personal');
+      settleUp = \`
+        <div class="actions settle-actions">
+          <a class="action-btn settle-btn" href="${esc(paymentUrl.toString())}" target="_blank" rel="noopener">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M7 17 17 7M8 7h9v9"/></svg>
+            Settle up · ${esc(money(amount))}
+          </a>
+        </div>\`;
+    }
+
+    return \`
       <div class="section-label">Account</div>
       <div class="card acct ${cls}">
         <div class="acct-mark">${mark}</div>
@@ -530,9 +555,9 @@
           <b>${head}</b>
           <span>${esc(sub)}</span>
         </div>
-      </div>`;
+      </div>
+      ${settleUp}\`;
   }
-
   function renderGrade(g) {
     if (!g || !g.boundaries.length) return '';
 
@@ -833,7 +858,7 @@
     <div class="sub">${pupilView
       ? (data.progress ? 'Your lessons and how your papers are going' : 'Your lessons')
       : 'Progress, lessons and payment status'}</div>
-    ${pupilView ? '' : renderAccount(data.account)}
+    ${pupilView ? '' : renderAccount(data.account, data.can_settle_up, data.name)}
     ${renderProgress(data.progress)}
     ${renderGrade(data.grade)}
     ${pupilView || !actions ? '' : `<div class="actions" style="margin-top:18px">${actions}</div>`}
