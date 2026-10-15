@@ -20,26 +20,26 @@
       @media print{body *{visibility:hidden}#weekly-agreement,#weekly-agreement *{visibility:visible}#weekly-agreement{position:absolute;left:0;top:0;width:95%;border:0;background:white;color:black}#weekly-agreement button,#weekly-agreement form{display:none}.weekly-terms{font-size:11pt} }
     </style>
     <section class="weekly-card" aria-label="Weekly tuition arrangement">
-      ${mini?`<details id="weekly-card-wrap" ${p.review_required?'open':''}><summary><b>£80 every week, including school holidays</b> · ${p.ends_before?'ending':'active'}</summary>`:'<h2>£80 every week, including school holidays</h2>'}
-      <p>${esc(p.lesson_slot)}<br>First weekly charge: ${esc(day(p.starts_on))}.</p>
-      <p>${p.status==='proposed'?'Your agreement is awaiting activation by Daniel. Weekly charges have not started.':p.ends_before?`No new weekly charges from ${esc(day(p.ends_before))}.`:'Your weekly place is active. The fee continues when your child cannot attend.'}</p>
+      ${mini?`<details id="weekly-card-wrap" ${p.review_required?'open':''}><summary><b>£80 a week</b> · ${p.ends_before?'ending':'active'}</summary>`:'<h2>£80 a week</h2>'}
+      <p>${esc(p.lesson_slot)}<br>First payment: ${esc(day(p.starts_on))}.</p>
+      <p>${p.status==='proposed'?'Waiting for Daniel to start it. Nothing has been charged yet.':p.ends_before?`Weekly tuition ends. No charges from ${esc(day(p.ends_before))}.`:'Your weekly slot is booked. It is paid every week, even holidays.'}</p>
       ${p.review_required?'<p role="alert">Your cooling off cancellation has been recorded. Daniel will review any proportionate final charge and arrange a refund or credit where due. The balance below is awaiting that review.</p>':''}
-      <p>If Daniel cancels and no replacement is agreed, that week is not charged. Tell Daniel if a waiver is missing.</p>
-      ${w.entries.length?`<details><summary>Weekly charges and payment coverage</summary><p>Payments cover the oldest charges first. Future charges are scheduled and are not included in the current balance.</p><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Charge</th><th>Amount</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></details>`:''}
+      <p>If Daniel cancels and you cannot rearrange, that week is free.</p>
+      ${w.entries.length?`<details><summary>Weekly charges</summary><div style="overflow-x:auto"><table><thead><tr><th>Date</th><th>Charge</th><th>Amount</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></details>`:''}
       <details style="margin-top:18px"><summary>Payments received</summary>${w.payments.length?w.payments.map(r=>`<p>${esc(day(r.date_paid))}: ${esc(money(r.amount))}</p>`).join(''):'<p>No payments recorded yet.</p>'}</details>
-      <p>You can set up a weekly bank standing order using the details Daniel supplies. Accepting this agreement does not set up an automatic payment.</p>
-      ${a && p.status!=='ended' && !p.end_requested_at && !p.ends_before?`<div class="actions">${button('weekly-end',`Give ${p.notice_days} days' notice to end tuition`)}${cooling?button('weekly-cooling','Cancel within the 14 day cooling off period'):''}</div>`:''}
+      <p>Pay by bank transfer or standing order. Nothing is taken automatically.</p>
+      ${a && p.status!=='ended' && !p.end_requested_at && !p.ends_before?`<div class="actions">${button('weekly-end',`Stop weekly tuition (${p.notice_days} days' notice)`)}${cooling?button('weekly-cooling','Cancel within 14 days of agreeing'):''}</div>`:''}
       <p class="weekly-message" id="weekly-action-message" role="status"></p>
       ${mini?'</details>':''}
     </section>
     <section class="weekly-card" id="weekly-agreement">
       ${a?`<details id="weekly-agreement-wrap" ${location.hash==='#weekly-agreement'?'open':''}><summary>Your tuition agreement · accepted ${esc(new Date(a.accepted_at).toLocaleDateString('en-GB',{timeZone:'Europe/London'}))}</summary>`:'<h2>Your tuition agreement</h2>'}
-      <details ${!a || location.hash==='#weekly-agreement'?'open':''} id="weekly-terms-details"><summary>Read the full agreement</summary><pre class="weekly-terms">${esc(p.terms_text)}</pre></details>
+      <details ${!a || location.hash==='#weekly-agreement'?'open':''} id="weekly-terms-details"><summary>Read the agreement</summary><pre class="weekly-terms">${esc(p.terms_text)}</pre></details>
       ${a?`<p><b>Accepted by ${esc(a.signer_name)}</b><br>${esc(new Date(a.accepted_at).toLocaleString('en-GB',{timeZone:'Europe/London'}))}, UK time<br>Terms version ${esc(a.terms_version)}${a.start_early?'<br>Early start expressly requested.':''}</p>`:p.status==='proposed'?`
-      <form id="weekly-accept-form"><label>Your full name, as the parent or guardian responsible for payment<input type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name"></label>
-      <label><input type="checkbox" name="agree" required>I have read and accept this agreement, including £80 every week during school holidays and when my child cannot attend.</label>
+      <form id="weekly-accept-form"><label>Your full name<input type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name"></label>
+      <label><input type="checkbox" name="agree" required>I agree to the terms above: £80 a week, including holidays and missed lessons.</label>
       <label><input type="checkbox" name="start_early">If tuition starts within 14 days of my acceptance, I expressly request that early start. I understand I may need to pay a proportionate amount for services supplied if I cancel during the cooling off period.</label>
-      <button class="action-btn" type="submit">Accept weekly tuition agreement</button></form><p>This records your name, the time and the exact agreement accepted. Keep your parent link private, as anyone with it can access your account.</p>`:'<p>This proposal is no longer available to accept.</p>'}
+      <button class="action-btn" type="submit">Accept weekly tuition agreement</button></form><p>Keep this page link private.</p>`:'<p>This proposal is no longer available to accept.</p>'}
       <p id="weekly-accept-message" class="weekly-message" role="status"></p><div class="actions">${button('weekly-print','Print or save agreement')}${button('weekly-download','Download agreement text')}</div>
       ${w.history?.length?`<details><summary>Previous agreements</summary>${w.history.map(h=>`<pre class="weekly-terms">${esc(h.terms_text)}</pre>${h.acceptance?`<p>Accepted by ${esc(h.acceptance.signer_name)} on ${esc(new Date(h.acceptance.accepted_at).toLocaleString('en-GB'))}</p>`:'<p>Not accepted.</p>'}`).join('')}</details>`:''}
       ${a?'</details>':''}
@@ -66,7 +66,7 @@
       action({action:'accept',terms_version:p.terms_version,signer_name:f.get('signer_name'),agree:f.has('agree'),start_early:f.has('start_early')},'weekly-accept-message');
     });
     document.getElementById('weekly-end')?.addEventListener('click',()=>{
-      if(confirm(`Give ${p.notice_days} calendar days' notice to end weekly tuition? Charges before the end date remain payable. Daniel will see the notice in TutorTally.`)) action({action:'end'},'weekly-action-message');
+      if(confirm(`Stop weekly tuition? You give ${p.notice_days} days' notice and pay up to the end date.`)) action({action:'end'},'weekly-action-message');
     });
     document.getElementById('weekly-cooling')?.addEventListener('click',()=>{
       if(confirm('Cancel your agreement under the 14 day cooling off right? Daniel will review any proportionate charge for services already supplied and arrange any refund due.')) action({action:'cooling_off'},'weekly-action-message');
