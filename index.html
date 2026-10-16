@@ -969,7 +969,7 @@
   }
 
 </style>
-<link rel="stylesheet" href="ux.css?v=6.30.2">
+<link rel="stylesheet" href="ux.css?v=6.31.0">
 </head>
 <body>
 <div id="root"></div>
@@ -6505,7 +6505,7 @@ function CopyAction({ value, label, icon = 'link', walkthrough, extraClass = '' 
 const WEEKLY_GUIDE = [
   { title: 'What it is', body: 'A fixed price a week for one lesson a week, charged every week, holidays included. If they miss a lesson, they miss it and you keep the slot. It is switched on per student and never changes anyone by itself.' },
   { title: 'Set up', body: 'Pick the price (£80 by default), the day and time, and the first payment date. Creating the agreement does not charge anything.' },
-  { title: 'Send it', body: 'Copy the parent link and send it. The agreement is at the top of their page. They type their name and tick one box.' },
+  { title: 'Send it', body: 'WhatsApp them the rules, or copy the parent link. The agreement is at the top of their page. They type their name and tick one box.' },
   { title: 'It starts itself', body: 'The moment they accept, it switches on by itself and a charge appears every week. Lessons inside the plan stop counting separately, so leave your normal rate alone in Settings.' },
   { title: 'Each week', body: 'Payments cover the oldest charge first. If you cancel one, use Waive a week and it is free. If a parent skips one, do nothing.' },
   { title: 'Stopping', body: 'Parents just message you. When it is over, Stop weekly tuition ends the charges from today.' },
@@ -6562,6 +6562,19 @@ function WeeklyTuitionSheet({ student, lessons, payments, rateHistory, onChanged
       weekly_fee: Number(fee), lesson_slot: slot, notice_days: 7, terms_text: '',
     }), () => go('main'));
   };
+  // WhatsApp explainer: the rules in plain words, what they need to do, and their link.
+  const childName = student.name.split(' ')[0];
+  const parentFirst = (student.parent_name || '').split(' ')[0];
+  const waPhone = normaliseUKPhone(student.parent_phone);
+  const waText = plan ? `${parentFirst ? `Hi ${parentFirst}!` : 'Hi!'} I'd like to move ${childName}'s lessons to a weekly slot: ${plan.lesson_slot}, ${moneyText(plan.weekly_fee)} a week, starting ${niceDate(plan.starts_on)}.
+
+How it works: it's paid every week, including school holidays. If ${childName} can't make a lesson we miss that week, and I keep the slot free. If I ever have to cancel, we'll rearrange. You can pay by bank transfer or cash (receipt provided).
+
+What I need from you: open ${childName}'s page here, read the agreement at the top, type your name and tick the box. That's it, it starts as soon as you do.
+${agreementUrl.toString()}
+
+Thanks!` : '';
+  const waLink = waPhone && plan ? `https://wa.me/${waPhone}?text=${encodeURIComponent(waText)}` : null;
   const status = !plan ? null : plan.status === 'proposed' ? (plan.acceptance ? 'Ready to switch on' : 'Waiting for parent') : 'Active';
   const helpRow = <div className="tools-menu"><ToolsSection title="Help"><ToolsRow title="How it works" subtitle="A short walkthrough" onClick={() => { setGuideStep(0); go('guide'); }} end="›" /></ToolsSection></div>;
 
@@ -6645,13 +6658,16 @@ function WeeklyTuitionSheet({ student, lessons, payments, rateHistory, onChanged
                 <p className="wk-sub">{plan.acceptance ? `Accepted by ${plan.acceptance.signer_name}, ${new Date(plan.acceptance.accepted_at).toLocaleDateString('en-GB')}` : 'Not accepted yet.'}</p>
               </div>
               {plan.status === 'proposed' ? <>
-                <div className="btn-row" style={{marginTop:0}}>
+                {!plan.acceptance && (waLink
+                  ? <div className="btn-row" style={{marginTop:0}}><a className="btn whatsapp" href={waLink} target="_blank" rel="noopener" style={{display:'inline-flex',alignItems:'center',justifyContent:'center',gap:8}}><AppIcon name="chat" /><span>WhatsApp them the rules</span></a></div>
+                  : <div className="btn-row" style={{marginTop:0}}><button type="button" className="btn needs-setup" onClick={() => setError("Add the parent's mobile number on their profile first.")}><AppIcon name="chat" /><span>WhatsApp them the rules</span></button></div>)}
+                <div className="btn-row" style={{marginTop:plan.acceptance ? 0 : 8}}>
                   <button type="button" className="btn cancel" disabled={busy} onClick={() => run(() => supabase.from('tutoring_weekly_plans').update({ status: 'ended', ends_before: plan.starts_on }).eq('id', plan.id))}>Cancel setup</button>
                   {plan.acceptance
                     ? <button type="button" className="btn save" disabled={busy} onClick={() => run(() => supabase.from('tutoring_weekly_plans').update({ status: 'active' }).eq('id', plan.id))}>Switch on</button>
                     : <CopyAction value={agreementUrl.toString()} label="Copy parent link" extraClass="save" />}
                 </div>
-                {!plan.acceptance && <p className="wk-note" style={{marginTop:12}}>Send them their parent link. The agreement is at the top. When they accept, it switches on by itself.</p>}
+                {!plan.acceptance && <p className="wk-note" style={{marginTop:12}}>WhatsApp sends the rules and their link in one go. When they accept, it switches on by itself.</p>}
               </> : <div className="tools-menu" style={{marginTop:0}}>
                 <ToolsSection title="This plan">
                   <ToolsRow title="Weekly statement" subtitle="Charges and what has been paid" onClick={() => go('statement')} end="›" />
@@ -8180,7 +8196,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.30.2</div>}
+        {!loading && <div className="version-tag">v6.31.0</div>}
       </div>
 
       {showAddModal && (
