@@ -438,8 +438,11 @@ Deno.serve(async (req) => {
     if(planErr || !plan) return json({ok:false,problem:'agreement_not_found'},404)
     if(body.action==='accept') {
       if(plan.status!=='proposed' || body.terms_version!==plan.terms_version || body.agree!==true || typeof body.signer_name!=='string' || body.signer_name.trim().length<2 || body.signer_name.trim().length>150) return json({ok:false,problem:'Please read and accept the current agreement.'},400)
-      const {error}=await supabase.from('tutoring_weekly_acceptances').insert({plan_id:plan.id,owner_id:student.owner_id,signer_name:body.signer_name.trim(),terms_version:plan.terms_version,terms_text:plan.terms_text,start_early:body.start_early===true})
-      if(error) return json({ok:false,problem:error.code==='23505'?'This agreement has already been accepted. Refresh to see the record.':'Could not accept the agreement. Check the early start request or ask Daniel for help.'},400)
+      // The signing trail: where and on what the agreement was accepted.
+      const signerIp=(req.headers.get('cf-connecting-ip')||req.headers.get('x-forwarded-for')||'').split(',')[0].trim().slice(0,64)||null
+      const signerAgent=(req.headers.get('user-agent')||'').slice(0,300)||null
+      const {error}=await supabase.from('tutoring_weekly_acceptances').insert({plan_id:plan.id,owner_id:student.owner_id,signer_name:body.signer_name.trim(),terms_version:plan.terms_version,terms_text:plan.terms_text,start_early:body.start_early===true,signer_ip:signerIp,signer_user_agent:signerAgent})
+      if(error) return json({ok:false,problem:error.code==='23505'?'This agreement has already been accepted. Refresh to see the record.':(error.message||'Could not accept the agreement. Ask Daniel for help.')},400)
       return json({ok:true})
     }
     if(body.action==='end' || body.action==='cooling_off') {
@@ -521,7 +524,7 @@ Deno.serve(async (req) => {
     if(results.some(r=>r.error)) return json({ok:false,problem:'Could not load the weekly account. Please try again.'},503)
     weeklyPlans=results[0].data || []; weeklyCharges=results[1].data || []
     if(weeklyPlans.length) {
-      const {data,error}=await supabase.from('tutoring_weekly_acceptances').select('plan_id,signer_name,accepted_at,start_early,terms_version,terms_text').in('plan_id',weeklyPlans.map(p=>p.id))
+      const {data,error}=await supabase.from('tutoring_weekly_acceptances').select('plan_id,signer_name,accepted_at,signer_ip,start_early,terms_version,terms_text').in('plan_id',weeklyPlans.map(p=>p.id))
       if(error) return json({ok:false,problem:'Could not load your agreement.'},503)
       weeklyAcceptances=data || []
     }

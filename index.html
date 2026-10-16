@@ -969,7 +969,7 @@
   }
 
 </style>
-<link rel="stylesheet" href="ux.css?v=6.31.1">
+<link rel="stylesheet" href="ux.css?v=6.32.0">
 </head>
 <body>
 <div id="root"></div>
@@ -6655,7 +6655,7 @@ Thanks!` : '';
               <div className="wk-sum">
                 <div className="wk-sum-head"><span className="wk-price">{moneyText(plan.weekly_fee)} a week</span><span className={`pill ${plan.status === 'active' ? 'ok' : 'neutral'}`}>{status}</span></div>
                 <p className="wk-sub">{plan.lesson_slot}<br />First payment {niceDate(plan.starts_on)}</p>
-                <p className="wk-sub">{plan.acceptance ? `Accepted by ${plan.acceptance.signer_name}, ${new Date(plan.acceptance.accepted_at).toLocaleDateString('en-GB')}` : 'Not accepted yet.'}</p>
+                <p className="wk-sub">{plan.acceptance ? `Signed by ${plan.acceptance.signer_name}, ${new Date(plan.acceptance.accepted_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}${plan.acceptance.signer_ip ? ` · IP ${plan.acceptance.signer_ip}` : ''}` : 'Not accepted yet.'}</p>
               </div>
               {plan.status === 'proposed' ? <>
                 {!plan.acceptance && (waLink
@@ -7851,7 +7851,7 @@ function App() {
         const results = await Promise.all([
           supabase.from('tutoring_weekly_plans').select('*').eq('owner_id', session.user.id).order('created_at'),
           supabase.from('tutoring_weekly_charges').select('*').eq('owner_id', session.user.id),
-          supabase.from('tutoring_weekly_acceptances').select('plan_id,signer_name,accepted_at').eq('owner_id', session.user.id)
+          supabase.from('tutoring_weekly_acceptances').select('plan_id,signer_name,accepted_at,signer_ip').eq('owner_id', session.user.id)
         ]);
         const failure = results.find(r => r.error); if (failure) throw failure.error;
         weeklyPlans = (results[0].data || []).map(p => ({...p, acceptance:(results[2].data || []).find(a => a.plan_id === p.id) || null}));
@@ -8196,7 +8196,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.31.1</div>}
+        {!loading && <div className="version-tag">v6.32.0</div>}
       </div>
 
       {showAddModal && (

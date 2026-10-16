@@ -5,6 +5,10 @@
   const day = d => new Date(d+'T12:00:00Z').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
 
   // One card, styled with the same tokens as the rest of the parent page.
+  // A signed-document look: the name in a signature hand, with when, where from and a reference.
+  const ukTime = t => new Date(t).toLocaleString('en-GB',{timeZone:'Europe/London',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const sigBlock = a => `<div class="wk-sig"><div class="wk-sig-label">Signed electronically</div><div class="wk-sig-name">${esc(a.signer_name)}</div>
+      <div class="wk-sig-meta">${esc(ukTime(a.accepted_at))} UK time${a.signer_ip?`<br>IP address ${esc(a.signer_ip)}`:''}<br>Reference ${esc(String(a.plan_id||'').slice(0,8).toUpperCase())}</div></div>`;
   window.renderWeekly = function (w) {
     if(!w) return '';
     const p=w.plan, a=w.acceptance;
@@ -16,7 +20,7 @@
       ${p.status==='ended'&&p.ends_before?`<p class="wk-line">Weekly tuition has ended. No charges from ${esc(day(p.ends_before))}.</p>`:''}
       ${w.entries.length?`<details class="wk-more"><summary>Charges</summary><div class="wk-body" style="overflow-x:auto"><table class="wk-table"><thead><tr><th>Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></details>`:''}
       <details class="wk-more"><summary>Payments received</summary><div class="wk-body">${w.payments.length?w.payments.map(r=>`<p class="wk-line">${esc(day(r.date_paid))}: ${esc(money(r.amount))}</p>`).join(''):'<p class="wk-line">No payments yet.</p>'}</div></details>
-      <details class="wk-more"><summary>The agreement</summary><div class="wk-body"><pre class="wk-terms">${esc(p.terms_text)}</pre>${a?`<p class="wk-line">Agreed by ${esc(a.signer_name)} on ${esc(new Date(a.accepted_at).toLocaleDateString('en-GB',{timeZone:'Europe/London'}))}.</p>`:''}</div></details>`;
+      <details class="wk-more"><summary>The agreement</summary><div class="wk-body"><pre class="wk-terms">${esc(p.terms_text)}</pre>${a?sigBlock(a):''}</div></details>`;
     const style=`<style>
       .wk-card{padding:0;margin:18px 0}
       .wk-card summary{list-style:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -43,6 +47,11 @@
       .wk-check{display:flex;align-items:center;gap:10px;margin:14px 0;font-size:.88rem;line-height:1.45;color:var(--ink);text-transform:none;letter-spacing:0;font-weight:500}
       .wk-check input{width:20px;height:20px;flex:none;accent-color:var(--accent)}
       .wk-msg{color:var(--warn);font-size:.84rem;margin:10px 0 0}
+      .wk-sig{margin:14px 0 4px;padding:14px 16px;border:1px dashed var(--line);border-radius:var(--r-md);background:var(--card-2)}
+      .wk-sig-label{font-size:.66rem;text-transform:uppercase;letter-spacing:.09em;font-weight:700;color:var(--muted)}
+      .wk-sig-name{font-family:'Snell Roundhand','Segoe Script','Brush Script MT','Lucida Handwriting',cursive;font-size:1.7rem;line-height:1.25;color:var(--ink);margin:4px 0 6px;overflow-wrap:anywhere}
+      .wk-sig-meta{font-size:.76rem;line-height:1.55;color:var(--ink-dim);font-variant-numeric:tabular-nums}
+      .wk-sig-live{min-height:2.2rem;margin:2px 0 0}
       @media (prefers-reduced-motion:reduce){.wk-card *{animation:none!important;transition:none!important}}
     </style>`;
     if(a) return `${style}<section class="card wk-card" aria-label="Weekly tuition">
@@ -51,9 +60,10 @@
     if(p.status==='proposed') return `${style}<section class="card wk-card" id="weekly-agreement" aria-label="Weekly tuition">
       <div class="wk-inner" style="padding-top:16px">
       <pre class="wk-terms">${esc(p.terms_text)}</pre>
-      <form class="wk-form" id="weekly-accept-form"><label for="wk-name">Your full name</label><input id="wk-name" type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name">
+      <form class="wk-form" id="weekly-accept-form"><label for="wk-name">Type your full name to sign</label><input id="wk-name" type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name">
+      <div class="wk-sig-name wk-sig-live" id="wk-sig-live" aria-hidden="true"></div>
       <label class="wk-check"><input type="checkbox" name="agree" required><span>I agree to this, ${price} a week.</span></label>
-      <button class="action-btn settle-btn" type="submit" style="width:100%">Agree</button></form>
+      <button class="action-btn settle-btn" type="submit" style="width:100%">Sign and agree</button></form>
       <p class="wk-msg" id="weekly-accept-message" role="status"></p></div></section>`;
     return '';
   };
@@ -62,6 +72,8 @@
     if(!w) return;
     const p=w.plan;
     let busy=false;
+    const nameBox=document.getElementById('wk-name'), live=document.getElementById('wk-sig-live');
+    nameBox?.addEventListener('input',()=>{ if(live) live.textContent=nameBox.value; });
     document.getElementById('weekly-accept-form')?.addEventListener('submit',async e=>{
       e.preventDefault(); if(busy) return; busy=true;
       const f=new FormData(e.currentTarget), message=document.getElementById('weekly-accept-message');
