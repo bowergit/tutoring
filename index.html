@@ -969,7 +969,7 @@
   }
 
 </style>
-<link rel="stylesheet" href="ux.css?v=6.32.0">
+<link rel="stylesheet" href="ux.css?v=6.32.1">
 </head>
 <body>
 <div id="root"></div>
@@ -6533,11 +6533,26 @@ function WeeklyTuitionSheet({ student, lessons, payments, rateHistory, onChanged
   const [confirmingStop, setConfirmingStop] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  // Their upcoming calendar lessons usually repeat, so the most common weekday and time
+  // among them is the likeliest weekly slot, and its next date the likeliest first payment.
+  const suggestion = React.useMemo(() => {
+    const today = TTWeekly.today();
+    const up = lessons.filter(l => l.student_id === student.id && l.status === 'scheduled' && l.lesson_date >= today && l.start_time)
+      .sort((a, b) => (a.lesson_date + a.start_time).localeCompare(b.lesson_date + b.start_time));
+    if (!up.length) return null;
+    const counts = new Map();
+    up.forEach(l => { const k = `${weekdayOf(l.lesson_date)}|${l.start_time.slice(0, 5)}`; counts.set(k, (counts.get(k) || 0) + 1); });
+    let best = null;
+    for (const [k, n] of counts) if (!best || n > best.n) best = { k, n };
+    const [d, t] = best.k.split('|');
+    const first = up.find(l => `${weekdayOf(l.lesson_date)}|${l.start_time.slice(0, 5)}` === best.k);
+    return { day: Number(d), time: t, start: first.lesson_date, count: best.n };
+  }, [lessons, student.id]);
   const [fee, setFee] = useState('80');
-  const [day, setDay] = useState(weekdayOf(TTWeekly.today()));
-  const [time, setTime] = useState('17:00');
-  const [format, setFormat] = useState('Online');
-  const [start, setStart] = useState(TTWeekly.today());
+  const [day, setDay] = useState(suggestion ? suggestion.day : weekdayOf(TTWeekly.today()));
+  const [time, setTime] = useState(suggestion ? suggestion.time : '17:00');
+  const [format, setFormat] = useState(student.is_zoom ? 'Online' : 'In person');
+  const [start, setStart] = useState(suggestion ? suggestion.start : TTWeekly.today());
   const [waiverDate, setWaiverDate] = useState('');
   const slot = `${DAYS[day]} ${niceTime(time)}, ${format.toLowerCase()}, one hour`;
 
@@ -6599,6 +6614,7 @@ Thanks!` : '';
 
           {view === 'setup' && <form onSubmit={propose}>
             <p className="wk-note">The parent accepts first, then it switches on by itself. Nothing is charged until then.</p>
+            {suggestion && <p className="wk-note" style={{marginTop:-6}}>Filled in from their calendar: {DAYS[suggestion.day]}s at {niceTime(suggestion.time)}. Change anything that is wrong.</p>}
             <div className="wk-row">
               <div className="field"><label>Price a week</label>
                 <div className="money-input"><span>£</span><input type="number" required min="1" max="500" step="0.5" value={fee} onChange={e => setFee(e.target.value)} /></div></div>
@@ -8196,7 +8212,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.32.0</div>}
+        {!loading && <div className="version-tag">v6.32.1</div>}
       </div>
 
       {showAddModal && (
