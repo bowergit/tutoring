@@ -969,7 +969,7 @@
   }
 
 </style>
-<link rel="stylesheet" href="ux.css?v=6.30.0">
+<link rel="stylesheet" href="ux.css?v=6.30.1">
 </head>
 <body>
 <div id="root"></div>
@@ -6505,7 +6505,7 @@ function CopyAction({ value, label, icon = 'link', walkthrough, extraClass = '' 
 const WEEKLY_GUIDE = [
   { title: 'What it is', body: 'A fixed price a week for one lesson a week, charged every week, holidays included. If they miss a lesson, they miss it and you keep the slot. It is switched on per student and never changes anyone by itself.' },
   { title: 'Set up', body: 'Pick the price (£80 by default), the day and time, and the first payment date. Creating the agreement does not charge anything.' },
-  { title: 'Send it', body: 'Copy the agreement link and send it to the parent. They type their name and tick one box.' },
+  { title: 'Send it', body: 'Copy the parent link and send it. The agreement is at the top of their page. They type their name and tick one box.' },
   { title: 'It starts itself', body: 'The moment they accept, it switches on by itself and a charge appears every week. Lessons inside the plan stop counting separately, so leave your normal rate alone in Settings.' },
   { title: 'Each week', body: 'Payments cover the oldest charge first. If you cancel one, use Waive a week and it is free. If a parent skips one, do nothing.' },
   { title: 'Stopping', body: 'Parents just message you. When it is over, Stop weekly tuition ends the charges from today.' },
@@ -6649,9 +6649,9 @@ function WeeklyTuitionSheet({ student, lessons, payments, rateHistory, onChanged
                   <button type="button" className="btn cancel" disabled={busy} onClick={() => run(() => supabase.from('tutoring_weekly_plans').update({ status: 'ended', ends_before: plan.starts_on }).eq('id', plan.id))}>Cancel setup</button>
                   {plan.acceptance
                     ? <button type="button" className="btn save" disabled={busy} onClick={() => run(() => supabase.from('tutoring_weekly_plans').update({ status: 'active' }).eq('id', plan.id))}>Switch on</button>
-                    : <CopyAction value={agreementUrl.toString()} label="Copy agreement link" extraClass="save" />}
+                    : <CopyAction value={agreementUrl.toString()} label="Copy parent link" extraClass="save" />}
                 </div>
-                {!plan.acceptance && <p className="wk-note" style={{marginTop:12}}>Send them the link. When they accept, it switches on by itself.</p>}
+                {!plan.acceptance && <p className="wk-note" style={{marginTop:12}}>Send them their parent link. The agreement is at the top. When they accept, it switches on by itself.</p>}
               </> : <div className="tools-menu" style={{marginTop:0}}>
                 <ToolsSection title="This plan">
                   <ToolsRow title="Weekly statement" subtitle="Charges and what has been paid" onClick={() => go('statement')} end="›" />
@@ -8180,7 +8180,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.30.0</div>}
+        {!loading && <div className="version-tag">v6.30.1</div>}
       </div>
 
       {showAddModal && (
