@@ -49,8 +49,7 @@
       <details class="wk-main" id="weekly-card-wrap"><summary><span>${price} a week<small>${state}</small></span><span class="wk-chev" aria-hidden="true">›</span></summary>
       <div class="wk-inner">${details}</div></details></section>`;
     if(p.status==='proposed') return `${style}<section class="card wk-card" id="weekly-agreement" aria-label="Weekly tuition">
-      <div class="wk-head"><h2>${price} a week</h2></div>
-      <div class="wk-inner"><p class="wk-line">${esc(p.lesson_slot)}<br>First payment: ${esc(day(p.starts_on))}</p>
+      <div class="wk-inner" style="padding-top:16px">
       <pre class="wk-terms">${esc(p.terms_text)}</pre>
       <form class="wk-form" id="weekly-accept-form"><label for="wk-name">Your full name</label><input id="wk-name" type="text" name="signer_name" required minlength="2" maxlength="150" autocomplete="name">
       <label class="wk-check"><input type="checkbox" name="agree" required><span>I agree to this, ${price} a week.</span></label>
