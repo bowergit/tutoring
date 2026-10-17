@@ -968,8 +968,63 @@
     .actions .btn { padding:11px 8px; }
   }
 
+
+  /* ── Branded select (desktop) ── */
+  .sort-wrap .bsel-native, .bsel-btn {
+    font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    border-radius: var(--r-md); border: 1px solid var(--line); background: var(--card);
+    color: var(--ink); box-shadow: var(--sh-1); min-height: 46px;
+  }
+  .sort-wrap .bsel-native { padding: 9px 10px; max-width: 160px; }
+  .bsel { position: relative; }
+  .bsel-btn {
+    display: inline-flex; align-items: center; justify-content: space-between; gap: 14px;
+    min-width: 138px; padding: 9px 14px; text-align: left;
+    transition: border-color .18s var(--ease), box-shadow .18s var(--ease), transform .12s ease;
+  }
+  .bsel-btn:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .bsel-btn:active { transform: scale(.97); }
+  .bsel-btn:focus-visible, .bsel.open .bsel-btn { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+  .bsel-chev { color: var(--muted); font-size: 1rem; line-height: 1; transform: rotate(90deg); transition: transform .25s cubic-bezier(0.4,0,0.2,1); }
+  .bsel.open .bsel-chev { transform: rotate(-90deg); color: var(--accent); }
+  .bsel-menu {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 60; min-width: 100%;
+    margin: 0; padding: 6px; list-style: none;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
+    box-shadow: var(--sh-3); transform-origin: top right;
+    animation: bselIn .18s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes bselIn { from { opacity: 0; transform: translateY(-6px) scale(.97); } to { opacity: 1; transform: none; } }
+  .bsel-opt {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 9px 11px; border-radius: 9px; font-size: 0.86rem; font-weight: 550; color: var(--ink);
+    cursor: pointer; white-space: nowrap; transition: background .12s var(--ease);
+  }
+  .bsel-opt.hi { background: var(--card-2); }
+  .bsel-opt.sel { color: var(--accent); font-weight: 700; }
+  .bsel-opt .app-icon { width: 15px; height: 15px; color: var(--accent); }
+
+  /* ── Header: a rounded floating bar on wider screens, like everything below it ── */
+  @media (min-width: 600px) {
+    .app-header {
+      top: 12px; margin: 12px 22px 0; border: 1px solid var(--line);
+      border-radius: var(--r-lg); box-shadow: var(--sh-2);
+    }
+  }
+
+  /* ── Students as tiles on desktop; an opened student takes the whole row ── */
+  @media (min-width: 900px) {
+    #root { max-width: 1120px; }
+    .student-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+    .student-grid > .card { margin-bottom: 0; }
+    .student-grid > .card:not(.is-open) .card-header { min-height: 118px; align-items: flex-start; }
+    .student-grid > .card.is-open { grid-column: 1 / -1; }
+  }
+  @media (min-width: 1100px) {
+    .student-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.33.1">
+<link rel="stylesheet" href="ux.css?v=6.34.0">
 </head>
 <body>
 <div id="root"></div>
@@ -1896,6 +1951,65 @@ function currentSchoolYear(baseYear, asOfDate) {
 
 // How the student list can be ordered. Year and price put the ones that tend
 // to matter most at the top: exam years first, best-paid first.
+// ---------- Branded select ----------
+// The browser's own dropdown looks different on every system, and on Windows it
+// is a grey OS list that clashes with everything around it. On a mouse or
+// trackpad this draws the menu itself. On a touchscreen the phone's own picker
+// is kept, because there it is the nicer of the two.
+function BrandSelect({ value, options, onChange, ariaLabel }) {
+  const coarse = React.useMemo(() => { try { return window.matchMedia('(pointer: coarse)').matches; } catch { return false; } }, []);
+  const [open, setOpen] = useState(false);
+  const [hi, setHi] = useState(0);
+  const wrapRef = React.useRef(null);
+  const btnRef = React.useRef(null);
+  const current = options.find(([k]) => k === value) || options[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const away = e => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('pointerdown', away);
+    return () => document.removeEventListener('pointerdown', away);
+  }, [open]);
+
+  if (coarse) {
+    return <select className="bsel-native" value={value} aria-label={ariaLabel} onChange={e => onChange(e.target.value)}>
+      {options.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+    </select>;
+  }
+
+  const pick = k => { setOpen(false); btnRef.current?.focus(); if (k !== value) onChange(k); };
+  const openMenu = () => { setHi(Math.max(0, options.findIndex(([k]) => k === value))); setOpen(true); };
+  const onKey = e => {
+    if (!open) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) { e.preventDefault(); openMenu(); }
+      return;
+    }
+    if (e.key === 'Escape') { e.preventDefault(); setOpen(false); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setHi(i => (i + 1) % options.length); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setHi(i => (i - 1 + options.length) % options.length); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(options[hi][0]); }
+    else if (e.key === 'Tab') setOpen(false);
+  };
+
+  return (
+    <div className={`bsel${open ? ' open' : ''}`} ref={wrapRef}>
+      <button type="button" ref={btnRef} className="bsel-btn" aria-haspopup="listbox" aria-expanded={open} aria-label={ariaLabel}
+        onClick={() => open ? setOpen(false) : openMenu()} onKeyDown={onKey}>
+        <span>{current[1]}</span><span className="bsel-chev" aria-hidden="true">›</span>
+      </button>
+      {open && <ul className="bsel-menu" role="listbox" aria-label={ariaLabel}>
+        {options.map(([k, label], i) => (
+          <li key={k} role="option" aria-selected={k === value}
+            className={`bsel-opt${k === value ? ' sel' : ''}${i === hi ? ' hi' : ''}`}
+            onPointerEnter={() => setHi(i)} onClick={() => pick(k)}>
+            <span>{label}</span>{k === value && <AppIcon name="check" />}
+          </li>
+        ))}
+      </ul>}
+    </div>
+  );
+}
+
 const STUDENT_SORTS = [
   ['name', 'Name'],
   ['surname', 'Surname'],
@@ -8181,16 +8295,14 @@ function App() {
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => { captureListPositions(); setQuery(''); }}><AppIcon name="close" /></button>}
             </div>
-            <label className="sort-wrap">
+            <div className="sort-wrap">
               <span>Sort</span>
-              <select value={sortBy} aria-label="Sort students by" onChange={e => {
+              <BrandSelect value={sortBy} options={STUDENT_SORTS} ariaLabel="Sort students by" onChange={v => {
                 captureListPositions();
-                setSortBy(e.target.value);
-                try { localStorage.setItem('tutortally_sort', e.target.value); } catch {}
-              }}>
-                {STUDENT_SORTS.map(([k, label]) => <option key={k} value={k}>{label}</option>)}
-              </select>
-            </label>
+                setSortBy(v);
+                try { localStorage.setItem('tutortally_sort', v); } catch {}
+              }} />
+            </div>
           </div>
         )}
 
@@ -8202,7 +8314,7 @@ function App() {
           <div className="empty"><AppIcon name="search" /><strong>No students found</strong>Try a different name or school.</div>
         )}
 
-        <div ref={studentListRef}>
+        <div ref={studentListRef} className="student-grid">
           {!loading && shownStudents.map(s => (
             <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
               allocations={allocations} allStudents={students} rateHistory={rateHistory}
@@ -8212,7 +8324,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.33.1</div>}
+        {!loading && <div className="version-tag">v6.34.0</div>}
       </div>
 
       {showAddModal && (
