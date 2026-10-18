@@ -1023,8 +1023,60 @@
   @media (min-width: 1100px) {
     .student-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
+
+  /* ── Overview: owed leads ── */
+  .overview-value.owed { color: var(--warn); }
+  .overview-potential { font-size: 0.74rem; color: var(--muted); margin-top: 9px; }
+
+  /* ── This week ── */
+  .week {
+    background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent-fill);
+    border-radius: var(--r-lg); padding: 14px 17px; margin-bottom: 12px; box-shadow: var(--sh-1);
+  }
+  .week-title {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; font-weight: 700; color: var(--accent);
+  }
+  .week-days { display: flex; gap: 14px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .week-days::-webkit-scrollbar { display: none; }
+  .week-day { flex: 0 0 auto; min-width: 92px; }
+  .week-day-label { font-size: .72rem; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+  .week-day.today .week-day-label { color: var(--ink); }
+  .week-chip {
+    display: flex; align-items: baseline; gap: 6px; width: 100%; margin-bottom: 6px;
+    padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--card-2);
+    font: inherit; color: var(--ink); cursor: pointer; text-align: left; white-space: nowrap;
+    transition: border-color .15s var(--ease), transform .12s ease;
+  }
+  .week-chip:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); }
+  .week-chip:active { transform: scale(.97); }
+  .week-chip.past { opacity: .5; }
+  .week-time { font-size: .74rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .week-name { font-size: .84rem; font-weight: 600; }
+
+  /* ── Needs attention: chase button ── */
+  .attn-right { display: inline-flex; align-items: center; gap: 10px; }
+  .attn-chase {
+    display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 999px;
+    background: #25D366; color: #07300f; font-size: .72rem; font-weight: 700; text-decoration: none;
+    transition: transform .12s ease, filter .15s ease;
+  }
+  .attn-chase .app-icon { width: 13px; height: 13px; }
+  .attn-chase:active { transform: scale(.95); }
+  @media (hover:hover) { .attn-chase:hover { filter: brightness(1.06); } }
+
+  /* ── Undo toast ── */
+  .undo-toast {
+    position: fixed; left: 0; right: 0; bottom: 22px; margin-inline: auto; width: fit-content; max-width: 92vw; z-index: 210;
+    display: flex; align-items: center; gap: 16px; padding: 11px 12px 11px 18px; border-radius: 14px;
+    background: var(--ink); color: var(--card); font-size: .86rem; font-weight: 600; box-shadow: 0 8px 28px rgba(0,0,0,.3);
+  }
+  .undo-toast button {
+    border: 0; border-radius: 9px; padding: 7px 13px; cursor: pointer; font: inherit; font-weight: 700;
+    background: var(--accent-fill); color: var(--on-accent);
+  }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.34.1">
+<link rel="stylesheet" href="ux.css?v=6.35.0">
 </head>
 <body>
 <div id="root"></div>
@@ -2354,8 +2406,90 @@ function Toggle({ checked, onChange, label }) {
   );
 }
 
+// ---------- Shared money and wording helpers ----------
+// What a family owes right now: lessons taught (or weekly charges due) minus
+// everything paid. The same sum the card and Needs attention use.
+function studentBalance(s, lessons, payments, rateHistory) {
+  const mine = TTWeekly.financialLessons(lessons.filter(l => l.student_id === s.id), s.id);
+  const scale = moneyScaleFor(s.id, rateHistory);
+  const owed = mine
+    .filter(l => l.status === 'completed' && !l.is_complimentary && !l.pre_settled)
+    .reduce((sum, l) => sum + rateForLesson(l, rateHistory), 0);
+  const paid = payments
+    .filter(p => p.student_id === s.id)
+    .reduce((sum, p) => sum + parseFloat(p.amount) * scale, 0);
+  return owed - paid;
+}
+
+// The words a person reads, not the database's own: "Done", not "completed".
+function lessonStatusLabel(status) {
+  return { completed: 'Done', scheduled: 'Upcoming', missed: 'Missed', cancelled: 'Cancelled' }[status] || status;
+}
+
+// One payment request, worded the same wherever it is sent from.
+function paymentRequestText(student, balance, rate, weekly) {
+  const parentFirstName = (student.parent_name || '').split(' ')[0];
+  const greeting = parentFirstName ? `Hi ${parentFirstName}!` : 'Hi!';
+  if (weekly) return `${greeting} There is ${moneyText(balance)} outstanding on your tuition account. Your parent dashboard shows the weekly charges and payments. Please could you settle this when you get the chance? Thanks!`;
+  const unpaidCount = balance > 0 && rate > 0 ? Math.ceil(balance / rate) : 0;
+  return `${greeting} Just a note that we have ${unpaidCount} outstanding session${unpaidCount !== 1 ? 's' : ''} totalling ${moneyText(balance)}. Please could you settle this when you get the chance? Thanks!`;
+}
+
+function weeklyRateFor(studentId, rateHistory) {
+  const plan = TTWeekly.plans(studentId).find(p => p.status !== 'proposed' && p.acceptance);
+  return plan ? Number(plan.weekly_fee) : getCurrentRate(studentId, rateHistory);
+}
+
+// ---------- This week ----------
+// The next seven days of lessons at a glance, because the app gets opened
+// around lessons and "Next: 23 Oct" pills hid when the next one actually is.
+function WeekStrip({ students, lessons, onJump }) {
+  const N = useNameDisplay();
+  const today = TTWeekly.today();
+  const end = new Date(Date.parse(today + 'T12:00:00Z') + 6 * 86400000).toISOString().slice(0, 10);
+  const byId = new Map(students.filter(s => s.active).map(s => [s.id, s]));
+  const nowHHMM = new Date().toTimeString().slice(0, 5);
+  const upcoming = lessons
+    .filter(l => byId.has(l.student_id) && l.status !== 'cancelled' && l.lesson_date >= today && l.lesson_date <= end)
+    .filter(l => l.lesson_date > today || l.status === 'scheduled' || l.status === 'completed')
+    .sort((a, b) => (a.lesson_date + (a.start_time || '')).localeCompare(b.lesson_date + (b.start_time || '')));
+  if (!upcoming.length) return null;
+  const days = [];
+  upcoming.forEach(l => {
+    let d = days.find(x => x.date === l.lesson_date);
+    if (!d) { d = { date: l.lesson_date, items: [] }; days.push(d); }
+    d.items.push(l);
+  });
+  const tomorrow = new Date(Date.parse(today + 'T12:00:00Z') + 86400000).toISOString().slice(0, 10);
+  const dayLabel = d => d === today ? 'Today' : d === tomorrow ? 'Tomorrow'
+    : new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', timeZone: 'UTC' });
+  const timeLabel = t => { if (!t) return ''; const [hh, mm] = t.split(':').map(Number); return `${hh % 12 || 12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${hh < 12 ? 'am' : 'pm'}`; };
+  return (
+    <section className="week" aria-label="This week">
+      <div className="week-title"><AppIcon name="calendar" />This week · {upcoming.length} lesson{upcoming.length === 1 ? '' : 's'}</div>
+      <div className="week-days">
+        {days.map(d => (
+          <div className={`week-day${d.date === today ? ' today' : ''}`} key={d.date}>
+            <div className="week-day-label">{dayLabel(d.date)}</div>
+            {d.items.map(l => {
+              const past = l.lesson_date === today && l.start_time && l.start_time.slice(0, 5) < nowHHMM;
+              const s = byId.get(l.student_id);
+              return (
+                <button type="button" key={l.id} className={`week-chip${past ? ' past' : ''}`} onClick={() => onJump(l.student_id)}>
+                  <span className="week-time">{timeLabel(l.start_time)}</span>
+                  <span className="week-name">{N(s.name, s.id).split(' ')[0]}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ---------- Summary Widget ----------
-function SummaryWidget({ students, rateHistory }) {
+function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
   const M = useMoney();
   const active = students.filter(s => s.active);
   const readSavedTarget = () => {
@@ -2401,10 +2535,22 @@ function SummaryWidget({ students, rateHistory }) {
 
   const awayFromFull = Math.max(0, fullTarget - active.length);
 
+  // What is owed now and what came in this month lead, because that is what
+  // the app is opened to find out. The "potential" figures moved to a line
+  // under the booking bar.
+  const owing = students
+    .map(s => ({ s, bal: studentBalance(s, lessons, payments, rateHistory) }))
+    .filter(x => x.bal > 0.005);
+  const owedTotal = owing.reduce((sum, x) => sum + x.bal, 0);
+  const monthKey = TTWeekly.today().slice(0, 7);
+  const paidThisMonth = payments
+    .filter(p => String(p.date_paid || '').slice(0, 7) === monthKey)
+    .reduce((sum, p) => sum + parseFloat(p.amount) * moneyScaleFor(p.student_id, rateHistory), 0);
+  const monthName = new Date().toLocaleDateString('en-GB', { month: 'long' });
   const stats = [
-    { label: 'students', value: active.length,  accent: false },
-    { label: 'per week', value: M(weeklyGross, 'summary-week', fmt), accent: true },
-    { label: 'per year', value: M(annualGross, 'summary-year', fmt), accent: true },
+    { label: 'owed', value: M(owedTotal, 'summary-owed', fmt), note: owing.length ? `From ${owing.length} famil${owing.length === 1 ? 'y' : 'ies'}` : 'Everyone is paid up' },
+    { label: 'paid', value: M(paidThisMonth, 'summary-paid', fmt), note: `So far in ${monthName}` },
+    { label: 'students', value: active.length, note: null },
   ];
 
   return (
@@ -2415,10 +2561,10 @@ function SummaryWidget({ students, rateHistory }) {
       position:'relative', overflow:'hidden'
     }}>
       {active.length > 0 && <div className="overview-grid">
-        {stats.map(({label, value}) => <div key={label}>
-          <div className="overview-value">{value}</div>
-          <div className="overview-label">{label === 'students' ? 'Active students' : label === 'per week' ? 'Weekly potential' : 'Yearly potential'}</div>
-          {label === 'per year' && <div className="overview-note">Based on 40 teaching weeks</div>}
+        {stats.map(({label, value, note}) => <div key={label}>
+          <div className={`overview-value${label === 'owed' && owedTotal > 0.005 ? ' owed' : ''}`}>{value}</div>
+          <div className="overview-label">{label === 'owed' ? 'Owed to you' : label === 'paid' ? 'Paid this month' : 'Active students'}</div>
+          {note && <div className="overview-note">{note}</div>}
         </div>)}
       </div>}
       <div>
@@ -2444,6 +2590,9 @@ function SummaryWidget({ students, rateHistory }) {
         <div style={{background:'var(--card-2)',borderRadius:4,height:5,border:'1px solid var(--line)'}}>
           <div style={{background:'var(--accent-fill)',opacity:1,width:`${Math.min(active.length/fullTarget,1)*100}%`,height:'100%',borderRadius:4,transition:'width 0.6s cubic-bezier(0.4,0,0.2,1)'}}></div>
         </div>
+        {active.length > 0 && <div className="overview-potential">
+          Weekly potential {M(weeklyGross, 'summary-week', fmt)} · yearly {M(annualGross, 'summary-year', fmt)} (40 teaching weeks)
+        </div>}
         {targetSaving !== 'idle' && (
           <div style={{fontSize:'0.72rem',color:targetSaving==='error'?'var(--warn)':'var(--muted)',marginTop:6}}>
             {targetSaving === 'saving' ? 'Saving target...' : targetSaving === 'saved' ? 'Target saved' : 'Could not save target'}
@@ -4701,10 +4850,13 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
     if (balance > 0.005 && oldestUnpaid) {
       const days = Math.floor((new Date(today) - new Date(oldestUnpaid.lesson_date)) / 86400000);
       if (days >= 7) {
+        const phone = normaliseUKPhone(s.parent_phone);
+        const text = paymentRequestText(s, balance, weeklyRateFor(s.id, rateHistory), weeklyLedger);
         items.push({
           id: s.id + ':owing', studentId: s.id, name: s.name,
           why: `${M(balance, s.id + ':balance')} · ${days}d`,
           sort: 1000 - days,
+          chase: phone ? `https://wa.me/${phone}?text=${encodeURIComponent(text)}` : null,
         });
       }
     }
@@ -4731,7 +4883,12 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
         {items.slice(0, 6).map(it => (
           <div className="attn-item" key={it.id} onClick={() => onJump(it.studentId)}>
             <span>{N(it.name, it.studentId)}</span>
-            <span className="attn-why">{it.why}</span>
+            <span className="attn-right">
+              <span className="attn-why">{it.why}</span>
+              {it.chase && <a className="attn-chase" href={it.chase} target="_blank" rel="noopener"
+                aria-label={`Ask ${it.name.split(' ')[0]}'s parent for payment on WhatsApp`} title="Request payment on WhatsApp"
+                onClick={e => e.stopPropagation()}><AppIcon name="chat" /><span>Chase</span></a>}
+            </span>
           </div>
         ))}
       </div></div>
@@ -5789,9 +5946,18 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
       // StudentFormModal - the column DEFAULT belongs to Daniel's account, so
       // a second tenant's insert would otherwise fail the RLS WITH CHECK.
       const ownerId = (await supabase.auth.getUser()).data.user?.id;
-      await supabase.from('tutoring_payments').insert({
+      const { data: added } = await supabase.from('tutoring_payments').insert({
         student_id: student.id, amount: amt, date_paid: datePaid, method, owner_id: ownerId
-      });
+      }).select('id').single();
+      // Undo instead of an "are you sure": logging is the common case, a slip
+      // is rare, and taking it back is the same soft delete the payment list uses.
+      if (added?.id) window.dispatchEvent(new CustomEvent('tt-undo', { detail: {
+        text: `${moneyText(amt)} logged for ${student.name.split(' ')[0]}`,
+        undo: async () => {
+          await supabase.from('tutoring_payments').update({ deleted_at: new Date().toISOString() }).eq('id', added.id);
+          await supabase.rpc('reallocate_student_payments', { p_student_id: student.id });
+        },
+      } }));
     }
 
     setSaving(false);
@@ -5901,7 +6067,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
                     {M(take)}{partial ? ' (part)' : ''}
                   </span>
                   <span style={{fontSize:'0.72rem', color: l.status === 'scheduled' ? 'var(--gold)' : 'var(--muted)'}}>
-                    {l.status === 'scheduled' ? 'upcoming' : l.status}
+                    {lessonStatusLabel(l.status)}
                   </span>
                 </div>
               ))}
@@ -5993,7 +6159,7 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
                 </span>
                 <span style={{display:'flex', alignItems:'center', gap:8}}>
                   <span style={{fontSize:'0.78rem', fontWeight:600, color:'var(--accent)'}}>{M(amount, l.id + ':rate')}</span>
-                  <span className={`lesson-status ${l.status}`}>{l.status}</span>
+                  <span className={`lesson-status ${l.status}`}>{lessonStatusLabel(l.status)}</span>
                 </span>
               </div>
             ))}
@@ -6430,7 +6596,7 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
   const d = new Date(lesson.lesson_date + 'T12:00:00');
   const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   const statusClass = lesson.is_complimentary ? 'ok' : lesson.status === 'completed' ? 'ok' : lesson.status === 'missed' ? 'warn' : 'neutral';
-  const statusLabel = lesson.is_complimentary ? 'Free lesson' : lesson.status;
+  const statusLabel = lesson.is_complimentary ? 'Free lesson' : lessonStatusLabel(lesson.status);
   const METHODS = { cash:'cash', bank_transfer:'bank transfer', monzo_auto:'bank transfer', other:'payment' };
   const st = payState || { rate: lessonRate, paid: 0, payments: [], settled: false, partial: false };
   const moneySeed = lesson.id + ':rate';
@@ -6827,6 +6993,16 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const danielOnly = isDanielAccount(session);
   const weeklyActive = TTWeekly.plans(student.id).some(p => p.status !== 'proposed' && p.acceptance);
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = e => {
+      if (e.key !== 'Escape' || document.querySelector('.overlay')) return;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '')) return;
+      setOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
   const [notesOpen, setNotesOpen] = useState(false);
   const [showMoreTools, setShowMoreTools] = useState(false);
   const [showWeekly, setShowWeekly] = useState(false);
@@ -6978,7 +7154,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   // General contact stays separate from the explicit payment reminder below.
   const waMessage = `${greeting} Just checking in about ${studentFirstName}'s next lesson.`;
   const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}` : null;
-  const paymentMsg = weeklyActive ? `${greeting} There is ${moneyText(balance)} outstanding on your tuition account. Your parent dashboard shows the weekly charges and payments. Please could you settle this when you get the chance? Thanks!` : `${greeting} Just a note that we have ${unpaidCount} outstanding session${unpaidCount !== 1 ? 's' : ''} totalling ${moneyText(balance)}. Please could you settle this when you get the chance? Thanks!`;
+  const paymentMsg = paymentRequestText(student, balance, currentRate, weeklyActive);
   const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
   const bundleWaLink = null;
   const cardParentLink = new URL(`student.html?t=${student.public_token}`, window.location.href).toString();
@@ -7039,9 +7215,8 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               : <button className="btn needs-setup" onClick={() => setSetupHint('whatsapp')}><AppIcon name="chat" /><span>WhatsApp</span></button>}
             {student.is_zoom && student.zoom_link && <CopyAction value={student.zoom_link} label="Copy Zoom" icon="video" />}
             <CopyAction value={cardParentLink} label="Parent link" walkthrough="parentlink" />
-            <CopyAction value={cardPupilLink} label="Student link" icon="student" />
             {student.spreadsheet_url && <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener"><AppIcon name="chart" /><span>Progress sheet</span></a>}
-            <button className="btn" onClick={() => { setEditPayment(null); setShowCashModal(true); }}><AppIcon name="payment" /><span>Log payment</span></button>
+            <button className={`btn${balance > 0 ? '' : ' action-primary'}`} onClick={() => { setEditPayment(null); setShowCashModal(true); }}><AppIcon name="payment" /><span>Log payment</span></button>
             <button className="btn edit action-muted" data-wt="edit" onClick={() => onEdit(student)}><AppIcon name="edit" /><span>Edit student</span></button>
             <button className="btn more action-muted" data-wt="moretools" onClick={() => setShowMoreTools(true)}><AppIcon name="tools" /><span>More tools</span></button>
             {student.general_notes && <button className="btn notes action-muted" aria-expanded={notesOpen} onClick={() => setNotesOpen(!notesOpen)}><AppIcon name="notes" /><span>{notesOpen ? 'Hide notes' : 'Notes'}</span></button>}
@@ -7081,7 +7256,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                   </span>
                   <span style={{display:'flex',alignItems:'center'}}>
                     <span className="lesson-status scheduled" style={lessonPayState(l).settled ? {color:'var(--accent)'} : {}}>
-                      {lessonPayState(l).settled ? 'prepaid' : 'scheduled'}
+                      {lessonPayState(l).settled ? 'Prepaid' : 'Upcoming'}
                     </span>
                     <span className="chev">›</span>
                   </span>
@@ -7138,7 +7313,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                             : l.status === 'completed' ? {color: settled ? 'var(--good)' : 'var(--warn)'}
                             : {}
                           }>
-                            {TTWeekly.covers(l) ? `${l.status}, included in weekly tuition` : l.is_complimentary ? 'free' : `${l.status} · ${M(rateForLesson(l, rateHistory), l.id + ':rate')}`}
+                            {TTWeekly.covers(l) ? `${lessonStatusLabel(l.status)}, included in weekly tuition` : l.is_complimentary ? 'Free' : `${lessonStatusLabel(l.status)} · ${M(rateForLesson(l, rateHistory), l.id + ':rate')}`}
                           </span>
                         </>
                       );
@@ -7779,6 +7954,24 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
 }
 
 function App() {
+  const [undoOffer, setUndoOffer] = useState(null);
+  useEffect(() => {
+    let timer;
+    const onOffer = e => { clearTimeout(timer); setUndoOffer(e.detail); timer = setTimeout(() => setUndoOffer(null), 8000); };
+    window.addEventListener('tt-undo', onOffer);
+    return () => { window.removeEventListener('tt-undo', onOffer); clearTimeout(timer); };
+  }, []);
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== '/' || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '') || document.activeElement?.isContentEditable) return;
+      if (document.querySelector('.overlay')) return;
+      const box = document.querySelector('.list-tools input[type="search"]');
+      if (box) { e.preventDefault(); box.focus(); box.select(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, []);
   const [students, setStudents] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -8136,6 +8329,15 @@ function App() {
         suppressFreePrompt={billingStillChecking}
         ownerName={tutorDisplayName}
       />
+      {undoOffer && (
+        <div role="status" className="undo-toast toast-in">
+          <span>{undoOffer.text}</span>
+          <button type="button" onClick={async () => {
+            const offer = undoOffer; setUndoOffer(null);
+            try { await offer.undo(); } finally { loadAll(); }
+          }}>Undo</button>
+        </div>
+      )}
       {refreshNote && (
         <div role="status" className="toast-in" style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
@@ -8264,7 +8466,9 @@ function App() {
           </>
         )}
 
-        {!loading && <SummaryWidget students={students} rateHistory={rateHistory} />}
+        {!loading && <SummaryWidget students={students} rateHistory={rateHistory} lessons={lessons} payments={payments} />}
+
+        {!loading && <WeekStrip students={students} lessons={lessons} onJump={jumpToStudent} />}
 
         {!loading && (
           <CalendarCandidates
@@ -8324,7 +8528,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.34.1</div>}
+        {!loading && <div className="version-tag">v6.35.0</div>}
       </div>
 
       {showAddModal && (
