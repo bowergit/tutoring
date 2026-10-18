@@ -1,4 +1,4 @@
-// Sits in front of the parent page only. Link-preview crawlers (WhatsApp, iMessage,
+// Sits in front of the parent and pupil pages only. Link-preview crawlers (WhatsApp, iMessage,
 // Slack) read the raw HTML and never run the page's script, so the static <title>
 // is all they ever see. This looks up the first name behind the link's token and
 // writes "[Name]'s Lessons" into the title and og:title before the page is sent.
@@ -23,13 +23,16 @@ export default {
       if (!first) return res;
 
       const title = `${first}'s Lessons`;
+      // The pupil's own page never mentions money, so its preview does not either.
+      const pupil = /^\/lessons/.test(new URL(request.url).pathname);
+      const desc = pupil ? 'Your upcoming lessons.' : 'Upcoming lessons, payments and progress. Private to your family.';
       const out = new HTMLRewriter()
         .on('title', { element(el) { el.setInnerContent(title); } })
-        .on('meta[property="og:title"], meta[name="twitter:title"]', { element(el) { el.remove(); } })
+        .on('meta[property="og:title"], meta[name="twitter:title"], meta[property="og:description"], meta[property="og:image"], meta[property="og:site_name"]', { element(el) { el.remove(); } })
         .on('head', {
           element(el) {
             el.append(
-              `<meta property="og:title" content="${esc(title)}"><meta property="og:site_name" content="TutorTally"><meta name="twitter:title" content="${esc(title)}">`,
+              `<meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:image" content="${new URL('/icon-512.png', request.url)}"><meta property="og:site_name" content="TutorTally"><meta name="twitter:title" content="${esc(title)}">`,
               { html: true },
             );
           },

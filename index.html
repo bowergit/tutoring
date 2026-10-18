@@ -1094,7 +1094,7 @@
     .dash-top .week-days { flex-wrap: wrap; overflow: visible; row-gap: 4px; }
   }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.35.3">
+<link rel="stylesheet" href="ux.css?v=6.36.0">
 </head>
 <body>
 <div id="root"></div>
@@ -6475,11 +6475,11 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
   // Built from wherever the app is actually being served, so moving domain
   // needs no code change and links always point at the site the tutor is
   // looking at rather than a hardcoded one.
-  const studentLink = new URL(`student.html?t=${student.public_token}`, window.location.href).toString();
+  const studentLink = new URL(`student?t=${student.public_token}`, window.location.href).toString();
   // A different token, not a different path on the same one. The pupil's link
   // has to be safe to hand to the pupil, and a shared token would let anyone
   // holding it edit the URL and read the balance.
-  const pupilLink = new URL(`lessons.html?t=${student.student_token}`, window.location.href).toString();
+  const pupilLink = new URL(`lessons?t=${student.student_token}`, window.location.href).toString();
 
   function copyStudentLink() {
     navigator.clipboard.writeText(studentLink).then(() => {
@@ -7177,8 +7177,12 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const paymentMsg = paymentRequestText(student, balance, currentRate, weeklyActive);
   const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
   const bundleWaLink = null;
-  const cardParentLink = new URL(`student.html?t=${student.public_token}`, window.location.href).toString();
-  const cardPupilLink = new URL(`lessons.html?t=${student.student_token}`, window.location.href).toString();
+  const cardParentLink = new URL(`student?t=${student.public_token}`, window.location.href).toString();
+  const cardPupilLink = new URL(`lessons?t=${student.student_token}`, window.location.href).toString();
+  // Sent rather than copied: the link arrives with a line saying what it is, in the
+  // chat the parent already has with you, which is where they will look for it again.
+  const parentLinkMsg = `${greeting} Here's ${studentFirstName}'s page with upcoming lessons, payments and progress. It's private to you and always up to date, so it's worth saving: ${cardParentLink}`;
+  const parentLinkWa = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(parentLinkMsg)}` : null;
   // Which "you haven't filled this in yet" explainer is open, if any.
   const [setupHint, setSetupHint] = useState(null);
 
@@ -7234,7 +7238,9 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               ? <a className="btn whatsapp" href={waLink} target="_blank" rel="noopener"><AppIcon name="chat" /><span>WhatsApp</span></a>
               : <button className="btn needs-setup" onClick={() => setSetupHint('whatsapp')}><AppIcon name="chat" /><span>WhatsApp</span></button>}
             {student.is_zoom && student.zoom_link && <CopyAction value={student.zoom_link} label="Copy Zoom" icon="video" />}
-            <CopyAction value={cardParentLink} label="Parent link" walkthrough="parentlink" />
+            {parentLinkWa
+              ? <a className="btn" data-wt="parentlink" href={parentLinkWa} target="_blank" rel="noopener"><AppIcon name="link" /><span>Send parent link</span></a>
+              : <CopyAction value={cardParentLink} label="Parent link" walkthrough="parentlink" />}
             {student.spreadsheet_url && <a className="btn" href={student.spreadsheet_url} target="_blank" rel="noopener"><AppIcon name="chart" /><span>Progress sheet</span></a>}
             <button className={`btn${balance > 0 ? '' : ' action-primary'}`} onClick={() => { setEditPayment(null); setShowCashModal(true); }}><AppIcon name="payment" /><span>Log payment</span></button>
             <button className="btn edit action-muted" data-wt="edit" onClick={() => onEdit(student)}><AppIcon name="edit" /><span>Edit student</span></button>
@@ -7649,7 +7655,7 @@ const WT_STEPS = [
   {
     key: 'links',
     title: 'Give parents their own page',
-    body: "This copies a private page showing that child's past lessons grouped by month, what has been paid and what is outstanding. Send it once and the parent can check it whenever they like. No login, and they only ever see their own child.",
+    body: "This sends the parent a private page on WhatsApp showing that child's lessons, what has been paid and what is outstanding (it copies the link instead if there is no number saved). Send it once and they can check it whenever they like. No login, and they only ever see their own child.",
     anchor: ['[data-wt="parentlink"]', '[data-wt="card"]'],
   },
   {
@@ -8549,7 +8555,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.35.3</div>}
+        {!loading && <div className="version-tag">v6.36.0</div>}
       </div>
 
       {showAddModal && (

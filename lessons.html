@@ -7,6 +7,9 @@
      static value is only what a link-preview crawler sees, since it reads the
      raw HTML and never runs the script that knows whose page it is. -->
 <title>Lessons</title>
+<meta property="og:description" content="Your upcoming lessons.">
+<meta property="og:image" content="https://tutortally.co.uk/icon-512.png">
+<meta property="og:site_name" content="TutorTally">
 <link rel="icon" type="image/x-icon" href="favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
@@ -207,8 +210,13 @@
   .action-btn .app-icon { color:var(--accent); }
   .card { animation:tt-enter .3s ease both; }
   @media (max-width:360px) { .kpis { grid-template-columns:repeat(2,1fr); } }
+  .next-up { display: flex; align-items: center; gap: 8px; margin: -8px 0 20px; padding: 11px 14px; border-radius: var(--r-md);
+    background: var(--accent-light); color: var(--ink); font-size: 0.86rem; }
+  .next-up .app-icon { color: var(--accent); flex: none; }
+  .next-up span { color: var(--ink-dim); }
+  .next-up b { margin-left: auto; font-weight: 700; color: var(--accent); white-space: nowrap; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.35.3">
+<link rel="stylesheet" href="ux.css?v=6.36.0">
 </head>
 <body>
 <div class="wrap" id="app">
@@ -864,12 +872,18 @@
     data.spreadsheet_url ? `<a class="action-btn" href="${esc(data.spreadsheet_url)}" target="_blank" rel="noopener"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 3v17h17 M8 15l4-5 4 3 4-7"/></svg> View ${esc(firstName)}'s progress</a>` : '',
   ].join('');
 
+  // The one thing most people open the page to check, so it sits under the name.
+  const todayIso = new Date().toLocaleDateString('en-CA');
+  const nextUp = (data.upcoming || []).filter(l => l.date >= todayIso).sort((a, b) => (a.date + (a.time || '')).localeCompare(b.date + (b.time || '')))[0];
+  const nextHTML = nextUp ? `<div class="next-up"><svg class="app-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16"/></svg><span>Next lesson</span><b>${fmtDate(nextUp.date)}${nextUp.time ? ' · ' + esc(String(nextUp.time).slice(0, 5)) : ''}</b></div>` : '';
+
   portalData = data;
   app.innerHTML = `
     <h1>${esc(data.name)}</h1>
     <div class="sub">${pupilView
       ? (data.progress ? 'Your lessons and how your papers are going' : 'Your lessons')
       : 'Progress, lessons and payment status'}</div>
+    ${nextHTML}
     ${pupilView ? '' : renderAccount(data.account)}
     ${pupilView ? '' : renderSettleUp(data)}
     ${renderProgress(data.progress)}
