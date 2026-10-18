@@ -392,7 +392,7 @@
     transition: background .18s var(--ease);
   }
   .attn-head:active { background: color-mix(in srgb, var(--warn) 10%, transparent); }
-  .attn-head:focus-visible { outline: none; box-shadow: inset var(--ring); }
+  .attn-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--r-lg); }
   .attn-title {
     display: flex; align-items: center; gap: 6px;
     font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.09em;
@@ -1081,8 +1081,20 @@
     border: 0; border-radius: 9px; padding: 7px 13px; cursor: pointer; font: inherit; font-weight: 700;
     background: var(--accent-fill); color: var(--on-accent);
   }
+
+  /* ── Top of the dashboard: summary and this week side by side on desktop ── */
+  .dash-top { margin-bottom: 12px; }
+  .dash-top > * { margin-bottom: 12px !important; }
+  .dash-top > *:last-child { margin-bottom: 0 !important; }
+  @media (min-width: 900px) {
+    .dash-top { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; align-items: stretch; }
+    .dash-top > * { margin-bottom: 0 !important; }
+    .dash-top > :only-child { grid-column: 1 / -1; }
+    .dash-top .week { display: flex; flex-direction: column; }
+    .dash-top .week-days { flex-wrap: wrap; overflow: visible; row-gap: 4px; }
+  }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.35.1">
+<link rel="stylesheet" href="ux.css?v=6.35.2">
 </head>
 <body>
 <div id="root"></div>
@@ -2069,7 +2081,7 @@ function BrandSelect({ value, options, onChange, ariaLabel }) {
 }
 
 const STUDENT_SORTS = [
-  ['name', 'Name'],
+  ['name', 'First name'],
   ['surname', 'Surname'],
   ['year', 'School year'],
   ['price', 'Price'],
@@ -2544,7 +2556,9 @@ function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
   // What is owed now and what came in this month lead, because that is what
   // the app is opened to find out. The "potential" figures moved to a line
   // under the booking bar.
-  const owing = students
+  // Active students only, the same people as the cards and Needs attention.
+  // Archived students (and test ones) would otherwise swell the total.
+  const owing = active
     .map(s => ({ s, bal: studentBalance(s, lessons, payments, rateHistory) }))
     .filter(x => x.bal > 0.005);
   const owedTotal = owing.reduce((sum, x) => sum + x.bal, 0);
@@ -8472,9 +8486,10 @@ function App() {
           </>
         )}
 
-        {!loading && <SummaryWidget students={students} rateHistory={rateHistory} lessons={lessons} payments={payments} />}
-
-        {!loading && <WeekStrip students={students} lessons={lessons} onJump={jumpToStudent} />}
+        {!loading && <div className="dash-top">
+          <SummaryWidget students={students} rateHistory={rateHistory} lessons={lessons} payments={payments} />
+          <WeekStrip students={students} lessons={lessons} onJump={jumpToStudent} />
+        </div>}
 
         {!loading && (
           <CalendarCandidates
@@ -8534,7 +8549,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.35.1</div>}
+        {!loading && <div className="version-tag">v6.35.2</div>}
       </div>
 
       {showAddModal && (
