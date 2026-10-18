@@ -1093,8 +1093,11 @@
     .dash-top .week { display: flex; flex-direction: column; }
     .dash-top .week-days { flex-wrap: wrap; overflow: visible; row-gap: 4px; }
   }
+
+  /* Room for the sticky header when an opened student is scrolled into view. */
+  .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.36.0">
+<link rel="stylesheet" href="ux.css?v=6.36.1">
 </head>
 <body>
 <div id="root"></div>
@@ -4243,28 +4246,31 @@ function useFlip(containerRef) {
   const capture = React.useCallback(() => {
     const el = containerRef.current;
     if (!el || prefersLessMotion() || !el.animate) { before.current = null; return; }
-    const tops = new Map();
-    for (const c of el.children) tops.set(c.id, c.getBoundingClientRect().top);
-    before.current = tops;
+    const spots = new Map();
+    for (const c of el.children) { const r = c.getBoundingClientRect(); spots.set(c.id, { x: r.left, y: r.top, w: r.width }); }
+    before.current = spots;
   }, [containerRef]);
 
   React.useLayoutEffect(() => {
-    const tops = before.current;
-    if (!tops) return;
+    const spots = before.current;
+    if (!spots) return;
     before.current = null;
     const el = containerRef.current;
     if (!el) return;
     try {
       for (const c of el.children) {
-        const was = tops.get(c.id);
+        const was = spots.get(c.id);
         if (was == null) continue;
         c.getAnimations?.().forEach(a => { if (a.id === 'flip') a.cancel(); });
-        const dy = was - c.getBoundingClientRect().top;
-        if (Math.abs(dy) < 1) continue;
-        const a = c.animate(
-          [{ transform: `translateY(${dy}px)` }, { transform: 'translateY(0)' }],
-          { duration: 360, easing: 'cubic-bezier(.2,.75,.25,1)' },
-        );
+        const now = c.getBoundingClientRect();
+        const dx = was.x - now.left, dy = was.y - now.top;
+        // A tile that becomes the full-width open card also grows from its old
+        // width, so it never sticks out past the edge while it slides into place.
+        const grew = Math.abs(was.w - now.width) > 1;
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1 && !grew) continue;
+        const from = { transform: `translate(${dx}px, ${dy}px)` }, to = { transform: 'translate(0, 0)' };
+        if (grew) { from.width = `${was.w}px`; to.width = `${now.width}px`; }
+        const a = c.animate([from, to], { duration: 380, easing: 'cubic-bezier(.2,.75,.25,1)' });
         a.id = 'flip';
       }
     } catch { /* a missed animation is not worth an error */ }
@@ -7007,12 +7013,12 @@ Thanks!` : '';
   );
 }
 
-function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, focused, session, onEdit, onDataChanged }) {
+function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, focused, session, onEdit, onDataChanged, open = false, onToggle }) {
   const M = useMoney();
   const N = useNameDisplay();
   const danielOnly = isDanielAccount(session);
   const weeklyActive = TTWeekly.plans(student.id).some(p => p.status !== 'proposed' && p.acceptance);
-  const [open, setOpen] = useState(false);
+  const setOpen = want => onToggle?.(want);
   useEffect(() => {
     if (!open) return;
     const onKey = e => {
@@ -8315,6 +8321,19 @@ function App() {
   const shownStudents = sortStudents(matchingStudents, sortBy, rateHistory);
   const studentListRef = React.useRef(null);
   const captureListPositions = useFlip(studentListRef);
+  // One student open at a time. Opening someone closes whoever was open, and the
+  // other cards slide to their new places rather than jumping.
+  const [openStudentId, setOpenStudentId] = useState(null);
+  function toggleStudent(id, want) {
+    captureListPositions();
+    setOpenStudentId(cur => want ? id : (cur === id ? null : cur));
+    if (want) setTimeout(() => {
+      const el = document.getElementById('student-' + id);
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      if (r.top < 80 || r.top > window.innerHeight - 160) el.scrollIntoView({ behavior: prefersLessMotion() ? 'auto' : 'smooth', block: 'start' });
+    }, 400);
+  }
 
   function jumpToStudent(id) {
     setQuery('');
@@ -8550,12 +8569,13 @@ function App() {
             <StudentCard key={s.id} student={s} lessons={lessons} payments={payments} bundles={bundles}
               allocations={allocations} allStudents={students} rateHistory={rateHistory}
               focused={focusStudentId === s.id}
+              open={openStudentId === s.id} onToggle={want => toggleStudent(s.id, want)}
               session={session}
               onEdit={setEditingStudent} onDataChanged={loadAll} />
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.36.0</div>}
+        {!loading && <div className="version-tag">v6.36.1</div>}
       </div>
 
       {showAddModal && (
