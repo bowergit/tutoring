@@ -140,6 +140,15 @@
   }
   .chip.warn { background: var(--warn-light); color: var(--warn); }
   .chip.neutral { background: var(--card-3); color: var(--ink-dim); }
+  .chip.chase { background: #25D366; color: #07300f; }
+  .mock-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .mock-stats div { background: var(--card-3); border-radius: 12px; padding: 9px 11px; }
+  .mock-stats b { display: block; font-size: 1.15rem; letter-spacing: -.02em; }
+  .mock-stats b.owed { color: var(--warn); }
+  .mock-stats span { font-size: .68rem; color: var(--muted); }
+  .mock-week { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; font-size: .72rem; margin-bottom: 12px; padding: 8px 11px; border-radius: 12px; border: 1px solid var(--line); }
+  .mock-week-t { font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .62rem; color: var(--accent); }
+  .mock-week i { font-style: normal; color: var(--muted); margin-right: 3px; }
   .spacer { margin-left: auto; }
   .demo-student { width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color .16s, transform .16s, background .16s; }
   .demo-student:hover, .demo-student:focus-visible { border-color: var(--accent); background: var(--accent-light); outline: none; }
@@ -317,15 +326,20 @@
           </div>
           <div class="pill-btn">+ Add</div>
         </div>
+        <div class="mock-stats">
+          <div><b class="owed">£270</b><span>Owed to you · 2 families</span></div>
+          <div><b>£640</b><span>Paid this month</span></div>
+        </div>
+        <div class="mock-week"><span class="mock-week-t">This week</span><span><i>Today</i> 4pm Amira</span><span><i>Wed</i> 5:30pm Joe</span><span><i>Thu</i> 6pm Priya</span></div>
 
         <button type="button" class="srow demo-student" data-student="amira"><span class="dot ok"></span><span class="sname">Amira K.</span>
           <span class="spacer"></span><span class="chip">Paid up</span><span class="chip neutral">Y11</span></button>
         <button type="button" class="srow demo-student" data-student="joe"><span class="dot warn"></span><span class="sname">Joe F.</span>
-          <span class="spacer"></span><span class="chip warn">Owes £180</span><span class="chip neutral">Y11</span></button>
+          <span class="spacer"></span><span class="chip warn">Owes £180</span><span class="chip chase">Chase</span></button>
         <button type="button" class="srow demo-student" data-student="priya"><span class="dot ok"></span><span class="sname">Priya S.</span>
           <span class="spacer"></span><span class="chip">Paid up</span><span class="chip neutral">Y13</span></button>
         <button type="button" class="srow demo-student" data-student="tom"><span class="dot warn"></span><span class="sname">Tom B.</span>
-          <span class="spacer"></span><span class="chip warn">Owes £90</span><span class="chip neutral">Y9</span></button>
+          <span class="spacer"></span><span class="chip warn">Owes £90</span><span class="chip chase">Chase</span></button>
         <div id="demoDetail" class="demo-detail" aria-live="polite"></div>
       </div>
       <p class="cta-note" style="text-align:center">2 of them owe you £270. Tap a name to see the useful bit.</p>
@@ -363,7 +377,7 @@
     <div class="rv" style="max-width:640px">
       <div class="eyebrow">How it works</div>
       <h2>You already did the admin when you booked the lesson.</h2>
-      <p class="lede">Connect Google Calendar once. TutorTally keeps lesson records and balances right as plans change.</p>
+      <p class="lede">Connect your calendar once: Google, Apple or Outlook. TutorTally keeps lesson records and balances right as plans change.</p>
     </div>
 
     <div class="flow rv" style="margin-top:34px">
@@ -435,14 +449,18 @@
     </div>
 
     <div class="grid g2" style="margin-top:30px">
-      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 4h18v5H3z M5 9v11h14V9 M10 13h4"/></svg></span><h3>Student cards</h3>
-        <p class="muted" style="font-size:.93rem">See the next lesson, what has been paid, what is overdue, and the balance that actually needs chasing.</p></div>
+      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 4h18v5H3z M5 9v11h14V9 M10 13h4"/></svg></span><h3>Money first</h3>
+        <p class="muted" style="font-size:.93rem">It opens on what you are owed and what came in this month. Each student shows the next lesson, what has been paid and what actually needs chasing.</p></div>
       <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z M7 10h10 M7 14h6"/></svg></span><h3>Payment requests</h3>
         <p class="muted" style="font-size:.93rem">Tap once and WhatsApp opens with the amount, the lesson count and the dates already written in human language.</p></div>
       <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2"/></svg></span><h3>Changes stay accurate</h3>
         <p class="muted" style="font-size:.93rem">Your teaching calendar stays the source of truth, so cancellations and rescheduled lessons do not leave a wrong balance behind.</p></div>
       <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2 M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg></span><h3>Parent pages</h3>
-        <p class="muted" style="font-size:.93rem">Every family gets a private lesson page, which makes a one-person tutoring business feel organised without extra admin.</p></div>
+        <p class="muted" style="font-size:.93rem">Every family gets a private lesson page, and the pupil gets their own with just their lessons and no money. Shared links show the child's name, like "Amira's Lessons".</p></div>
+      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2"/></svg></span><h3>This week at a glance</h3>
+        <p class="muted" style="font-size:.93rem">Every lesson in the next seven days on one strip, so you know who is next without opening anything.</p></div>
+      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9 M10 21h4"/></svg></span><h3>Needs attention</h3>
+        <p class="muted" style="font-size:.93rem">Who has owed for over a week, and who has nothing booked. Chase from right there in one tap, and undo a payment you logged by mistake.</p></div>
     </div>
 
     <div class="try rv">
@@ -474,12 +492,13 @@
     <div class="rv">
       <a class="mock" href="/student.html?t=demo-amira" style="display:block;max-width:340px;margin:0 auto;text-decoration:none;color:inherit">
         <div style="font-weight:750;font-size:1.05rem;letter-spacing:-.02em">Amira</div>
-        <div class="mock-sub" style="margin-bottom:14px">Your lessons and payment status</div>
-        <div class="srow"><span class="sname" style="font-weight:560">Tue 19 Aug · 16:00</span><span class="spacer"></span><span class="chip neutral">Scheduled</span></div>
-        <div class="srow"><span class="sname" style="font-weight:560">Tue 26 Aug · 16:00</span><span class="spacer"></span><span class="chip neutral">Scheduled</span></div>
+        <div class="mock-sub" style="margin-bottom:14px">Lessons and payment status</div>
+        <div class="mock-sub" style="margin:0 0 8px">UPCOMING</div>
+        <div class="srow"><span class="sname" style="font-weight:560" data-tue="0">Tue · 16:00</span><span class="spacer"></span><span class="chip neutral">Upcoming</span></div>
+        <div class="srow"><span class="sname" style="font-weight:560" data-tue="1">Tue · 16:00</span><span class="spacer"></span><span class="chip neutral">Upcoming</span></div>
         <div class="mock-sub" style="margin:14px 0 8px">RECENT</div>
-        <div class="srow"><span class="sname" style="font-weight:560">Tue 12 Aug · 16:00</span><span class="spacer"></span><span class="chip">Paid</span></div>
-        <div class="srow" style="margin-bottom:0"><span class="sname" style="font-weight:560">Tue 5 Aug · 16:00</span><span class="spacer"></span><span class="chip">Paid</span></div>
+        <div class="srow"><span class="sname" style="font-weight:560" data-tue="-1">Tue · 16:00</span><span class="spacer"></span><span class="chip">Paid</span></div>
+        <div class="srow" style="margin-bottom:0"><span class="sname" style="font-weight:560" data-tue="-2">Tue · 16:00</span><span class="spacer"></span><span class="chip">Paid</span></div>
       </a>
     </div>
   </div>
@@ -526,8 +545,8 @@
           <div class="eyebrow">Built for tutors who</div>
           <h3 style="margin-bottom:12px">Already use an online calendar.</h3>
           <div class="ref-step"><div class="ref-n">1</div><div>
-            <b>Put lessons in Google Calendar.</b>
-            <div class="muted" style="font-size:.9rem">That is what TutorTally reads. A paper diary is not a match yet.</div></div></div>
+            <b>Put lessons in an online calendar.</b>
+            <div class="muted" style="font-size:.9rem">Google, Apple Calendar or Outlook. That is what TutorTally reads. A paper diary is not a match yet.</div></div></div>
           <div class="ref-step"><div class="ref-n">2</div><div>
             <b>Get paid by bank transfer or cash.</b>
             <div class="muted" style="font-size:.9rem">You record payments. TutorTally does the sums.</div></div></div>
@@ -546,7 +565,7 @@
     <div class="rv"><div class="eyebrow">Questions</div><h2>The things people ask.</h2></div>
     <div class="rv" style="margin-top:24px">
       <details><summary>Do I have to change how I book lessons?</summary>
-        <div class="faq-answer"><p>No. Keep using your teaching calendar. Google Calendar is the direct connection. If you use Apple Calendar to view a Google calendar, it is already covered. Outlook and iCloud calendar connections are not built in yet.</p></div></details>
+        <div class="faq-answer"><p>No. Keep using your teaching calendar. Google Calendar connects directly. Apple Calendar, Outlook and most other calendars connect with a private share link, and the app shows you where to find it.</p></div></details>
       <details><summary>What if I teach something other than maths?</summary>
         <div class="faq-answer"><p>It does not care what you teach. Lessons, students and money owed work the same way for English, languages, DT or any other subject.</p></div></details>
       <details><summary>Does it connect to my bank?</summary>
@@ -594,6 +613,15 @@
 </footer>
 
 <script>
+// Sample parent page dates follow the calendar, so the example never looks months old.
+(function () {
+  var now = new Date(); now.setHours(12, 0, 0, 0);
+  var next = new Date(now); next.setDate(now.getDate() + ((2 - now.getDay() + 7) % 7 || 7));
+  document.querySelectorAll('[data-tue]').forEach(function (el) {
+    var d = new Date(next); d.setDate(next.getDate() + 7 * Number(el.getAttribute('data-tue')));
+    el.textContent = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · 16:00';
+  });
+})();
   document.getElementById('yr').textContent = new Date().getFullYear();
 
   // Reveal on scroll. Falls back to everything visible if unsupported, so the
@@ -658,7 +686,7 @@
 
   const demoStudents = {
     amira: { name: 'Amira Khan', year: 'Year 11', summary: 'Paid up. Next lesson: Tuesday at 16:00.', link: '/?demo=1' },
-    joe: { name: 'Joe Fletcher', year: 'Year 11', summary: '3 lessons unpaid, £180 outstanding. Last payment: 6 August.', link: '/?demo=1' },
+    joe: { name: 'Joe Fletcher', year: 'Year 11', summary: '3 lessons unpaid, £180 outstanding, the oldest from 3 weeks ago. One tap to chase.', link: '/?demo=1' },
     priya: { name: 'Priya Shah', year: 'Year 13', summary: 'Paid up. Online lesson: Thursday at 18:00.', link: '/?demo=1' },
     tom: { name: 'Tom Bennett', year: 'Year 9', summary: '2 lessons unpaid, £90 outstanding. Next lesson: Monday at 17:00.', link: '/?demo=1' },
   };

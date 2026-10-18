@@ -44,6 +44,10 @@
     /* The old coral was 3.61:1 on its own tint, under the 4.5 needed. */
     --warn: #c0362c;
     --warn-light: #fdecea;
+    /* Solid red and green for white text to sit on. The dark theme's --warn is a
+       light coral that is readable as text but not as a button behind white text. */
+    --danger-fill: #b3261e;
+    --good-fill: #0f7a35;
     --muted: #87938f;
     --gold: #b7791f;
     --gold-light: #fff4d8;
@@ -78,6 +82,8 @@
       --good-light: #0f2e1a;
       --warn: #ff8a63;
       --warn-light: #351d15;
+      --danger-fill: #c0392b;
+      --good-fill: #157a3c;
       --muted: #7f918c;
       --gold: #e6bd62;
       --gold-light: #302612;
@@ -887,7 +893,7 @@
     background:var(--accent-fill); color:var(--on-accent); text-decoration:none; display:inline-block;
   }
   .billing-bar.demo .billing-btn { background:#fff; color:var(--accent); }
-  .billing-bar.warn .billing-btn { background:var(--warn); color:#fff; }
+  .billing-bar.warn .billing-btn { background:var(--danger-fill); color:#fff; }
   .billing-btn.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
   .billing-btn:disabled { opacity:.6; cursor:default; }
   .go-pro-action { display:inline-flex; flex-direction:column; align-items:flex-start; gap:6px; max-width:100%; }
@@ -1076,7 +1082,7 @@
     background: var(--accent-fill); color: var(--on-accent);
   }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.35.0">
+<link rel="stylesheet" href="ux.css?v=6.35.1">
 </head>
 <body>
 <div id="root"></div>
@@ -3091,7 +3097,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
       }}>
         <span style={{
           width:9, height:9, borderRadius:5, flexShrink:0,
-          background: status === null ? 'var(--muted)' : (status.connected || feed) ? 'var(--good)' : 'var(--warn)'
+          background: status === null ? 'var(--muted)' : (status.connected || feed) ? 'var(--good-fill)' : 'var(--danger-fill)'
         }} />
         <span style={{flex:1}}>
           {status === null ? 'Checking…'
@@ -3415,7 +3421,7 @@ function MonzoPanel({ students, onDataChanged }) {
       }}>
         <span style={{
           width:9, height:9, borderRadius:5, flexShrink:0,
-          background: status === null ? 'var(--muted)' : connected ? 'var(--good)' : 'var(--warn)'
+          background: status === null ? 'var(--muted)' : connected ? 'var(--good-fill)' : 'var(--danger-fill)'
         }} />
         <span style={{flex:1}}>
           {status === null ? 'Checking…'
@@ -3832,7 +3838,7 @@ function DeleteAccount({ session }) {
           Delete your TutorTally account, students, lessons, payments and calendar connection.
           If you have TutorTally Pro, the subscription is cancelled too.
         </p>
-        <button className="btn" style={{width:'100%', background:'var(--warn)', color:'#fff'}} onClick={() => setConfirming(true)}>
+        <button className="btn" style={{width:'100%', background:'var(--danger-fill)', color:'#fff'}} onClick={() => setConfirming(true)}>
           Delete my account
         </button>
       </div>
@@ -3851,7 +3857,7 @@ function DeleteAccount({ session }) {
       {state === 'error' && <div style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:12}}>{detail}</div>}
       <div style={{display:'flex', gap:8}}>
         <button className="btn" style={{flex:1, background:'var(--card-2)', color:'var(--ink)', border:'1px solid var(--line)'}} onClick={() => { setConfirming(false); setWord(''); setState('idle'); }} disabled={state === 'busy'}>Keep my account</button>
-        <button className="btn" style={{flex:1, background:'var(--warn)', color:'#fff'}} onClick={removeAccount} disabled={state === 'busy' || word !== 'DELETE'}>{state === 'busy' ? 'Deleting…' : 'Delete permanently'}</button>
+        <button className="btn" style={{flex:1, background:'var(--danger-fill)', color:'#fff'}} onClick={removeAccount} disabled={state === 'busy' || word !== 'DELETE'}>{state === 'busy' ? 'Deleting…' : 'Delete permanently'}</button>
       </div>
     </div>
   );
@@ -6187,7 +6193,7 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
         ) : (
           <div className="btn-row">
             <button className="btn cancel" onClick={close}>Close</button>
-            <button className="btn" style={{background:'var(--warn)', color:'#fff'}} onClick={() => setConfirming(true)}>Delete</button>
+            <button className="btn" style={{background:'var(--danger-fill)', color:'#fff'}} onClick={() => setConfirming(true)}>Delete</button>
             <button className="btn save" onClick={onEdit}>Edit</button>
           </div>
         )}
@@ -6344,7 +6350,7 @@ function StatementSheet({ student, lessons, payments, allocations, payState, sca
         <DialogClose onClose={close} />
         {masked && (
           <div style={{
-            fontSize:'0.76rem', fontWeight:600, color:'#fff', background:'var(--warn)',
+            fontSize:'0.76rem', fontWeight:600, color:'#fff', background:'var(--danger-fill)',
             padding:'8px 11px', borderRadius:8, marginBottom:14, lineHeight:1.4
           }}>
             Privacy mode is on, so this screen is masked. Turn it off in Settings
@@ -6671,7 +6677,7 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
         ) : (
           <div className="btn-row">
             <button className="btn cancel" onClick={close}>Close</button>
-            <button className="btn" style={{background:'var(--warn)', color:'#fff', flex:'0 0 auto', minWidth:'auto', padding:'11px 14px'}}
+            <button className="btn" style={{background:'var(--danger-fill)', color:'#fff', flex:'0 0 auto', minWidth:'auto', padding:'11px 14px'}}
               onClick={() => setConfirmingDelete(true)}>Delete</button>
             {lesson.status === 'completed' && (
               <button
@@ -7310,7 +7316,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                             // Green only once the money is actually in. A lesson
                             // that has happened but hasn't been paid for is money
                             // owed, not a job done, so it reads as a warning.
-                            : l.status === 'completed' ? {color: settled ? 'var(--good)' : 'var(--warn)'}
+                            : l.status === 'completed' ? {color: settled ? 'var(--good-fill)' : 'var(--danger-fill)'}
                             : {}
                           }>
                             {TTWeekly.covers(l) ? `${lessonStatusLabel(l.status)}, included in weekly tuition` : l.is_complimentary ? 'Free' : `${lessonStatusLabel(l.status)} · ${M(rateForLesson(l, rateHistory), l.id + ':rate')}`}
@@ -8342,7 +8348,7 @@ function App() {
         <div role="status" className="toast-in" style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600, maxWidth:'92vw',
-          background: refreshNote.bad ? 'var(--warn)' : 'var(--good)',
+          background: refreshNote.bad ? 'var(--danger-fill)' : 'var(--good-fill)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {refreshNote.text}
@@ -8352,7 +8358,7 @@ function App() {
         <div className="toast-in" style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600, maxWidth:'92vw',
-          background: billingNotice === 'done' && !billingNeedsAttention ? 'var(--good)' : 'var(--warn)',
+          background: billingNotice === 'done' && !billingNeedsAttention ? 'var(--good-fill)' : 'var(--danger-fill)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {billingNotice === 'done'
@@ -8368,7 +8374,7 @@ function App() {
         <div className="toast-in" style={{
           position:'fixed', top:12, left:'50%', transform:'translateX(-50%)', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600,
-          background: monzoStatus === 'connected' ? 'var(--good)' : 'var(--warn)',
+          background: monzoStatus === 'connected' ? 'var(--good-fill)' : 'var(--danger-fill)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {monzoStatus === 'connected' ? '🏦 Monzo connected successfully' : 'Monzo connection was cancelled or denied'}
@@ -8378,7 +8384,7 @@ function App() {
         <div style={{
           position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600,
-          background: googleStatus === 'connected' ? 'var(--good)' : 'var(--warn)',
+          background: googleStatus === 'connected' ? 'var(--good-fill)' : 'var(--danger-fill)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
           {googleStatus === 'connected' ? '📅 Google Calendar connected - pick a calendar in Settings to finish' : 'Google Calendar connection was cancelled or denied'}
@@ -8528,7 +8534,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.35.0</div>}
+        {!loading && <div className="version-tag">v6.35.1</div>}
       </div>
 
       {showAddModal && (
