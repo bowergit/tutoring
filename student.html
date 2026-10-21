@@ -302,7 +302,7 @@
   }
   function pillHTML(l, scheduled) {
     if (!window.__pupilView && l.weekly_included) return '<span class="pill scheduled">Included in weekly tuition</span>';
-    if (scheduled) return '<span class="pill scheduled">Scheduled</span>';
+    if (scheduled) return `<span class="pill scheduled">${l.free ? 'Free' : 'Scheduled'}</span>`;
     // A pupil is told the lesson happened, not whether it was paid for.
     if (window.__pupilView) {
       return `<span class="pill scheduled">${l.status === 'missed' ? 'Missed' : 'Done'}</span>`;
