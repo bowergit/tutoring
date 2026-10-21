@@ -263,17 +263,27 @@ function replacePapers_(config, studentId, papers) {
   }
   if (papers.length === 0) return;
 
-  const rows = papers.map(p => ({
-    student_id: studentId,
-    owner_id: config.ownerId,
-    sheet_tab: p.tab,
-    paper_set: p.set,
-    paper_code: p.code,
-    score_raw: p.raw,
-    max_score: p.max,
-    percentage: p.pct,
-    date_taken: p.date
-  }));
+  // The same paper sat twice (a duplicated set in the tracker) is a second
+  // attempt, numbered in the order it was taken, never a clash with the first.
+  const seen = {};
+  const rows = papers.slice()
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')))
+    .map(p => {
+      const key = p.tab + '|' + p.set + '|' + p.code;
+      seen[key] = (seen[key] || 0) + 1;
+      return {
+        student_id: studentId,
+        owner_id: config.ownerId,
+        sheet_tab: p.tab,
+        paper_set: p.set,
+        paper_code: p.code,
+        score_raw: p.raw,
+        max_score: p.max,
+        percentage: p.pct,
+        date_taken: p.date,
+        attempt: seen[key]
+      };
+    });
 
   const res = UrlFetchApp.fetch(config.url + '/rest/v1/tutoring_past_papers', {
     method: 'post',

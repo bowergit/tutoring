@@ -1097,11 +1097,12 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.36.1">
+<link rel="stylesheet" href="ux.css?v=6.37.0">
 </head>
 <body>
 <div id="root"></div>
 <script src="weekly-billing.js"></script>
+<script src="hourly-billing.js"></script>
 <script type="text/babel">
 const { useState, useEffect } = React;
 
@@ -2448,9 +2449,11 @@ function lessonStatusLabel(status) {
 }
 
 // One payment request, worded the same wherever it is sent from.
-function paymentRequestText(student, balance, rate, weekly) {
+function paymentRequestText(student, balance, rate, weekly, hourly) {
   const parentFirstName = (student.parent_name || '').split(' ')[0];
   const greeting = parentFirstName ? `Hi ${parentFirstName}!` : 'Hi!';
+  // Hourly lessons vary in length, so "N sessions" would be guesswork.
+  if (hourly) return `${greeting} Just a note that there's ${moneyText(balance)} outstanding for ${student.name.split(' ')[0]}'s lessons. Your page shows each lesson, how long it was and what's been paid. Please could you settle this when you get the chance? Thanks!`;
   if (weekly) return `${greeting} There is ${moneyText(balance)} outstanding on your tuition account. Your parent dashboard shows the weekly charges and payments. Please could you settle this when you get the chance? Thanks!`;
   const unpaidCount = balance > 0 && rate > 0 ? Math.ceil(balance / rate) : 0;
   return `${greeting} Just a note that we have ${unpaidCount} outstanding session${unpaidCount !== 1 ? 's' : ''} totalling ${moneyText(balance)}. Please could you settle this when you get the chance? Thanks!`;
@@ -4877,7 +4880,7 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
       const days = Math.floor((new Date(today) - new Date(oldestUnpaid.lesson_date)) / 86400000);
       if (days >= 7) {
         const phone = normaliseUKPhone(s.parent_phone);
-        const text = paymentRequestText(s, balance, weeklyRateFor(s.id, rateHistory), weeklyLedger);
+        const text = paymentRequestText(s, balance, weeklyRateFor(s.id, rateHistory), weeklyLedger, !!TTHourly.currentPlan(s.id));
         items.push({
           id: s.id + ':owing', studentId: s.id, name: s.name,
           why: `${M(balance, s.id + ':balance')} · ${days}d`,
@@ -5916,6 +5919,8 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
     : '•••';
 
   const [datePaid, setDatePaid]   = useState(payment?.date_paid || today);
+  const payerPlan = TTHourly.planFor(student.id, new Date().toISOString().slice(0, 10)) || TTHourly.currentPlan(student.id);
+  const [payer, setPayer] = useState(payment?.payer || payerPlan?.payer || 'parent');
   const [method, setMethod]       = useState(payment?.method || (student.pays_in_cash ? 'cash' : 'bank_transfer'));
   const [amount, setAmount]       = useState(payment ? String(payment.amount) : '');
   const [saving, setSaving]       = useState(false);
@@ -5965,7 +5970,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
     // however the payment arrives - here, from Monzo, or by hand.
     if (editing) {
       await supabase.from('tutoring_payments')
-        .update({ amount: amt, date_paid: datePaid, method })
+        .update({ amount: amt, date_paid: datePaid, method, ...(payerPlan ? { payer } : {}) })
         .eq('id', payment.id);
     } else {
       // owner_id set explicitly: see the comment on the same pattern in
@@ -5973,7 +5978,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
       // a second tenant's insert would otherwise fail the RLS WITH CHECK.
       const ownerId = (await supabase.auth.getUser()).data.user?.id;
       const { data: added } = await supabase.from('tutoring_payments').insert({
-        student_id: student.id, amount: amt, date_paid: datePaid, method, owner_id: ownerId
+        student_id: student.id, amount: amt, date_paid: datePaid, method, owner_id: ownerId, ...(payerPlan ? { payer } : {})
       }).select('id').single();
       // Undo instead of an "are you sure": logging is the common case, a slip
       // is rare, and taking it back is the same soft delete the payment list uses.
@@ -6057,6 +6062,13 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
             ))}
           </div>
         </div>
+
+        {payerPlan && <div className="field">
+          <label>Paid by</label>
+          <div className="seg">
+            {PAYERS.map(([v, lab]) => <button key={v} className={payer === v ? 'sel' : ''} onClick={() => setPayer(v)}>{lab}</button>)}
+          </div>
+        </div>}
 
         <div className="field">
           <label>Date paid</label>
@@ -6471,7 +6483,7 @@ function StatementSheet({ student, lessons, payments, allocations, payState, sca
 }
 
 // ---------- More Tools Sheet ----------
-function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive, onDelete, onWeekly, weeklySubtitle }) {
+function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive, onDelete, onWeekly, weeklySubtitle, onHourly, hourlySubtitle }) {
   const [confirmingArchive, setConfirmingArchive] = useState(false);
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
@@ -6520,13 +6532,19 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
             />
           </ToolsSection>
 
-          {onWeekly && <ToolsSection title="Weekly tuition">
-            <ToolsRow
+          {(onWeekly || onHourly) && <ToolsSection title="How they pay">
+            {onWeekly && <ToolsRow
               title="Weekly tuition"
               subtitle={weeklySubtitle}
               onClick={onWeekly}
               end="›"
-            />
+            />}
+            {onHourly && <ToolsRow
+              title="Hourly tuition"
+              subtitle={hourlySubtitle}
+              onClick={onHourly}
+              end="›"
+            />}
           </ToolsSection>}
 
           <ToolsSection title="Parent page">
@@ -6614,7 +6632,7 @@ function groupByMonth(lessons) {
   return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
 }
 
-function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree, onDelete, toggling }) {
+function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree, onDelete, toggling, hourly, onSaved }) {
   const M = useMoney();
   const { nameMode } = usePrivacy();
   const [cls, close] = useAnimatedClose(onClose);
@@ -6626,6 +6644,26 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
   const METHODS = { cash:'cash', bank_transfer:'bank transfer', monzo_auto:'bank transfer', other:'payment' };
   const st = payState || { rate: lessonRate, paid: 0, payments: [], settled: false, partial: false };
   const moneySeed = lesson.id + ':rate';
+  // Hourly lessons: how long, at what price, and notes for termly reports.
+  const [len, setLen] = useState(lesson.duration_minutes != null ? String(lesson.duration_minutes) : '');
+  const [ownPrice, setOwnPrice] = useState(!!lesson.charge_overridden);
+  const [price, setPrice] = useState(lesson.charge_overridden && lesson.rate_charged != null ? String(lesson.rate_charged) : '');
+  const [free, setFree] = useState(!!lesson.is_complimentary);
+  const [notes, setNotes] = useState(lesson.tutor_notes || '');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const hourlyPlan = hourly ? TTHourly.planFor(lesson.student_id, lesson.lesson_date) : null;
+  const previewMins = Number(len) || lesson.billed_minutes || hourlyPlan?.default_minutes || 60;
+  const previewPrice = hourlyPlan ? TTHourly.price(hourlyPlan.hourly_rate, previewMins) : null;
+  async function saveHourly() {
+    setSaving(true); setSaveError('');
+    const change = { duration_minutes: len === '' ? null : Number(len), charge_overridden: ownPrice, is_complimentary: free, tutor_notes: notes.trim() || null };
+    if (ownPrice) change.rate_charged = Number(price) || 0;
+    const { error } = await supabase.from('tutoring_lessons').update(change).eq('id', lesson.id);
+    if (!error) await supabase.rpc('reallocate_student_payments', { p_student_id: lesson.student_id });
+    setSaving(false);
+    if (error) setSaveError(error.message || 'Could not save this lesson.'); else onSaved?.();
+  }
   return (
     <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
       <div className={`sheet${cls}`} role="dialog" aria-modal="true">
@@ -6672,6 +6710,26 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
             )}
           </div>
         )}
+        {hourly && <div className="wk-sum" style={{marginBottom:16}}>
+          <div className="wk-row">
+            <div className="field" style={{marginBottom:10}}><label>Length</label>
+              <select value={len} onChange={e => setLen(e.target.value)}>
+                <option value="">{`Usual (${TTHourly.minutesLabel(lesson.billed_minutes || hourlyPlan?.default_minutes || 60)})`}</option>
+                {[30, 45, 60, 75, 90, 105, 120, 150, 180].map(m => <option key={m} value={m}>{TTHourly.minutesLabel(m)}</option>)}
+              </select></div>
+            <div className="field" style={{marginBottom:10}}><label>Charge</label>
+              {ownPrice
+                ? <div className="money-input"><span>£</span><input type="number" min="0" step="0.01" value={price} onChange={e => setPrice(e.target.value)} /></div>
+                : <div className="wk-price" style={{fontSize:'1.15rem', paddingTop:8}}>{free ? 'Free' : previewPrice != null ? moneyText(previewPrice) : '-'}</div>}
+            </div>
+          </div>
+          <label className="checkbox-row" style={{fontSize:'.84rem', marginBottom:6}}><input type="checkbox" checked={ownPrice} onChange={e => { setOwnPrice(e.target.checked); if (e.target.checked && !price) setPrice(String(previewPrice ?? '')); }} />Set the price by hand</label>
+          <label className="checkbox-row" style={{fontSize:'.84rem', marginBottom:10}}><input type="checkbox" checked={free} onChange={e => setFree(e.target.checked)} />Complimentary (no charge)</label>
+          <div className="field" style={{marginBottom:10}}><label>Progress notes</label>
+            <textarea maxLength={4000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="What you covered and how it went. Used in termly summaries." /></div>
+          {saveError && <p className="wk-error" role="alert">{saveError}</p>}
+          <button type="button" className="btn save" style={{width:'100%'}} disabled={saving} onClick={saveHourly}>{saving ? 'Saving…' : 'Save lesson'}</button>
+        </div>}
         {/* Lesson notes come straight from the calendar event title, which
             usually contains the student's name - hidden whenever names are. */}
         {lesson.lesson_notes && nameMode === 'normal' && (
@@ -6969,9 +7027,11 @@ Thanks!` : '';
           {view === 'main' && <>
             {!plan ? <>
               <p className="wk-note">{allPlans.length ? 'The last weekly plan has ended. ' : ''}This student pays per lesson. You can switch them to one fixed price every week.</p>
-              <div className="btn-row" style={{marginTop:0}}>
-                <button type="button" className="btn save" onClick={() => go('setup')}>Set up weekly tuition</button>
-              </div>
+              {TTHourly.currentPlan(student.id)
+                ? <p className="wk-note">This student is on hourly tuition. Stop that first to switch them to weekly.</p>
+                : <div className="btn-row" style={{marginTop:0}}>
+                    <button type="button" className="btn save" onClick={() => go('setup')}>Set up weekly tuition</button>
+                  </div>}
               {helpRow}
             </> : <>
               <div className="wk-sum">
@@ -7013,6 +7073,294 @@ Thanks!` : '';
   );
 }
 
+// ---------- Hourly tuition sheet ----------
+// The third billing arrangement: priced by the hour and by lesson length. The
+// database prices each lesson (see tutoring_hourly_price), so this sheet only
+// sets the arrangement up and reads it back. Built from the same pieces as the
+// weekly sheet so it looks and moves like the rest of the app.
+function hourlyEnabled(session) { return !DEMO_MODE && isDanielAccount(session); }
+const HOURLY_LENGTHS = [30, 45, 60, 75, 90, 120];
+const PAYERS = [['parent', 'Parent'], ['council', 'Council'], ['other', 'Other']];
+
+function HourlyTuitionSheet({ student, lessons, session, onChanged, onClose }) {
+  const { moneyMode, nameMode } = usePrivacy();
+  const N = useNameDisplay();
+  const [cls, close] = useAnimatedClose(onClose);
+  const readonly = moneyMode !== 'normal' || nameMode !== 'normal';
+  const H = TTHourly;
+  const plan = H.currentPlan(student.id);
+  const history = H.plans(student.id);
+  const weeklyOpen = TTWeekly.plans(student.id).some(p => p.status !== 'ended');
+  const meta = session?.user?.user_metadata || {};
+  const today = H.today();
+
+  const [view, setView] = useState('main');   // main | setup | rate | invoices | term
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [confirmingStop, setConfirmingStop] = useState(false);
+  const blank = { hourly_rate: String(meta.default_hourly_rate ?? 100), default_minutes: 60, slots: [], starts_on: today,
+    payer: 'parent', payer_name: '', payer_email: '', payer_reference: '', cancellation_terms: '', invoice_notes: '' };
+  const [form, setForm] = useState(blank);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const [newRate, setNewRate] = useState('');
+  const [rateFrom, setRateFrom] = useState(today);
+  const lastMonth = (() => { const d = new Date(today + 'T12:00:00Z'); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 7); })();
+  const [month, setMonth] = useState(today.slice(8) <= '10' ? lastMonth : today.slice(0, 7));
+  const termGuess = (() => { const y = Number(today.slice(0, 4)), md = today.slice(5);
+    return md >= '09-01' ? [`${y}-09-01`, `${y}-12-23`] : md >= '04-15' ? [`${y}-04-15`, `${y}-07-31`] : [`${y}-01-01`, `${y}-04-14`]; })();
+  const [termFrom, setTermFrom] = useState(termGuess[0]);
+  const [termTo, setTermTo] = useState(termGuess[1]);
+
+  const go = v => { setError(''); setView(v); };
+  async function run(fn, then) {
+    if (readonly || busy) return;
+    setBusy(true); setError('');
+    try { await fn(); await onChanged(); if (then) then(); }
+    catch (e) { setError(e.message || 'Could not save this. Try again.'); }
+    finally { setBusy(false); }
+  }
+  const must = r => { if (r?.error) throw r.error; return r; };
+  const reprice = from => supabase.rpc('tutoring_hourly_reprice', { p_student_id: student.id, p_from: from }).then(must);
+  const payerLabel = p => (PAYERS.find(([k]) => k === p) || [p, p])[1];
+  const tutor = { tutor_name: meta.display_name || session?.user?.email || '', tutor_email: meta.contact_email || session?.user?.email || '', tutor_phone: meta.contact_phone || '' };
+
+  function startEdit() {
+    setForm(plan ? { hourly_rate: String(plan.hourly_rate), default_minutes: plan.default_minutes, slots: plan.slots || [], starts_on: plan.starts_on,
+      payer: plan.payer, payer_name: plan.payer_name || '', payer_email: plan.payer_email || '', payer_reference: plan.payer_reference || '',
+      cancellation_terms: plan.cancellation_terms || '', invoice_notes: plan.invoice_notes || '' } : blank);
+    go('setup');
+  }
+  const cleanSlots = () => form.slots
+    .filter(s => s.start && Number(s.minutes) > 0)
+    .map(s => ({ weekday: Number(s.weekday), start: s.start, minutes: Number(s.minutes) }));
+  function saveSetup(e) {
+    e.preventDefault();
+    const details = {
+      default_minutes: Number(form.default_minutes) || 60, slots: cleanSlots(), payer: form.payer,
+      payer_name: form.payer_name.trim() || null, payer_email: form.payer_email.trim() || null,
+      payer_reference: form.payer_reference.trim() || null, cancellation_terms: form.cancellation_terms.trim() || null,
+      invoice_notes: form.invoice_notes.trim() || null,
+    };
+    if (plan) {
+      // Lengths and slots apply from today, so lessons already taught keep their price.
+      run(async () => { must(await supabase.from('tutoring_hourly_plans').update(details).eq('id', plan.id)); await reprice(today); }, () => go('main'));
+    } else {
+      run(async () => {
+        must(await supabase.from('tutoring_hourly_plans').insert({ ...details, student_id: student.id, owner_id: student.owner_id,
+          hourly_rate: Number(form.hourly_rate), starts_on: form.starts_on }));
+        await reprice(form.starts_on);
+      }, () => go('main'));
+    }
+  }
+  function changeRate(e) {
+    e.preventDefault();
+    // A new rate is a new arrangement from that date. The old one keeps covering
+    // the lessons before it, so history is never re-priced.
+    run(async () => {
+      must(await supabase.from('tutoring_hourly_plans').update({ ends_before: rateFrom, status: 'ended' }).eq('id', plan.id));
+      const { id, created_at, ends_before, status, ...rest } = plan;
+      must(await supabase.from('tutoring_hourly_plans').insert({ ...rest, hourly_rate: Number(newRate), starts_on: rateFrom }));
+      await reprice(rateFrom);
+    }, () => go('main'));
+  }
+  function stopPlan() {
+    run(async () => {
+      if (plan.starts_on >= today) must(await supabase.from('tutoring_hourly_plans').delete().eq('id', plan.id));
+      else must(await supabase.from('tutoring_hourly_plans').update({ ends_before: today, status: 'ended' }).eq('id', plan.id));
+      await reprice(plan.starts_on >= today ? plan.starts_on : today);
+    }, () => setConfirmingStop(false));
+  }
+
+  // Invoices
+  const range = H.monthRange(month);
+  const lines = H.invoiceLines(lessons, student.id, range.start, range.end);
+  const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100;
+  const invoices = H.invoices(student.id);
+  const printable = inv => H.invoiceHTML({ ...inv, ...tutor, student_name: student.name,
+    invoice_notes: (H.planFor(student.id, inv.period_start) || plan || {}).invoice_notes || '' });
+  function openPrint(html) {
+    const w = window.open('', '_blank');
+    if (!w) { setError('Your browser blocked the new tab. Allow pop-ups for TutorTally and try again.'); return null; }
+    w.document.open(); w.document.write(html); w.document.close();
+    return w;
+  }
+  function createInvoice() {
+    const p = H.planFor(student.id, range.start) || plan;
+    const inv = { student_id: student.id, owner_id: student.owner_id, plan_id: p?.id || null,
+      number: H.invoiceNumber(student.name, month, invoices), period_start: range.start, period_end: range.end,
+      payer: p?.payer || 'parent', payer_name: p?.payer_name || null, payer_reference: p?.payer_reference || null,
+      lines, total, issued_at: new Date().toISOString() };
+    const w = window.open('', '_blank');   // opened before the save, or the browser treats it as a pop-up
+    run(async () => {
+      must(await supabase.from('tutoring_invoices').insert(inv));
+      if (w) { w.document.open(); w.document.write(printable({ ...inv, status: 'issued' })); w.document.close(); }
+    });
+  }
+  const setInvoiceStatus = (inv, status) => run(async () => must(await supabase.from('tutoring_invoices').update({ status }).eq('id', inv.id)));
+
+  // Termly summary
+  const term = H.termSummary(lessons, student.id, termFrom, termTo);
+
+  const head = <h2>Hourly tuition - {N(student.name, student.id)}</h2>;
+  const helpNote = <p className="wk-note">Each lesson is charged at the hourly rate for its length: 90 minutes at £100 an hour is £150. Set a lesson's length, a different price or mark it free from the lesson itself.</p>;
+
+  return (
+    <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
+        {head}
+        {readonly ? <p className="wk-note">Hourly details are hidden while privacy mode is on.</p> : <div className="wk-view" key={view}>
+
+          {view === 'setup' && <form onSubmit={saveSetup}>
+            {!plan && helpNote}
+            <div className="wk-row">
+              <div className="field"><label>Price an hour</label>
+                <div className="money-input"><span>£</span><input type="number" required min="1" max="1000" step="0.5" value={form.hourly_rate}
+                  disabled={!!plan} onChange={e => set('hourly_rate', e.target.value)} /></div></div>
+              <div className="field"><label>Usual lesson length</label>
+                <select value={form.default_minutes} onChange={e => set('default_minutes', Number(e.target.value))}>
+                  {HOURLY_LENGTHS.map(m => <option key={m} value={m}>{TTHourly.minutesLabel(m)}</option>)}
+                </select></div>
+            </div>
+            {plan && <p className="wk-note" style={{marginTop:-6}}>To change the rate, use Change the rate, so lessons already taught keep their price.</p>}
+            <div className="field"><label>Weekly lessons</label>
+              {form.slots.map((s, i) => (
+                <div className="wk-row" key={i} style={{marginBottom:8, alignItems:'center'}}>
+                  <select value={s.weekday} onChange={e => set('slots', form.slots.map((x, j) => j === i ? { ...x, weekday: Number(e.target.value) } : x))}>
+                    {[1,2,3,4,5,6,0].map(d => <option key={d} value={d}>{TTHourly.DAYS[d]}</option>)}</select>
+                  <input type="time" step="900" value={s.start} onChange={e => set('slots', form.slots.map((x, j) => j === i ? { ...x, start: e.target.value } : x))} />
+                  <select value={s.minutes} onChange={e => set('slots', form.slots.map((x, j) => j === i ? { ...x, minutes: Number(e.target.value) } : x))}>
+                    {HOURLY_LENGTHS.map(m => <option key={m} value={m}>{TTHourly.minutesLabel(m)}</option>)}</select>
+                  <button type="button" className="btn cancel" aria-label="Remove this weekly lesson" style={{flex:'0 0 auto', padding:'10px 12px'}}
+                    onClick={() => set('slots', form.slots.filter((_, j) => j !== i))}>✕</button>
+                </div>
+              ))}
+              <button type="button" className="btn edit" style={{width:'100%'}} onClick={() => set('slots', [...form.slots, { weekday: 2, start: '16:00', minutes: form.default_minutes }])}>+ Add a weekly lesson</button>
+              <p className="wk-note" style={{margin:'8px 0 0'}}>Lessons come from your calendar as usual. These set how long each one is, so it is priced right. A lesson on another day uses the usual length.</p>
+            </div>
+            {!plan && <div className="field"><label>First lesson on or after</label>
+              <input type="date" required value={form.starts_on} onChange={e => set('starts_on', e.target.value)} /></div>}
+            <div className="field"><label>Paid by</label>
+              <div className="seg">{PAYERS.map(([k, lab]) => <button type="button" key={k} className={form.payer === k ? 'sel' : ''} onClick={() => set('payer', k)}>{lab}</button>)}</div></div>
+            <div className="wk-row">
+              <div className="field"><label>{form.payer === 'council' ? 'Council or team' : 'Name on invoices'}</label>
+                <input type="text" maxLength={120} value={form.payer_name} onChange={e => set('payer_name', e.target.value)} placeholder={form.payer === 'council' ? 'e.g. Barnet SEN team' : "e.g. parent's name"} /></div>
+              <div className="field"><label>Reference</label>
+                <input type="text" maxLength={80} value={form.payer_reference} onChange={e => set('payer_reference', e.target.value)} placeholder="EHCP or PO number" /></div>
+            </div>
+            <div className="field"><label>Invoice email</label>
+              <input type="email" maxLength={160} value={form.payer_email} onChange={e => set('payer_email', e.target.value)} placeholder="Where invoices go" /></div>
+            <div className="field"><label>Cancellation terms</label>
+              <textarea maxLength={1000} value={form.cancellation_terms} onChange={e => set('cancellation_terms', e.target.value)} placeholder="Agreed separately. Leave blank if there is nothing set." /></div>
+            <div className="field"><label>Payment details on invoices</label>
+              <textarea maxLength={600} value={form.invoice_notes} onChange={e => set('invoice_notes', e.target.value)} placeholder="Bank name, sort code, account number, payment terms" /></div>
+            {plan && <p className="wk-note">Changes apply to lessons from today. Lessons already taught keep their price.</p>}
+            {error && <p className="wk-error" role="alert">{error}</p>}
+            <div className="btn-row">
+              <button type="button" className="btn cancel" onClick={() => go('main')}>Cancel</button>
+              <button className="btn save" disabled={busy || !(Number(form.hourly_rate) > 0)}>{busy ? 'Saving…' : plan ? 'Save changes' : 'Start hourly tuition'}</button>
+            </div>
+          </form>}
+
+          {view === 'rate' && plan && <form onSubmit={changeRate}>
+            <p className="wk-note">The new rate applies to lessons from the date you pick. Earlier lessons keep {moneyText(plan.hourly_rate)} an hour.</p>
+            <div className="wk-row">
+              <div className="field"><label>New price an hour</label>
+                <div className="money-input"><span>£</span><input type="number" required min="1" max="1000" step="0.5" value={newRate} onChange={e => setNewRate(e.target.value)} /></div></div>
+              <div className="field"><label>From</label>
+                <input type="date" required min={plan.starts_on > today ? plan.starts_on : today} value={rateFrom} onChange={e => setRateFrom(e.target.value)} /></div>
+            </div>
+            {error && <p className="wk-error" role="alert">{error}</p>}
+            <div className="btn-row">
+              <button type="button" className="btn cancel" onClick={() => go('main')}>Cancel</button>
+              <button className="btn save" disabled={busy || !(Number(newRate) > 0) || rateFrom <= plan.starts_on}>{busy ? 'Saving…' : 'Change the rate'}</button>
+            </div>
+            {rateFrom <= plan.starts_on && <p className="wk-note" style={{marginTop:10}}>Pick a date after {TTHourly.dateLabel(plan.starts_on)}, or edit the arrangement instead.</p>}
+          </form>}
+
+          {view === 'invoices' && <>
+            <div className="wk-row">
+              <div className="field"><label>Month</label>
+                <input type="month" value={month} max={today.slice(0, 7)} onChange={e => e.target.value && setMonth(e.target.value)} /></div>
+              <div className="field"><label>Total</label><div className="wk-price" style={{fontSize:'1.3rem', paddingTop:6}}>{moneyText(total)}</div></div>
+            </div>
+            {lines.length ? <div style={{overflowX:'auto'}}><table className="wk-table"><thead><tr><th>Lesson</th><th>Length</th><th>Charge</th></tr></thead><tbody>
+              {lines.map((l, i) => <tr key={i}><td>{TTHourly.dateLabel(l.date)}{l.start ? ` · ${TTHourly.timeLabel(l.start)}` : ''}</td><td>{TTHourly.minutesLabel(l.minutes) || '-'}</td><td>{moneyText(l.amount)}{l.note ? ` · ${l.note}` : ''}</td></tr>)}
+            </tbody></table></div> : <p className="wk-note">No taught lessons in this month yet.</p>}
+            {error && <p className="wk-error" role="alert">{error}</p>}
+            <div className="btn-row">
+              <button type="button" className="btn cancel" onClick={() => go('main')}>Back</button>
+              <button type="button" className="btn save" disabled={busy || !lines.length} onClick={createInvoice}>Create invoice</button>
+            </div>
+            <p className="wk-note" style={{marginTop:10}}>Creating an invoice saves a copy here and opens it to print or save as a PDF. Nothing is sent automatically.</p>
+            {invoices.length > 0 && <div className="tools-menu"><ToolsSection title="Invoices">
+              {invoices.map(inv => (
+                <div key={inv.id} className="tools-row" style={{cursor:'default', display:'flex', flexWrap:'wrap', gap:8, alignItems:'center'}}>
+                  <span className="tools-row-main" style={{flex:'1 1 160px'}}>
+                    <span className="tools-row-title">{inv.number} · {moneyText(inv.total)}</span>
+                    <span className="tools-row-sub">{TTHourly.dateLabel(inv.period_start)} to {TTHourly.dateLabel(inv.period_end)} · {payerLabel(inv.payer)}</span>
+                  </span>
+                  <span className={`pill ${inv.status === 'paid' ? 'ok' : inv.status === 'void' ? 'warn' : 'neutral'}`}>{inv.status === 'issued' ? 'Sent' : inv.status === 'paid' ? 'Paid' : 'Cancelled'}</span>
+                  <button type="button" className="btn edit" style={{flex:'0 0 auto'}} onClick={() => openPrint(printable(inv))}>Open</button>
+                  {inv.status === 'issued' && <button type="button" className="btn edit" style={{flex:'0 0 auto'}} disabled={busy} onClick={() => setInvoiceStatus(inv, 'paid')}>Mark paid</button>}
+                  {inv.status === 'issued' && <button type="button" className="btn cancel" style={{flex:'0 0 auto'}} disabled={busy} onClick={() => setInvoiceStatus(inv, 'void')}>Cancel</button>}
+                </div>
+              ))}
+            </ToolsSection></div>}
+          </>}
+
+          {view === 'term' && <>
+            <p className="wk-note">Lessons, attendance and your progress notes for a term, ready to print or attach to a report.</p>
+            <div className="wk-row">
+              <div className="field"><label>From</label><input type="date" value={termFrom} onChange={e => setTermFrom(e.target.value)} /></div>
+              <div className="field"><label>To</label><input type="date" value={termTo} onChange={e => setTermTo(e.target.value)} /></div>
+            </div>
+            <div className="wk-sum"><p className="wk-sub" style={{margin:0}}>{term.taught} lesson{term.taught === 1 ? '' : 's'} taught · {term.hours} hours{term.missed ? ` · ${term.missed} missed` : ''}{term.upcoming ? ` · ${term.upcoming} still to come` : ''}</p></div>
+            <div className="btn-row">
+              <button type="button" className="btn cancel" onClick={() => go('main')}>Back</button>
+              <button type="button" className="btn save" onClick={() => openPrint(H.termHTML({ student_name: student.name, start: termFrom, end: termTo, tutor_name: tutor.tutor_name, summary: term }))}>Open summary</button>
+            </div>
+            {error && <p className="wk-error" role="alert">{error}</p>}
+          </>}
+
+          {view === 'main' && <>
+            {!plan ? <>
+              {helpNote}
+              {weeklyOpen
+                ? <p className="wk-note">{N(student.name, student.id)} is on weekly tuition. End that first to switch them to hourly.</p>
+                : <div className="btn-row" style={{marginTop:0}}><button type="button" className="btn save" onClick={startEdit}>Set up hourly tuition</button></div>}
+              {history.length > 0 && <p className="wk-note" style={{marginTop:12}}>Earlier hourly arrangements are kept, and their lessons keep their prices.</p>}
+            </> : <>
+              <div className="wk-sum">
+                <div className="wk-sum-head"><span className="wk-price">{moneyText(plan.hourly_rate)} an hour</span>
+                  <span className={`pill ${plan.starts_on <= today ? 'ok' : 'neutral'}`}>{plan.starts_on <= today ? 'Active' : `From ${TTHourly.dateLabel(plan.starts_on)}`}</span></div>
+                <p className="wk-sub">{(plan.slots || []).length ? plan.slots.map(TTHourly.slotLabel).join(' · ') : 'No weekly lessons set'}<br />Usual length {TTHourly.minutesLabel(plan.default_minutes)}</p>
+                <p className="wk-sub">Paid by {payerLabel(plan.payer).toLowerCase()}{plan.payer_name ? `: ${plan.payer_name}` : ''}{plan.payer_reference ? ` (ref ${plan.payer_reference})` : ''}</p>
+                <p className="wk-sub">{plan.cancellation_terms ? `Cancellations: ${plan.cancellation_terms}` : 'Cancellation terms: agreed separately'}</p>
+              </div>
+              <div className="tools-menu" style={{marginTop:0}}>
+                <ToolsSection title="This arrangement">
+                  <ToolsRow title="Monthly invoice" subtitle="Create, print or save as PDF" onClick={() => go('invoices')} end="›" />
+                  <ToolsRow title="Progress summary" subtitle="Lessons and notes for a termly report" onClick={() => go('term')} end="›" />
+                  <ToolsRow title="Edit details" subtitle="Weekly lessons, payer, terms" onClick={startEdit} end="›" />
+                  <ToolsRow title="Change the rate" subtitle="From a date, keeping earlier prices" onClick={() => { setNewRate(String(plan.hourly_rate)); setRateFrom(today > plan.starts_on ? today : plan.starts_on); go('rate'); }} end="›" />
+                </ToolsSection>
+                <ToolsSection title="Ending">
+                  {confirmingStop
+                    ? <div style={{padding:'12px 14px'}}><SlideToConfirm tone="caution" icon="archive" label="Slide to stop hourly tuition" doneLabel="Stopping…" onConfirm={stopPlan} /></div>
+                    : <ToolsRow title="Stop hourly tuition" subtitle="Lessons from today go back to the normal rate" tone="danger" onClick={() => setConfirmingStop(true)} />}
+                </ToolsSection>
+              </div>
+              {error && <p className="wk-error" role="alert">{error}</p>}
+            </>}
+          </>}
+        </div>}
+        {(view === 'main' || readonly) && <div className="btn-row"><button type="button" className="btn cancel" style={{flex:1}} onClick={close}>Close</button></div>}
+      </div>
+    </div>
+  );
+}
+
 function StudentCard({ student, lessons, payments, bundles, allocations = [], allStudents, rateHistory, focused, session, onEdit, onDataChanged, open = false, onToggle }) {
   const M = useMoney();
   const N = useNameDisplay();
@@ -7032,6 +7380,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const [notesOpen, setNotesOpen] = useState(false);
   const [showMoreTools, setShowMoreTools] = useState(false);
   const [showWeekly, setShowWeekly] = useState(false);
+  const [showHourly, setShowHourly] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [openMonths, setOpenMonths] = useState({});
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
@@ -7180,7 +7529,8 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   // General contact stays separate from the explicit payment reminder below.
   const waMessage = `${greeting} Just checking in about ${studentFirstName}'s next lesson.`;
   const waLink = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waMessage)}` : null;
-  const paymentMsg = paymentRequestText(student, balance, currentRate, weeklyActive);
+  const hourlyPlanNow = TTHourly.currentPlan(student.id);
+  const paymentMsg = paymentRequestText(student, balance, currentRate, weeklyActive, !!hourlyPlanNow);
   const paymentWaLink = phone && balance > 0 ? `https://wa.me/${phone}?text=${encodeURIComponent(paymentMsg)}` : null;
   const bundleWaLink = null;
   const cardParentLink = new URL(`student?t=${student.public_token}`, window.location.href).toString();
@@ -7227,7 +7577,9 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               <span className="pill neutral">Next: {new Date(nextLesson.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
             )}
             {displayYear && <span className="pill neutral">Y{displayYear}</span>}
-            <span className="pill neutral">{M(currentRate, student.id + ':rate')}</span>
+            {hourlyPlanNow
+              ? <span className="pill neutral">{M(Number(hourlyPlanNow.hourly_rate), student.id + ':hrate')}/h</span>
+              : <span className="pill neutral">{M(currentRate, student.id + ':rate')}</span>}
             {lessonPills.map(label => <span className="pill neutral" key={label}>{label}</span>)}
           </div>
         </div>
@@ -7345,7 +7697,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                             : l.status === 'completed' ? {color: settled ? 'var(--good-fill)' : 'var(--danger-fill)'}
                             : {}
                           }>
-                            {TTWeekly.covers(l) ? `${lessonStatusLabel(l.status)}, included in weekly tuition` : l.is_complimentary ? 'Free' : `${lessonStatusLabel(l.status)} · ${M(rateForLesson(l, rateHistory), l.id + ':rate')}`}
+                            {TTWeekly.covers(l) ? `${lessonStatusLabel(l.status)}, included in weekly tuition` : l.is_complimentary ? 'Free' : `${lessonStatusLabel(l.status)}${l.hourly_plan_id && l.billed_minutes ? ` · ${TTHourly.minutesLabel(l.billed_minutes)}` : ''} · ${M(rateForLesson(l, rateHistory), l.id + ':rate')}`}
                           </span>
                         </>
                       );
@@ -7439,8 +7791,14 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           onArchive={archiveStudent}
           onDelete={deleteStudent}
           onWeekly={danielOnly && student.owner_id === 'babb06b5-b5e0-4436-8b72-bc5556814956' ? () => { setShowMoreTools(false); setShowWeekly(true); } : null}
+          onHourly={hourlyEnabled(session) && student.owner_id === session?.user?.id ? () => { setShowMoreTools(false); setShowHourly(true); } : null}
+          hourlySubtitle={(() => { const hp = TTHourly.currentPlan(student.id); return hp ? `${moneyText(hp.hourly_rate)} an hour, paid by ${hp.payer === 'council' ? 'the council' : hp.payer}` : 'Not set up. Charge by the hour and lesson length'; })()}
           weeklySubtitle={(() => { const wp = TTWeekly.plans(student.id).find(p => p.status !== 'ended'); return wp ? `${moneyText(wp.weekly_fee)} a week, ${wp.status === 'active' ? 'active' : 'not switched on yet'}` : 'Not set up. Pays per lesson'; })()}
         />, document.body
+      )}
+
+      {showHourly && ReactDOM.createPortal(
+        <HourlyTuitionSheet student={student} lessons={studentLessons} session={session} onChanged={onDataChanged} onClose={() => setShowHourly(false)} />, document.body
       )}
 
       {showWeekly && ReactDOM.createPortal(
@@ -7493,6 +7851,8 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           onToggleFree={() => toggleComplimentary(detailLesson)}
           onDelete={() => deleteLesson(detailLesson)}
           toggling={toggling}
+          hourly={!!(detailLesson.hourly_plan_id || TTHourly.planFor(student.id, detailLesson.lesson_date))}
+          onSaved={() => { setDetailLesson(null); onDataChanged(); }}
         />, document.body
       )}
     </div>
@@ -8213,6 +8573,16 @@ function App() {
         weeklyCharges = results[1].data || [];
       }
       TTWeekly.set(weeklyPlans, weeklyCharges);
+      let hourlyPlans = [], hourlyInvoices = [];
+      if (hourlyEnabled(session)) {
+        const hr = await Promise.all([
+          supabase.from('tutoring_hourly_plans').select('*').eq('owner_id', session.user.id).order('starts_on'),
+          supabase.from('tutoring_invoices').select('*').eq('owner_id', session.user.id),
+        ]);
+        if (hr.some(r => r.error)) console.warn('Hourly tuition could not be loaded', hr.find(r => r.error).error);
+        else { hourlyPlans = hr[0].data || []; hourlyInvoices = hr[1].data || []; }
+      }
+      TTHourly.set(hourlyPlans, hourlyInvoices);
       setStudents(s.data || []);
       setLessons(l.data || []);
       setPayments(p.data || []);
@@ -8575,7 +8945,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.36.1</div>}
+        {!loading && <div className="version-tag">v6.37.0</div>}
       </div>
 
       {showAddModal && (

@@ -215,8 +215,28 @@
   .next-up .app-icon { color: var(--accent); flex: none; }
   .next-up span { color: var(--ink-dim); }
   .next-up b { margin-left: auto; font-weight: 700; color: var(--accent); white-space: nowrap; }
+
+  /* The grade actually achieved, picked out from the rest of the boundaries. */
+  .gbtable td.hit span { display: inline-block; min-width: 2.2em; padding: 2px 6px; border-radius: 7px; background: var(--accent-fill); color: var(--on-accent); font-weight: 800; }
+  .grade-chip { display: inline-block; min-width: 1.8em; padding: 1px 7px; border-radius: 7px; background: var(--accent-light); color: var(--accent); font-weight: 800; text-align: center; }
+  .series-btn { position: relative; background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: help; text-decoration: underline dotted; text-underline-offset: 3px; text-decoration-color: var(--muted); }
+  .series-dates { display: none; font-size: .72rem; color: var(--muted); font-weight: 500; text-decoration: none; }
+  .series-btn.open .series-dates { display: block; }
+  @media (hover: hover) {
+    .series-btn:hover::after { content: attr(data-dates); position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 5; white-space: nowrap;
+      padding: 5px 9px; border-radius: 8px; background: var(--ink); color: var(--card); font-size: .72rem; font-weight: 600; text-decoration: none; }
+    .series-btn.open:hover::after { display: none; }
+  }
+  .hr-card { padding: 15px 16px; }
+  .hr-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .hr-top b { font-size: 1.05rem; }
+  .hr-top span { font-size: .8rem; color: var(--ink-dim); }
+  .hr-slots { margin: 10px 0 0; padding-left: 18px; font-size: .86rem; line-height: 1.6; }
+  .hr-note { font-size: .82rem; color: var(--ink-dim); line-height: 1.5; margin: 10px 0 0; }
+  .hr-more { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; font-size: .86rem; }
+  .hr-more summary { cursor: pointer; font-weight: 650; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.36.1">
+<link rel="stylesheet" href="ux.css?v=6.37.0">
 </head>
 <body>
 <div class="wrap" id="app">
@@ -234,6 +254,26 @@
 
   function esc(s) {
     return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function minLabel(m) { m = Number(m); return m % 60 ? `${m} min` : (m === 60 ? '1 hour' : `${m / 60} hours`); }
+  // Charged by the hour and by how long each lesson is, rather than per lesson or by the week.
+  function renderHourly(h) {
+    if (!h) return '';
+    const DAYS = ['Sundays', 'Mondays', 'Tuesdays', 'Wednesdays', 'Thursdays', 'Fridays', 'Saturdays'];
+    const t = v => { const [hh, mm] = String(v || '').split(':').map(Number); return isNaN(hh) ? '' : `${hh % 12 || 12}${mm ? ':' + String(mm).padStart(2, '0') : ''}${hh < 12 ? 'am' : 'pm'}`; };
+    const slots = (h.slots || []).map(x => `<li>${esc(DAYS[x.weekday] || '')} at ${esc(t(x.start))}, ${esc(minLabel(x.minutes))}</li>`).join('');
+    const payer = h.payer === 'council' ? (h.payer_name ? `${h.payer_name}` : 'the council') : h.payer === 'parent' ? 'you' : (h.payer_name || 'arranged separately');
+    const who = p => p === 'council' ? 'Council' : p === 'parent' ? 'Parent' : p === 'other' ? 'Other' : '';
+    const pays = (h.payments || []).map(p => `<div class="paid-line"><span>${esc(money(p.amount))}</span><span class="paid-when">${esc(fmtPaidDate(p.date))}${who(p.payer) ? ' · ' + esc(who(p.payer)) : ''}</span></div>`).join('');
+    return `
+      <div class="section-label">Hourly tuition</div>
+      <div class="card hr-card">
+        <div class="hr-top"><b>${esc(money(h.hourly_rate))} an hour</b><span>Paid by ${esc(payer)}</span></div>
+        ${slots ? `<ul class="hr-slots">${slots}</ul>` : ''}
+        <p class="hr-note">Each lesson is charged for how long it runs, so a 90 minute lesson is one and a half hours. Each lesson below shows its length and charge.</p>
+        ${h.cancellation_terms ? `<details class="hr-more"><summary>Cancellations</summary><p class="hr-note">${esc(h.cancellation_terms)}</p></details>` : ''}
+        <details class="hr-more"><summary>Payments received${h.payments && h.payments.length ? ` (${h.payments.length})` : ''}</summary>${pays || '<p class="hr-note">No payments yet.</p>'}</details>
+      </div>`;
   }
   function fmtDate(d) {
     const dt = new Date(d + 'T12:00:00');
@@ -270,8 +310,9 @@
       // A lesson that has not happened yet is not owed yet - the balance only
       // ever counts lessons actually taught. Calling it "due" three weeks out
       // reads as a demand for money the parent does not owe.
-      if (scheduled) return `<div>${esc(money(l.rate))} once this one has happened.</div>`;
-      return `<div>Nothing paid against this one yet. ${esc(money(l.rate))} due.</div>`;
+      const len = l.minutes ? ` for ${minLabel(l.minutes)}` : '';
+      if (scheduled) return `<div>${esc(money(l.rate))}${len} once this one has happened.</div>`;
+      return `<div>Nothing paid against this one yet. ${esc(money(l.rate))}${len} due.</div>`;
     }
 
     const lines = parts
@@ -304,7 +345,7 @@
       return `
         <div class="lesson">
           <div class="row"${expandable ? ` data-detail="${key}"` : ' style="cursor:default"'}>
-            <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}</span>
+            <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}${l.minutes ? `<span class="time"> · ${esc(minLabel(l.minutes))}</span>` : ''}</span>
             ${pillHTML(l, scheduled)}
           </div>
           ${expandable ? `<div class="detail" id="detail-${key}" hidden>${detailHTML(l, scheduled)}</div>` : ''}
@@ -515,16 +556,39 @@
   const GRADE_ORDER = ['9', '8', '7', '6', '5', '4', '3', '2', '1'];
   const gradesIn = g => GRADE_ORDER.filter(k => g.boundaries.length && g.boundaries[0].grades[k] != null);
 
+  // A series name that shows when its exams were sat: on hover with a mouse,
+  // and on a tap on a touchscreen, where there is no hover.
+  function seriesCell(label, dates) {
+    if (!dates) return esc(label);
+    return `<button type="button" class="series-btn" data-dates="${esc(dates)}" aria-label="${esc(label)}, sat ${esc(dates)}">`
+      + `${esc(label)}<span class="series-dates">${esc(dates)}</span></button>`;
+  }
+
   function boundaryBody(g, mode) {
     const cols = gradesIn(g);
-    // Only the series this student has actually been marked against get the
-    // highlight, so the table reads as theirs rather than as a data dump.
-    const used = new Set(g.sets.filter(s => s.complete && s.exact_series).map(s => s.series_used));
-    return g.boundaries.map(b => `
-      <tr class="${used.has(b.label) ? 'used' : ''}">
-        <td>${esc(b.label)}</td>
-        ${cols.map(k => `<td>${mode === 'pct' ? b.pcts[k] + '%' : b.grades[k]}</td>`).join('')}
-      </tr>`).join('');
+    // The series this student was marked against are tinted, and the grade they
+    // actually got in each is picked out, so the table reads as theirs rather
+    // than as a data dump. Worked out from their marks against that series'
+    // own boundaries, one per attempt.
+    const hits = new Map();
+    g.sets.filter(s => s.complete && s.exact_series && s.grade).forEach(s => {
+      if (!hits.has(s.series_used)) hits.set(s.series_used, []);
+      hits.get(s.series_used).push(s);
+    });
+    return g.boundaries.map(b => {
+      const got = hits.get(b.label) || [];
+      return `
+      <tr class="${got.length ? 'used' : ''}">
+        <td>${seriesCell(b.label, b.dates)}</td>
+        ${cols.map(k => {
+          const mine = got.filter(s => String(s.grade) === String(k));
+          const val = mode === 'pct' ? b.pcts[k] + '%' : b.grades[k];
+          if (!mine.length) return `<td>${val}</td>`;
+          const who = mine.map(s => s.attempt > 1 ? `attempt ${s.attempt}` : 'first attempt').join(' and ');
+          return `<td class="hit" title="Grade ${esc(k)} achieved (${esc(who)}): ${mine.map(s => s.total_marks + '/' + s.max_mark).join(', ')}"><span>${val}</span></td>`;
+        }).join('')}
+      </tr>`;
+    }).join('');
   }
 
   // Money in one line. Nothing owing is the normal state and should look like
@@ -612,9 +676,9 @@
         <tbody>
           ${done.slice().reverse().map(s => `
             <tr>
-              <td>${esc(s.set)}${s.exact_series ? '' : ' <span style="color:var(--muted)">(typical)</span>'}</td>
+              <td>${seriesCell(s.set, s.series_dates)}${s.exact_series ? '' : ' <span style="color:var(--muted)">(typical)</span>'}</td>
               <td class="num">${s.total_marks}/${s.max_mark}</td>
-              <td class="num">${esc(s.grade)}</td>
+              <td class="num"><span class="grade-chip">${esc(s.grade)}</span></td>
             </tr>`).join('')}
         </tbody>
       </table>` : '';
@@ -696,6 +760,8 @@
   // One delegated listener handles every row, including ones added later by
   // "Show more" - no need to re-bind click handlers on every re-render.
   app.addEventListener('click', e => {
+    const series = e.target.closest('.series-btn');
+    if (series) { series.classList.toggle('open'); return; }
     const row = e.target.closest('[data-detail]');
     if (!row) return;
     const detail = document.getElementById('detail-' + row.dataset.detail);

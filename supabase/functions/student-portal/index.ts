@@ -149,6 +149,11 @@ function examIdentity(student: any, papers: any[]) {
   return { qualification: international ? 'International GCSE' : 'GCSE', board, tier }
 }
 
+// When a series' exams are sat. January papers run into February, the summer
+// series is May to June, and the November series sits in November.
+const seriesDates = (year: number, month: number) =>
+  month === 1 ? `January\u2013February ${year}` : month === 6 ? `May\u2013June ${year}` : `November ${year}`
+
 const seriesLabel = (year: number, month: number) =>
   `${month === 1 ? 'Jan' : month === 6 ? 'June' : 'Nov'} ${year}`
 
@@ -193,6 +198,7 @@ function buildGrade(papers: any[], student: any, rows: any[]) {
       max_mark: r.max_mark,
       grades: r.boundaries,
       pcts: toPcts(r.boundaries, r.max_mark),
+      dates: seriesDates(r.series_year, r.series_month),
     })
   }
 
@@ -222,12 +228,15 @@ function buildGrade(papers: any[], student: any, rows: any[]) {
   const sets = new Map<string, any>()
   for (const p of papers) {
     const variant = /R$/i.test(String(p.paper_code || '')) ? 'R' : ''
-    const key = `${p.sheet_tab}|${p.paper_set}|${variant}`
+    const attempt = Number(p.attempt) || 1
+    const key = `${p.sheet_tab}|${p.paper_set}|${variant}|${attempt}`
     if (!sets.has(key)) {
+      const base = variant ? `${p.paper_set} (R)` : p.paper_set
       sets.set(key, {
-        set: variant ? `${p.paper_set} (R)` : p.paper_set,
+        set: attempt > 1 ? `${base}, attempt ${attempt}` : base,
         series: p.paper_set,
         tab: p.sheet_tab,
+        attempt,
         papers: [],
       })
     }
@@ -246,6 +255,8 @@ function buildGrade(papers: any[], student: any, rows: any[]) {
     const entry: any = {
       set: s.set,
       tab: s.tab,
+      attempt: s.attempt,
+      series_dates: parsed ? seriesDates(parsed.year, parsed.month) : null,
       date: lastDate,
       papers_done: done,
       papers_needed: papersPerSet,
@@ -343,7 +354,8 @@ function buildProgress(papers: any[], student: any) {
     papers_per_series: papersPerSeries,
     papers: papers.map((p) => ({
       date: p.date_taken,
-      label: `${p.paper_set} ${p.paper_code}`.trim(),
+      label: `${p.paper_set} ${p.paper_code}${Number(p.attempt) > 1 ? ` (attempt ${p.attempt})` : ''}`.trim(),
+      attempt: Number(p.attempt) || 1,
       set: p.paper_set,
       code: p.paper_code,
       pct: round1(Number(p.percentage)),
@@ -366,7 +378,7 @@ async function loadProgress(student: any) {
   }
 
   const { data: papersRaw } = await supabase.from('tutoring_past_papers')
-    .select('paper_set,paper_code,percentage,score_raw,max_score,date_taken,sheet_tab')
+    .select('paper_set,paper_code,percentage,score_raw,max_score,date_taken,sheet_tab,attempt')
     .eq('student_id', student.id)
     // Two papers sat on the same day are common, and a tie with no defined
     // order lets "latest" and the trend arrow change between refreshes on
@@ -374,6 +386,7 @@ async function loadProgress(student: any) {
     .order('date_taken')
     .order('paper_set')
     .order('paper_code')
+    .order('attempt')
   const papers = papersRaw ?? []
 
   let grade = null
@@ -502,7 +515,7 @@ Deno.serve(async (req) => {
 
   const accountReads = await Promise.all([
     supabase.from('tutoring_lessons')
-      .select('id,lesson_date,start_time,status,is_complimentary,pre_settled,rate_charged')
+      .select('id,lesson_date,start_time,status,is_complimentary,pre_settled,rate_charged,billed_minutes,hourly_plan_id')
       .eq('student_id', student.id)
       .neq('status', 'cancelled')
       .order('lesson_date'),
@@ -511,10 +524,14 @@ Deno.serve(async (req) => {
       .eq('student_id', student.id)
       .order('effective_from_date'),
     supabase.auth.admin.getUserById(student.owner_id),
+    supabase.from('tutoring_hourly_plans')
+      .select('hourly_rate,default_minutes,slots,payer,payer_name,cancellation_terms,starts_on,ends_before,status')
+      .eq('student_id', student.id)
+      .order('starts_on'),
   ])
 
   if(accountReads.some(r=>r.error)) return json({ok:false,problem:'Could not load your account. Please try again.'},503)
-  const [{data:lessons},{data:rateHistoryRaw},{data:ownerUser}]=accountReads
+  const [{data:lessons},{data:rateHistoryRaw},{data:ownerUser},{data:hourlyPlans}]=accountReads
   let weeklyPlans:any[] = [], weeklyCharges:any[] = [], weeklyAcceptances:any[] = []
   if(student.owner_id===MONZO_SETTLE_OWNER) {
     const results=await Promise.all([
@@ -540,7 +557,7 @@ Deno.serve(async (req) => {
     : { data: [] as any[] }
 
   const paymentRead = await supabase.from('tutoring_payments')
-    .select('id,date_paid,amount')
+    .select('id,date_paid,amount,payer')
     .eq('student_id', student.id)
     .is('deleted_at', null)
   if(paymentRead.error) return json({ok:false,problem:'Could not load payments.'},503)
@@ -569,6 +586,7 @@ Deno.serve(async (req) => {
 
   const shape = (l: any) => ({
     weekly_included: covered(l),
+    minutes: l.hourly_plan_id ? (l.billed_minutes ?? null) : null,
     date: l.lesson_date,
     time: l.start_time,
     status: l.status,
@@ -633,6 +651,22 @@ Deno.serve(async (req) => {
   const tutor = ownerUser?.user
   const tutorMeta = tutor?.user_metadata ?? {}
 
+  // The arrangement in force now (or about to start), with every payment and who made it.
+  const hourlyNow = (hourlyPlans ?? [])
+    .filter((p: any) => p.status === 'active' && (!p.ends_before || todayStr < p.ends_before))
+    .sort((a: any, b: any) => b.starts_on.localeCompare(a.starts_on))[0]
+  const hourly = hourlyNow ? {
+    hourly_rate: Number(hourlyNow.hourly_rate),
+    default_minutes: hourlyNow.default_minutes,
+    slots: hourlyNow.slots ?? [],
+    payer: hourlyNow.payer,
+    payer_name: hourlyNow.payer_name ?? null,
+    cancellation_terms: hourlyNow.cancellation_terms ?? null,
+    starts_on: hourlyNow.starts_on,
+    payments: (payments ?? []).slice().sort((a: any, b: any) => String(b.date_paid).localeCompare(String(a.date_paid)))
+      .map((p: any) => ({ date: p.date_paid, amount: Number(p.amount), payer: p.payer ?? null })),
+  } : null
+
   logView_(student.id, student.owner_id, 'parent')
 
   return json({
@@ -644,6 +678,7 @@ Deno.serve(async (req) => {
     grade,
     account,
     weekly,
+    hourly,
     // Monzo settle up is deliberately limited to Daniel's own tutoring account.
     // Cash students never get a bank transfer button.
     can_settle_up: student.owner_id === MONZO_SETTLE_OWNER && !student.pays_in_cash && !weeklyPlans.some(p=>p.review_required),
