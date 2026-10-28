@@ -1097,7 +1097,7 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.37.2">
+<link rel="stylesheet" href="ux.css?v=6.37.3">
 </head>
 <body>
 <div id="root"></div>
@@ -5962,6 +5962,15 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
     if (!editing) setAmount(String(rate));
   }, []);
 
+  const pendingUndo = React.useRef(null);
+  const offerUndo = () => {
+    if (!pendingUndo.current) return;
+    window.dispatchEvent(new CustomEvent('tt-undo', { detail: pendingUndo.current }));
+    pendingUndo.current = null;
+  };
+  // The receipt step's ways out all hand the Undo offer over first.
+  const afterReceipt = fn => () => { offerUndo(); fn(); };
+
   async function handleSave() {
     setSaving(true);
     const amt = parseFloat(amount) || 0;
@@ -5982,13 +5991,15 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
       }).select('id').single();
       // Undo instead of an "are you sure": logging is the common case, a slip
       // is rare, and taking it back is the same soft delete the payment list uses.
-      if (added?.id) window.dispatchEvent(new CustomEvent('tt-undo', { detail: {
+      // When the cash receipt step follows, the offer waits until that step is
+      // closed, so the Undo bar and the receipt buttons are never on screen together.
+      if (added?.id) pendingUndo.current = {
         text: `${moneyText(amt)} logged for ${student.name.split(' ')[0]}`,
         undo: async () => {
           await supabase.from('tutoring_payments').update({ deleted_at: new Date().toISOString() }).eq('id', added.id);
           await supabase.rpc('reallocate_student_payments', { p_student_id: student.id });
         },
-      } }));
+      };
     }
 
     setSaving(false);
@@ -6000,6 +6011,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
     if (!editing && method === 'cash' && normaliseUKPhone(student.parent_phone)) {
       setSavedCash({ amount: amt, date: datePaid });
     } else {
+      offerUndo();
       onSaved();
     }
   }
@@ -6016,9 +6028,9 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
 
   if (savedCash) {
     return (
-      <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && close()}>
+      <div className={`overlay${cls}`} onClick={(e) => e.target === e.currentTarget && afterReceipt(close)()}>
         <div className={`sheet${cls}`} role="dialog" aria-modal="true">
-        <DialogClose onClose={close} />
+        <DialogClose onClose={afterReceipt(close)} />
           <h2>Payment logged</h2>
           <div style={{fontSize:'0.85rem', color:'var(--muted)', marginBottom:18, lineHeight:1.5}}>
             {moneyText(savedCash.amount)} from {N(student.name, student.id)} on{' '}
@@ -6026,9 +6038,9 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
             Send a WhatsApp receipt to the parent?
           </div>
           <div className="btn-row">
-            <button className="btn cancel" onClick={onSaved}>Skip</button>
+            <button className="btn cancel" onClick={afterReceipt(onSaved)}>Skip</button>
             <a className="btn save" style={{textAlign:'center', textDecoration:'none'}}
-              href={receiptWaLink} target="_blank" rel="noopener" onClick={onSaved}>
+              href={receiptWaLink} target="_blank" rel="noopener" onClick={afterReceipt(onSaved)}>
               💬 Send receipt
             </a>
           </div>
@@ -8947,7 +8959,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.37.2</div>}
+        {!loading && <div className="version-tag">v6.37.3</div>}
       </div>
 
       {showAddModal && (
