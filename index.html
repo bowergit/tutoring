@@ -1097,7 +1097,7 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.37.1">
+<link rel="stylesheet" href="ux.css?v=6.37.2">
 </head>
 <body>
 <div id="root"></div>
@@ -6653,7 +6653,7 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
   const hourlyPlan = hourly ? TTHourly.planFor(lesson.student_id, lesson.lesson_date) : null;
-  const previewMins = Number(len) || lesson.billed_minutes || hourlyPlan?.default_minutes || 60;
+  const previewMins = Number(len) || lesson.calendar_minutes || lesson.billed_minutes || hourlyPlan?.default_minutes || 60;
   const previewPrice = hourlyPlan ? TTHourly.price(hourlyPlan.hourly_rate, previewMins) : null;
   async function saveHourly() {
     setSaving(true); setSaveError('');
@@ -6714,7 +6714,9 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
           <div className="wk-row">
             <div className="field" style={{marginBottom:10}}><label>Length</label>
               <select value={len} onChange={e => setLen(e.target.value)}>
-                <option value="">{`Usual (${TTHourly.minutesLabel(lesson.billed_minutes || hourlyPlan?.default_minutes || 60)})`}</option>
+                <option value="">{lesson.calendar_minutes
+                  ? `From calendar (${TTHourly.minutesLabel(lesson.calendar_minutes)})`
+                  : `Usual (${TTHourly.minutesLabel(lesson.billed_minutes || hourlyPlan?.default_minutes || 60)})`}</option>
                 {[30, 45, 60, 75, 90, 105, 120, 150, 180].map(m => <option key={m} value={m}>{TTHourly.minutesLabel(m)}</option>)}
               </select></div>
             <div className="field" style={{marginBottom:10}}><label>Charge</label>
@@ -8945,7 +8947,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.37.1</div>}
+        {!loading && <div className="version-tag">v6.37.2</div>}
       </div>
 
       {showAddModal && (
