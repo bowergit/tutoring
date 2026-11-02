@@ -105,8 +105,9 @@ nothing else, and orange never implies approval.
 
 Every pairing above clears 4.5:1 against the surface it sits on. Check any new
 one before using it rather than after.
-- Chase coral: `#d05b39`
-- Receipt gold: `#b7791f`
+
+The full token list, type scale, spacing and components are in
+`DESIGN_SYSTEM.md`, and the values themselves live only in `tokens.css`.
 
 Typography:
 - General Sans for product and marketing UI.
@@ -114,8 +115,7 @@ Typography:
 
 UI Rules:
 - Cards should feel like tidy records, not marketing tiles.
-- Paid states use teal.
-- Owed/chase states use coral.
-- Calendar and sync states can use blue.
-- Money/receipt details can use gold sparingly.
+- Paid states use green.
+- Owed/chase states use red.
+- Part-paid states use gold.
 - Do not overdecorate. The product should feel fast and trustworthy.

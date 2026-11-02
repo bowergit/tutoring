@@ -1,11 +1,4 @@
-/* TutorTally shared interface system. */
-:root {
-  --muted: #63736d;
-  --r-sm: 10px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px;
-  --ease: cubic-bezier(.2,.8,.2,1);
-  --ring: 0 0 0 4px rgba(255,165,0,.19);
-}
-@media (prefers-color-scheme: dark) { :root { --muted: #a2b5ad; } }
+/* TutorTally shared components. Tokens live in tokens.css. */
 html { color-scheme: light dark; scroll-padding-top: 110px; }
 body { line-height: 1.5; font-feature-settings: "ss01"; }
 button, input, select, textarea { font-family: inherit; }

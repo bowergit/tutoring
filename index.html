@@ -15,92 +15,8 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="stylesheet" href="tokens.css?v=6.38.0">
 <style>
-  /* ── Light mode (default) ── */
-  :root {
-    --bg: #f7f8f4;
-    --bg-tint: #ecf4f1;
-    --card: #ffffff;
-    --card-2: #f5f7f6;
-    --card-3: #edf1ef;
-    --line: #dfe7e3;
-    --line-soft: #edf1ef;
-    --ink: #15211f;
-    --ink-dim: #596965;
-    /* Orange is the brand colour, but it only behaves as a FILL. #ffa500 as
-       text on paper is 1.85:1 and under white text 1.97:1, both unreadable,
-       while ink on top of it is 8.4:1. So --accent is the readable orange used
-       for text and borders, --accent-fill is the brand orange used for blocks,
-       and --on-accent is what goes on top of a fill. */
-    --accent: #a15c00;
-    --accent-fill: #ffa500;
-    --on-accent: #15211f;
-    --accent-2: #ffa500;
-    --accent-light: #fff1d9;
-    /* Status is not brand. Orange says "this is TutorTally"; green and red
-       say whether a thing is good or bad, and never stand in for each other. */
-    --good: #0f7a35;
-    --good-light: #e3f7e9;
-    /* The old coral was 3.61:1 on its own tint, under the 4.5 needed. */
-    --warn: #c0362c;
-    --warn-light: #fdecea;
-    /* Solid red and green for white text to sit on. The dark theme's --warn is a
-       light coral that is readable as text but not as a button behind white text. */
-    --danger-fill: #b3261e;
-    --good-fill: #0f7a35;
-    --muted: #87938f;
-    --gold: #b7791f;
-    --gold-light: #fff4d8;
-    --shadow: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
-    /* Layered shadows read as real depth; a single blurred box never does. */
-    --sh-1: 0 1px 2px rgba(22,21,15,.06);
-    --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
-    --sh-3: 0 2px 6px rgba(22,21,15,.06), 0 16px 40px -12px rgba(22,21,15,.22);
-    --ring: 0 0 0 3px rgba(255,165,0,.28);
-  }
-
-  /* ── Dark mode ── */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #101716;
-      --bg-tint: #14211f;
-      --card: #182321;
-      --card-2: #1e2a27;
-      --card-3: #26332f;
-      --line: #30413d;
-      --line-soft: #26332f;
-      --ink: #eef8f5;
-      --ink-dim: #a5b7b1;
-      /* On a dark ground the brand orange is 9.2:1, so text and fill are the
-         same colour here and nothing has to be darkened. */
-      --accent: #ffa500;
-      --accent-fill: #ffa500;
-      --on-accent: #15211f;
-      --accent-2: #ffa500;
-      --accent-light: #3a2604;
-      --good: #4ade80;
-      --good-light: #0f2e1a;
-      --warn: #ff8a63;
-      --warn-light: #351d15;
-      --danger-fill: #c0392b;
-      --good-fill: #157a3c;
-      --muted: #7f918c;
-      --gold: #e6bd62;
-      --gold-light: #302612;
-      --shadow: 0 1px 3px rgba(0,0,0,0.3);
-      --sh-1: 0 1px 2px rgba(0,0,0,.4);
-      --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
-      --sh-3: 0 2px 8px rgba(0,0,0,.5), 0 20px 48px -14px rgba(0,0,0,.75);
-      --ring: 0 0 0 3px rgba(255,165,0,.30);
-    }
-  }
-
-  /* Radii and motion, shared across both themes. */
-  :root {
-    --r-sm: 9px; --r-md: 13px; --r-lg: 17px; --r-xl: 24px;
-    --ease: cubic-bezier(.2,.8,.2,1);
-    --ease-spring: cubic-bezier(.34,1.4,.64,1);
-  }
 
   * { box-sizing: border-box; }
   body {
@@ -1097,7 +1013,7 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.37.5">
+<link rel="stylesheet" href="ux.css?v=6.38.0">
 </head>
 <body>
 <div id="root"></div>
@@ -8970,7 +8886,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.37.5</div>}
+        {!loading && <div className="version-tag">v6.38.0</div>}
       </div>
 
       {showAddModal && (

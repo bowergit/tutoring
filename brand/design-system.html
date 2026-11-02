@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TutorTally Design System</title>
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../tokens.css?v=6.38.0">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+  main { max-width: 880px; margin: 0 auto; padding: var(--s-8) var(--s-4) var(--s-10); }
+  header { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2); }
+  header svg { width: 40px; height: 30px; }
+  h1 { font-size: var(--t-xl); margin: 0; }
+  h1 span { color: var(--accent); }
+  .lede { color: var(--ink-dim); margin: 0 0 var(--s-8); font-size: var(--t-sm); }
+  h2 { font-size: var(--t-lg); margin: var(--s-10) 0 var(--s-4); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: var(--s-3); }
+  .sw { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; background: var(--card); }
+  .sw i { display: block; height: 56px; border-bottom: 1px solid var(--line); }
+  .sw div { padding: var(--s-2) var(--s-3); font-size: var(--t-xs); }
+  .sw b { display: block; font-size: var(--t-sm); font-weight: 600; }
+  .sw small { color: var(--muted); }
+  .type > div { display: flex; align-items: baseline; gap: var(--s-4); padding: var(--s-2) 0; border-bottom: 1px solid var(--line-soft); }
+  .type code { width: 72px; flex: none; color: var(--muted); font-size: var(--t-xs); }
+  .row { display: flex; flex-wrap: wrap; gap: var(--s-3); align-items: center; }
+  .space i { display: inline-block; height: 16px; background: var(--accent-fill); border-radius: 3px; vertical-align: middle; }
+  .space div { display: flex; align-items: center; gap: var(--s-3); font-size: var(--t-xs); color: var(--ink-dim); margin-bottom: var(--s-1); }
+  .space code { width: 48px; }
+  .box { width: 96px; height: 64px; background: var(--card); border: 1px solid var(--line); display: grid; place-items: center; font-size: var(--t-xs); color: var(--ink-dim); }
+
+  /* Component samples, styled the way index.html styles them. */
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-2); padding: var(--s-4) var(--s-5); max-width: 420px; }
+  .card-top { display: flex; justify-content: space-between; align-items: center; gap: var(--s-3); }
+  .name { font-weight: 650; font-size: 1.05rem; }
+  .sub { color: var(--ink-dim); font-size: var(--t-sm); margin-top: 2px; }
+  .big { font-size: var(--t-2xl); font-weight: 700; letter-spacing: -.035em; font-variant-numeric: tabular-nums; margin: var(--s-4) 0 0; }
+  .pill { font-size: .7rem; padding: 4px 9px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+  .pill.ok { background: var(--good-light); color: var(--good); }
+  .pill.warn { background: var(--warn-light); color: var(--warn); }
+  .pill.gold { background: var(--gold-light); color: var(--gold); }
+  .pill.neutral { background: var(--card-2); color: var(--ink-dim); border: 1px solid var(--line); }
+  .section-label { font-size: var(--t-xs); text-transform: uppercase; letter-spacing: .075em; color: var(--ink-dim); font-weight: 700; margin: 0 0 var(--s-2); }
+  .btn { min-height: 44px; padding: 11px 18px; border-radius: var(--r-md); border: none; font: 650 .85rem var(--font); cursor: pointer; }
+  .btn.save { background: var(--accent-fill); color: var(--on-accent); }
+  .btn.quiet { background: var(--card-2); color: var(--ink); border: 1px solid var(--line); }
+  .btn.whatsapp { background: #25D366; color: #07300f; }
+  .btn.danger { background: var(--danger-fill); color: #fff; }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; box-shadow: var(--ring); }
+  .field label { display: block; color: var(--ink-dim); font-size: .8rem; font-weight: 600; margin-bottom: 7px; }
+  .field input { width: 100%; max-width: 320px; min-height: 46px; padding: 10px 12px; font: 400 var(--t-md) var(--font); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
+  .field input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
+  .attn { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: var(--r-lg); padding: var(--s-4); max-width: 420px; font-size: var(--t-sm); }
+  .empty { background: var(--card); border: 1px dashed var(--line); border-radius: var(--r-lg); padding: var(--s-8) var(--s-5); text-align: center; color: var(--muted); max-width: 420px; font-size: var(--t-sm); }
+  .empty strong { display: block; color: var(--ink); font-size: 1rem; margin-bottom: 5px; }
+  .note { color: var(--muted); font-size: var(--t-xs); margin-top: var(--s-2); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 40 30" aria-hidden="true"><path d="M10 4v22M18 4v22" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/><path d="M5 22L33 8" stroke="#ffa500" stroke-width="3.4" stroke-linecap="round"/></svg>
+    <h1>Tutor<span>Tally</span> design system</h1>
+  </header>
+  <p class="lede">Every value here comes from <code>tokens.css</code>. Switch your device to dark mode to see the other theme. Rules and usage are in <code>DESIGN_SYSTEM.md</code>.</p>
+
+  <h2>Colour</h2>
+  <div class="grid" id="swatches"></div>
+
+  <h2>Type</h2>
+  <div class="type">
+    <div><code>--t-2xl</code><span style="font-size:var(--t-2xl);font-weight:700;letter-spacing:-.035em">£240.00</span></div>
+    <div><code>--t-xl</code><span style="font-size:var(--t-xl);font-weight:700;letter-spacing:-.035em">This month</span></div>
+    <div><code>--t-lg</code><span style="font-size:var(--t-lg);font-weight:650">Record a payment</span></div>
+    <div><code>--t-md</code><span>Balances are worked out from completed lessons and payments.</span></div>
+    <div><code>--t-sm</code><span style="font-size:var(--t-sm);color:var(--ink-dim)">Thursday 4pm, 60 min, £35</span></div>
+    <div><code>--t-xs</code><span class="section-label" style="margin:0">Upcoming lessons</span></div>
+  </div>
+
+  <h2>Spacing, radius, depth</h2>
+  <div class="space" id="space"></div>
+  <div class="row" style="margin-top:var(--s-6)">
+    <div class="box" style="border-radius:var(--r-sm)">--r-sm</div>
+    <div class="box" style="border-radius:var(--r-md)">--r-md</div>
+    <div class="box" style="border-radius:var(--r-lg)">--r-lg</div>
+    <div class="box" style="border-radius:var(--r-xl)">--r-xl</div>
+  </div>
+  <div class="row" style="margin-top:var(--s-6)">
+    <div class="box" style="border-radius:var(--r-md);box-shadow:var(--sh-1)">--sh-1</div>
+    <div class="box" style="border-radius:var(--r-md);box-shadow:var(--sh-2)">--sh-2</div>
+    <div class="box" style="border-radius:var(--r-md);box-shadow:var(--sh-3)">--sh-3</div>
+  </div>
+
+  <h2>Status pills</h2>
+  <div class="row">
+    <span class="pill ok">Paid up</span>
+    <span class="pill warn">Owes £70</span>
+    <span class="pill gold">Part paid</span>
+    <span class="pill neutral">Free</span>
+  </div>
+  <p class="note">Green is good, red is owed, gold is waiting. Orange never appears here.</p>
+
+  <h2>Buttons</h2>
+  <div class="row">
+    <button class="btn save">Save payment</button>
+    <button class="btn quiet">Cancel</button>
+    <button class="btn whatsapp">Open WhatsApp</button>
+    <button class="btn danger">Delete student</button>
+  </div>
+  <p class="note">One orange button per view. The red one is only for deleting things.</p>
+
+  <h2>Card</h2>
+  <div class="card">
+    <div class="card-top">
+      <div><div class="name">Amelia Hart</div><div class="sub">GCSE Maths · Thursdays 4pm</div></div>
+      <span class="pill warn">Owes £70</span>
+    </div>
+    <p class="big">£70.00</p>
+    <div class="sub">2 lessons since the last payment</div>
+  </div>
+
+  <h2>Field</h2>
+  <div class="field"><label for="amt">Amount paid</label><input id="amt" inputmode="decimal" placeholder="£0.00"></div>
+
+  <h2>Attention and empty states</h2>
+  <div class="attn"><div class="section-label" style="color:var(--warn)">To chase</div>Leo Patel owes £105 from 3 lessons. The oldest is 19 days ago.</div>
+  <div class="empty" style="margin-top:var(--s-4)"><strong>No lessons yet</strong>Connect your Google Calendar and your lessons appear here.</div>
+</main>
+<script>
+  var colours = ['bg','bg-tint','card','card-2','card-3','line','ink','ink-dim','muted','accent','accent-fill','accent-light','on-accent','good','good-light','warn','warn-light','gold','gold-light','good-fill','danger-fill'];
+  var cs = getComputedStyle(document.documentElement);
+  document.getElementById('swatches').innerHTML = colours.map(function (n) {
+    return '<div class="sw"><i style="background:var(--' + n + ')"></i><div><b>--' + n + '</b><small>' + cs.getPropertyValue('--' + n).trim() + '</small></div></div>';
+  }).join('');
+  document.getElementById('space').innerHTML = [1,2,3,4,5,6,8,10].map(function (n) {
+    return '<div><code>--s-' + n + '</code><i style="width:var(--s-' + n + ')"></i>' + cs.getPropertyValue('--s-' + n).trim() + '</div>';
+  }).join('');
+</script>
+</body>
+</html>

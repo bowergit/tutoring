@@ -8,24 +8,17 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <meta name="theme-color" content="#ffa500">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="tokens.css?v=6.38.0">
 <style>
+  /* Admin-only: the amber stage colour and the dark help tooltip. */
   :root {
-    --bg: #f7f8f4; --card: #ffffff; --card-2: #f5f7f6; --line: #dfe7e3;
-    --ink: #15211f; --ink-dim: #596965; --accent: #a15c00; --accent-fill: #ffa500; --on-accent: #15211f; --accent-light: #fff1d9;
-    --good: #0f7a35; --good-light: #e3f7e9; --warn: #c0362c; --warn-light: #fdecea; --muted: #87938f;
     --amber: #9a5b00; --amber-light: #fdf1dc;
     --tip-bg: #15211f; --tip-ink: #f3f7f5; --tip-good: #6ee7a0; --tip-bad: #ff9a85; --tip-todo: #ffc46b;
-    --r-sm: 9px; --r-md: 13px; --r-lg: 17px;
-    --sh-2: 0 1px 2px rgba(22,21,15,.05), 0 6px 16px -8px rgba(22,21,15,.14);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #101716; --card: #182321; --card-2: #1e2a27; --line: #30413d;
-      --ink: #eef8f5; --ink-dim: #a5b7b1; --accent: #ffa500; --accent-light: #3a2604;
-      --good: #4ade80; --good-light: #0f2e1a; --warn: #ff8a63; --warn-light: #351d15; --muted: #7f918c;
       --amber: #f6c26b; --amber-light: #33260c;
       --tip-bg: #eef8f5; --tip-ink: #15211f; --tip-good: #0f7a35; --tip-bad: #c0362c; --tip-todo: #a15c00;
-      --sh-2: 0 1px 3px rgba(0,0,0,.45), 0 8px 20px -10px rgba(0,0,0,.6);
     }
   }
   * { box-sizing: border-box; }
@@ -297,7 +290,7 @@
   .tabs { padding:5px; gap:5px; }
   .row-item { padding:13px 16px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.23.0">
+<link rel="stylesheet" href="ux.css?v=6.38.0">
 </head>
 <body>
 <div class="wrap" id="app"><div class="empty">Loading…</div></div>
