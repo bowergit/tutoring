@@ -59,9 +59,10 @@ assert.equal(t.rows.find(r => r.date === '2026-11-05').notes, 'Fractions, good p
 
 // Printable pages escape whatever they are given.
 const inv = H.invoiceHTML({ number: 'INV-1', issued_at: '2026-12-01T10:00:00Z', student_name: '<b>Zachy</b>', period_start: start, period_end: end,
-  payer: 'council', payer_name: 'Barnet <Council>', payer_reference: 'EHCP 123', lines, total: 300, tutor_name: 'Daniel', invoice_notes: 'Sort code <x>' });
+  payer: 'council', payer_name: 'Barnet <Council>', payer_reference: 'EHCP 123', lines, total: 300, tutor_name: 'Daniel', tutor_address: 'Flat 7, Cornwall Works,\nLondon <N3>', invoice_notes: 'Sort code <x>' });
 assert(inv.includes('&lt;b&gt;Zachy&lt;/b&gt;') && !inv.includes('<b>Zachy</b>'), 'student name escaped');
 assert(inv.includes('Barnet &lt;Council&gt;') && inv.includes('Ref: EHCP 123'), 'payer and reference shown, escaped');
+assert(inv.includes('Daniel<br>Flat 7<br>Cornwall Works<br>London &lt;N3&gt;'), 'tutor address split into lines, escaped');
 assert(inv.includes('£300.00') && inv.includes('£150.00') && inv.includes('90 min'), 'totals, charges and lengths shown');
 const term = H.termHTML({ student_name: 'Zachy', start: '2026-10-01', end: '2026-11-30', summary: t });
 assert(term.includes('Fractions, good progress') && term.includes('3.5 hours'));

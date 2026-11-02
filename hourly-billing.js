@@ -123,7 +123,9 @@
     const rows = (inv.lines || []).map(l => `<tr><td>${esc(dateLabel(l.date))}${l.start ? ' · ' + esc(timeLabel(l.start)) : ''}</td>
       <td>${esc(minutesLabel(l.minutes) || '-')}</td><td class="num">${l.rate != null ? esc(money(l.rate)) + '/hr' : '-'}</td>
       <td>${esc(l.note || '')}</td><td class="num">${esc(money(l.amount))}</td></tr>`).join('');
-    const payTo = [inv.tutor_name, inv.tutor_email, inv.tutor_phone].filter(Boolean).map(esc).join('<br>');
+    // The address is one line in Settings; on the invoice each part gets its own line.
+    const address = String(inv.tutor_address || '').split(/[\n,]/).map(x => x.trim()).filter(Boolean);
+    const payTo = [inv.tutor_name, ...address, inv.tutor_email, inv.tutor_phone].filter(Boolean).map(esc).join('<br>');
     const billTo = [inv.payer_name || (inv.payer === 'council' ? 'Local authority' : 'Parent or guardian'),
       inv.payer_reference ? 'Ref: ' + inv.payer_reference : ''].filter(Boolean).map(esc).join('<br>');
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Invoice ${esc(inv.number)}</title><style>${PRINT_CSS}</style></head>

@@ -15,7 +15,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<link rel="stylesheet" href="tokens.css?v=6.41.2">
+<link rel="stylesheet" href="tokens.css?v=6.41.3">
 <style>
 
   * { box-sizing: border-box; }
@@ -1012,7 +1012,7 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.41.2">
+<link rel="stylesheet" href="ux.css?v=6.41.3">
 </head>
 <body>
 <div id="root"></div>
@@ -3837,6 +3837,7 @@ function YourName({ session }) {
   const [phone, setPhone] = useState(session?.user?.user_metadata?.contact_phone || '');
   const [email, setEmail] = useState(session?.user?.user_metadata?.contact_email || '');
   const [booking, setBooking] = useState(session?.user?.user_metadata?.booking_url || '');
+  const [address, setAddress] = useState(session?.user?.user_metadata?.invoice_address || '');
   const [state, setState] = useState('idle');
 
   const loginEmail = session?.user?.email || '';
@@ -3853,6 +3854,7 @@ function YourName({ session }) {
         contact_phone: normaliseUKPhone(phone),
         contact_email: email.trim(),
         booking_url: bookingUrl(booking),
+        invoice_address: address.trim(),
       },
     });
     setState(error ? 'error' : 'done');
@@ -3892,6 +3894,16 @@ function YourName({ session }) {
           anything else becomes a button. Leave blank to hide it.
         </div>
       </div>
+      {hourlyEnabled(session) && (
+        <div className="field">
+          <label>Address on invoices</label>
+          <textarea rows={2} value={address} onChange={e => setAddress(e.target.value)}
+                    placeholder="e.g. Flat 1, High Street, London, N1 1AA" />
+          <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
+            Goes under your name in the <b>From</b> box on invoices. Only shown on invoices.
+          </div>
+        </div>
+      )}
       {state === 'done' && (
         <div style={{fontSize:'0.82rem', color:'var(--accent)', marginBottom:12, fontWeight:600}}>Saved.</div>
       )}
@@ -7062,7 +7074,7 @@ function HourlyTuitionSheet({ student, lessons, session, onChanged, onClose }) {
   const must = r => { if (r?.error) throw r.error; return r; };
   const reprice = from => supabase.rpc('tutoring_hourly_reprice', { p_student_id: student.id, p_from: from }).then(must);
   const payerLabel = p => (PAYERS.find(([k]) => k === p) || [p, p])[1];
-  const tutor = { tutor_name: meta.display_name || session?.user?.email || '', tutor_email: meta.contact_email || session?.user?.email || '', tutor_phone: meta.contact_phone || '' };
+  const tutor = { tutor_name: meta.display_name || session?.user?.email || '', tutor_email: meta.contact_email || session?.user?.email || '', tutor_phone: meta.contact_phone || '', tutor_address: meta.invoice_address || '' };
 
   function startEdit() {
     setForm(plan ? { hourly_rate: String(plan.hourly_rate), default_minutes: plan.default_minutes, slots: plan.slots || [], starts_on: plan.starts_on,
@@ -8884,7 +8896,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.41.2</div>}
+        {!loading && <div className="version-tag">v6.41.3</div>}
       </div>
 
       {showAddModal && (
