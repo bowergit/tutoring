@@ -1097,7 +1097,7 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.37.4">
+<link rel="stylesheet" href="ux.css?v=6.37.5">
 </head>
 <body>
 <div id="root"></div>
@@ -6750,8 +6750,8 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
           </div>
           <label className="checkbox-row" style={{fontSize:'.84rem', marginBottom:6}}><input type="checkbox" checked={ownPrice} onChange={e => { setOwnPrice(e.target.checked); if (e.target.checked && !price) setPrice(String(previewPrice ?? '')); }} />Set the price by hand</label>
           <label className="checkbox-row" style={{fontSize:'.84rem', marginBottom:10}}><input type="checkbox" checked={free} onChange={e => setFree(e.target.checked)} />Complimentary (no charge)</label>
-          <div className="field" style={{marginBottom:10}}><label>Progress notes</label>
-            <textarea maxLength={4000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="What you covered and how it went. Used in termly summaries." /></div>
+          <div className="field" style={{marginBottom:10}}><label>Lesson notes · the parent can see these</label>
+            <textarea maxLength={4000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="What you covered and how it went. Shown on the parent's page and used in termly summaries." /></div>
           {saveError && <p className="wk-error" role="alert">{saveError}</p>}
           <button type="button" className="btn save" style={{width:'100%'}} disabled={saving} onClick={saveHourly}>{saving ? 'Saving…' : 'Save lesson'}</button>
         </div>}
@@ -8970,7 +8970,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.37.4</div>}
+        {!loading && <div className="version-tag">v6.37.5</div>}
       </div>
 
       {showAddModal && (

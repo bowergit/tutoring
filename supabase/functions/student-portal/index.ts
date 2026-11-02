@@ -515,7 +515,7 @@ Deno.serve(async (req) => {
 
   const accountReads = await Promise.all([
     supabase.from('tutoring_lessons')
-      .select('id,lesson_date,start_time,status,is_complimentary,pre_settled,rate_charged,billed_minutes,hourly_plan_id')
+      .select('id,lesson_date,start_time,status,is_complimentary,pre_settled,rate_charged,billed_minutes,hourly_plan_id,tutor_notes')
       .eq('student_id', student.id)
       .neq('status', 'cancelled')
       .order('lesson_date'),
@@ -587,6 +587,8 @@ Deno.serve(async (req) => {
   const shape = (l: any) => ({
     weekly_included: covered(l),
     minutes: l.hourly_plan_id ? (l.billed_minutes ?? null) : null,
+    // The tutor's progress note for this lesson. Parent page only: the pupil's view is built separately above.
+    notes: l.tutor_notes ? String(l.tutor_notes).slice(0, 4000) : null,
     date: l.lesson_date,
     time: l.start_time,
     status: l.status,

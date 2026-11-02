@@ -247,6 +247,10 @@
   .hr-note { font-size: .82rem; color: var(--ink-dim); line-height: 1.5; margin: 10px 0 0; }
   .hr-more { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; font-size: .86rem; }
   .hr-more summary { cursor: pointer; font-weight: 650; }
+
+  .has-note { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: var(--accent-light); color: var(--accent); font-size: .66rem; font-weight: 700; vertical-align: 1px; }
+  .lesson-note { white-space: pre-wrap; overflow-wrap: anywhere; font-size: .86rem; line-height: 1.55; color: var(--ink); background: var(--card-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; margin-bottom: 8px; }
+  .lesson-note-label { font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; color: var(--muted); margin-bottom: 3px; }
 </style>
 <link rel="stylesheet" href="ux.css?v=6.23.0">
 </head>
@@ -308,6 +312,7 @@
       return `<span class="pill scheduled">${l.status === 'missed' ? 'Missed' : 'Done'}</span>`;
     }
     if (l.weekly_included) return '<span class="pill scheduled">Included in weekly tuition</span>';
+    if (l.free) return '<span class="pill paid">Free</span>';
     const label = l.pay_status === 'paid' ? 'Paid' : l.pay_status === 'partial' ? 'Partly paid' : 'Not yet paid';
     return `<span class="pill ${l.pay_status}">${label}</span>`;
   }
@@ -351,6 +356,11 @@
     }
     return lines.join('');
   }
+  // What Daniel wrote about the lesson, shown first when it is opened.
+  function notesHTML(l) {
+    if (!l.notes) return '';
+    return `<div class="lesson-note"><div class="lesson-note-label">Lesson notes</div>${esc(l.notes)}</div>`;
+  }
   function renderList(lessons, prefix, scheduled) {
     if (!lessons.length) return '<div class="empty">Nothing here.</div>';
     return '<div class="card">' + lessons.map((l, i) => {
@@ -361,10 +371,10 @@
       return `
         <div class="lesson">
           <div class="row"${expandable ? ` data-detail="${key}"` : ' style="cursor:default"'}>
-            <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}${l.minutes ? `<span class="time"> · ${esc(minLabel(l.minutes))}</span>` : ''}</span>
+            <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}${l.minutes ? `<span class="time"> · ${esc(minLabel(l.minutes))}</span>` : ''}${l.notes && expandable ? '<span class="has-note" title="Has a lesson note">Note</span>' : ''}</span>
             ${pillHTML(l, scheduled)}
           </div>
-          ${expandable ? `<div class="detail" id="detail-${key}" hidden>${detailHTML(l, scheduled)}</div>` : ''}
+          ${expandable ? `<div class="detail" id="detail-${key}" hidden>${notesHTML(l)}${detailHTML(l, scheduled)}</div>` : ''}
         </div>
       `;
     }).join('') + '</div>';
