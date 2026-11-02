@@ -13,582 +13,439 @@
 <meta property="og:type" content="website">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script>document.documentElement.classList.add('js')</script>
-<link rel="stylesheet" href="tokens.css?v=6.40.0">
+<link rel="stylesheet" href="tokens.css?v=6.41.0">
 <style>
-  :root { --maxw: 1080px; }
+  /* Designed in Paper first (file "TutorTally", page Landing). The page is a
+     ledger: sections open on a rule rather than a label, and the pictures are
+     the real things (a calendar, the tally, a WhatsApp message), not icons. */
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font-family: 'General Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
+    margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font);
+    -webkit-font-smoothing: antialiased; -webkit-text-size-adjust: 100%; text-size-adjust: 100%;
     line-height: 1.55; overflow-x: hidden;
   }
-  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 20px; }
-  section { padding: 76px 0; }
-  h1, h2, h3 { line-height: 1.15; letter-spacing: -0.03em; margin: 0 0 14px; }
-  h1 { font-size: clamp(2.1rem, 6vw, 3.9rem); font-weight: 750; }
-  h2 { font-size: clamp(1.6rem, 4vw, 2.6rem); font-weight: 720; }
-  h3 { font-size: 1.12rem; font-weight: 680; letter-spacing: -0.02em; }
-  p  { margin: 0 0 15px; }
-  .lede { font-size: clamp(1.02rem, 2.1vw, 1.24rem); color: var(--ink-dim); max-width: 620px; }
-  .eyebrow {
-    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase;
-    color: var(--accent); margin-bottom: 13px;
-  }
-  .muted { color: var(--muted); }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+  h1, h2, h3, p { margin: 0; }
+  h1 { font-size: clamp(2.7rem, 7.4vw, 4.75rem); line-height: 1.02; font-weight: 700; letter-spacing: -0.045em; text-wrap: balance; }
+  h2 { font-size: clamp(2rem, 4.6vw, 3.25rem); line-height: 1.07; font-weight: 700; letter-spacing: -0.04em; text-wrap: balance; }
+  h3 { font-size: 1.45rem; line-height: 1.25; font-weight: 700; letter-spacing: -0.02em; }
+  .lede { font-size: clamp(1.1rem, 2vw, 1.32rem); line-height: 1.5; color: var(--ink-dim); max-width: 34em; }
+  .body { font-size: 1rem; line-height: 1.6; color: var(--ink-dim); }
+  .small { font-size: .875rem; color: var(--muted); }
+  a { color: inherit; }
+  section { padding: 120px 0; }
+  .ruled { border-top: 1px solid var(--line); }
 
-  /* ── Nav ── */
-  nav {
-    position: sticky; top: 0; z-index: 60; background: color-mix(in srgb, var(--bg) 88%, transparent);
-    backdrop-filter: blur(14px); border-bottom: 1px solid var(--line);
-  }
-  .nav-in { display: flex; align-items: center; gap: 14px; height: 62px; }
-  .logo { display:flex; align-items:center; gap:9px; font-weight: 780; letter-spacing: -0.03em; font-size: 1.08rem; margin-right: auto; }
-  .logo span { color: var(--accent); }
-  .brandmark {
-    width: 31px; height: 31px; border-radius: 10px; box-shadow: var(--sh-1);
-    display: block;
-  }
+  /* The wordmark. Each T is drawn: an ink upright crossed by the logo's
+     rising stroke, orange on the T of Tally. */
+  .wm { display: inline-flex; align-items: baseline; font-weight: 700; letter-spacing: -0.035em; color: var(--ink); text-decoration: none; white-space: nowrap; }
+  .wm svg { width: .63em; height: .71em; flex: none; }
+  .wm .gap { width: .04em; }
 
-  /* ── Buttons ── */
+  /* Buttons */
   .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 13px 22px; border-radius: 100px; font-weight: 650; font-size: 0.95rem;
-    text-decoration: none; cursor: pointer; border: 1px solid transparent;
-    font-family: inherit; transition: transform .16s cubic-bezier(.2,.8,.2,1), filter .16s, box-shadow .16s;
-    white-space: nowrap;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px;
+    padding: 14px 24px; border-radius: var(--r-md); border: 1px solid transparent;
+    font: 600 1rem var(--font); text-decoration: none; cursor: pointer; white-space: nowrap;
+    transition: transform .16s var(--ease), background .16s var(--ease), border-color .16s var(--ease);
   }
-  .btn-primary { background: var(--accent-fill); color: var(--on-accent); box-shadow: 0 6px 18px -6px color-mix(in srgb, var(--accent-fill) 70%, transparent); }
-  .btn-primary:hover { transform: translateY(-2px); filter: brightness(1.07); }
-  .btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
-  .btn-ghost:hover { border-color: var(--accent); }
-  .btn-sm { padding: 9px 16px; font-size: 0.86rem; }
-  .btn-lg { padding: 16px 30px; font-size: 1.04rem; }
-  .cta-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; margin-top: 26px; }
-  .cta-note { font-size: 0.84rem; color: var(--muted); margin-top: 13px; }
+  .btn:active { transform: scale(.98); }
+  .btn-primary { background: var(--accent-fill); color: var(--on-accent); font-weight: 700; }
+  .btn-ghost { background: var(--card); color: var(--ink); border-color: var(--line); }
+  @media (hover: hover) {
+    .btn-primary:hover { background: color-mix(in srgb, var(--accent-fill) 88%, var(--ink)); }
+    .btn-ghost:hover { border-color: var(--ink-dim); }
+  }
+  .btn-lg { min-height: 56px; padding: 16px 28px; font-size: 1.06rem; }
 
-  /* ── Reveal on scroll ──
-     Hidden only once the head script has confirmed JavaScript is running. If
-     it never does, every block stays visible rather than the page rendering as
-     an empty column, which is what a sales page must never do. The hero is
-     deliberately not animated at all: it has to paint instantly. */
-  .rv { transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1); }
-  .js .rv { opacity: 0; transform: translateY(22px); }
-  .js .rv.in { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) {
-    .js .rv, .js .rv.in { opacity: 1; transform: none; transition: none; }
-    html { scroll-behavior: auto; }
+  /* Nav */
+  nav { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
+  nav.scrolled { box-shadow: 0 1px 0 var(--line); }
+  .nav-in { display: flex; align-items: center; gap: 4px; height: 76px; }
+  .nav-in .wm { font-size: 1.6rem; margin-right: auto; }
+  .nav-link { padding: 10px 16px; border-radius: var(--r-sm); font-weight: 600; font-size: .95rem; text-decoration: none; color: var(--ink); }
+  @media (hover: hover) { .nav-link:hover { background: var(--card-2); } }
+  .nav-in .btn { min-height: 44px; padding: 10px 20px; font-size: .95rem; margin-left: 8px; }
+  .nav-link { white-space: nowrap; }
+  @media (max-width: 720px) { .nav-link.opt { display: none; } }
+  @media (max-width: 420px) {
+    .nav-in .wm { font-size: 1.3rem; }
+    .nav-link { padding: 10px 10px; }
+    .nav-in .btn { padding: 10px 16px; margin-left: 2px; }
   }
 
-  /* ── Hero ── */
-  .hero { padding: 58px 0 30px; position: relative; overflow: hidden; }
-  .hero::before {
-    content: ''; position: absolute; inset: -20% -30% auto -30%; height: 620px; z-index: -1;
-    background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--accent-fill) 22%, transparent), transparent 70%);
-    pointer-events: none;
-  }
-  .hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 46px; align-items: center; }
-  @media (max-width: 900px) { .hero-grid { grid-template-columns: 1fr; gap: 34px; } }
-  .hl { color: var(--accent); }
+  /* Hero */
+  .hero { padding: 64px 0 120px; }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 72px; align-items: start; }
+  .hero-copy { display: flex; flex-direction: column; gap: 28px; padding-top: 24px; }
+  .cta-row { display: flex; gap: 12px; flex-wrap: wrap; padding-top: 6px; }
+  @media (max-width: 1020px) { .hero-grid { grid-template-columns: 1fr; gap: 56px; } .book { max-width: 560px; } }
 
-  .trust { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--line); }
-  .trust div { font-size: 0.83rem; color: var(--muted); }
-  .trust b { display: block; color: var(--ink); font-size: 1.02rem; font-weight: 700; }
-
-  /* ── App mockup ── */
-  .mock {
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-xl);
-    box-shadow: var(--sh-3); padding: 15px; position: relative; overflow: hidden;
-  }
-  .mock-bar { display: flex; align-items: center; gap: 9px; margin-bottom: 13px; }
-  .mock-title { font-weight: 720; letter-spacing: -0.02em; font-size: 1rem; }
-  .mock-sub { font-size: 0.72rem; color: var(--muted); }
-  .pill-btn { margin-left: auto; background: var(--accent-fill); color: var(--on-accent); border-radius: 100px; padding: 6px 13px; font-size: 0.76rem; font-weight: 650; }
-
-  .srow {
-    display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: var(--r-md);
-    background: var(--card-2); border: 1px solid var(--line); margin-bottom: 8px;
-  }
-  .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .dot.ok { background: var(--good); } .dot.warn { background: var(--warn); }
-  .sname { font-weight: 640; font-size: 0.92rem; }
-  .chip {
-    font-size: 0.68rem; font-weight: 650; padding: 3px 9px; border-radius: 100px;
-    background: var(--accent-light); color: var(--accent); white-space: nowrap;
-  }
-  .chip.warn { background: var(--warn-light); color: var(--warn); }
-  .chip.neutral { background: var(--card-3); color: var(--ink-dim); }
-  .chip.chase { background: #25D366; color: #07300f; }
-  .mock-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-  .mock-stats div { background: var(--card-3); border-radius: 12px; padding: 9px 11px; }
-  .mock-stats b { display: block; font-size: 1.15rem; letter-spacing: -.02em; }
-  .mock-stats b.owed { color: var(--warn); }
-  .mock-stats span { font-size: .68rem; color: var(--muted); }
-  .mock-week { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; font-size: .72rem; margin-bottom: 12px; padding: 8px 11px; border-radius: 12px; border: 1px solid var(--line); }
-  .mock-week-t { font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: .62rem; color: var(--accent); }
-  .mock-week i { font-style: normal; color: var(--muted); margin-right: 3px; }
-  .spacer { margin-left: auto; }
-  .demo-student { width: 100%; font: inherit; color: inherit; text-align: left; cursor: pointer; transition: border-color .16s, transform .16s, background .16s; }
-  .demo-student:hover, .demo-student:focus-visible { border-color: var(--accent); background: var(--accent-light); outline: none; }
-  .demo-student:active { transform: scale(.985); }
-  .demo-detail { margin-top: 12px; padding: 13px; border: 1px solid var(--accent); border-radius: var(--r-md); background: var(--accent-light); }
-  .demo-detail-title { display:flex; justify-content:space-between; gap:10px; align-items:baseline; font-weight:720; }
-  .demo-detail-copy { color: var(--ink-dim); font-size:.82rem; margin:5px 0 10px; }
-  .demo-detail .btn { padding:8px 12px; font-size:.78rem; }
-
-  /* ── Sync animation ── */
-  .flow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin-top: 8px; }
-  @media (max-width: 620px) { .flow { grid-template-columns: 1fr; } .flow .arrow { transform: rotate(90deg); margin: 2px auto; } }
-  .flow-card { background: var(--card-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: 13px; }
-  .cal-ev {
-    font-size: 0.78rem; padding: 7px 9px; border-radius: 7px; margin-bottom: 6px;
-    background: #e8703a; color: #fff; font-weight: 600;
-  }
-  .cal-ev:nth-child(2) { background: #d9603a; } .cal-ev:nth-child(3) { background: #c9542f; }
-  .arrow { font-size: 1.5rem; color: var(--accent); animation: nudge 1.9s ease-in-out infinite; }
-  @keyframes nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(6px); } }
-
-  /* ── Cards / grid ── */
-  .grid { display: grid; gap: 18px; }
-  .g2 { grid-template-columns: repeat(2, 1fr); }
-  .g3 { grid-template-columns: repeat(3, 1fr); }
-  @media (max-width: 860px) { .g2, .g3 { grid-template-columns: 1fr; } }
-  .card {
+  /* The tally book: lessons as tally marks, unpaid strokes in red, a
+     double-ruled total. The whole page hangs off this one picture. */
+  .book {
     background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
-    padding: 24px; box-shadow: var(--sh-1);
+    padding: 28px 32px 30px; box-shadow: 0 1px 2px rgba(22,21,15,.05), 0 24px 48px -24px rgba(22,21,15,.22);
   }
-  .card .ico { font-size: 1.5rem; margin-bottom: 10px; display: block; }
+  .book-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 12px; border-bottom: 3px double var(--line); }
+  .book-head b { font-size: 1.12rem; }
+  .book-row {
+    display: grid; grid-template-columns: 150px 1fr auto; gap: 20px; align-items: center; width: 100%;
+    padding: 16px 0; border: 0; border-bottom: 1px solid var(--line-soft); background: none;
+    font: inherit; color: inherit; text-align: left; cursor: pointer;
+  }
+  .book-row .who b { display: block; font-weight: 600; }
+  .book-row .who span { font-size: .82rem; color: var(--muted); }
+  .book-row .st { font-weight: 700; font-size: .95rem; font-variant-numeric: tabular-nums; text-align: right; }
+  .st.good { color: var(--good); } .st.warn { color: var(--warn); }
+  @media (hover: hover) { .book-row:hover .who b { text-decoration: underline; text-underline-offset: 3px; } }
+  .book-row[aria-expanded="true"] .who b { color: var(--accent); }
+  .book-note { font-size: .9rem; color: var(--ink-dim); padding: 0 0 14px; border-bottom: 1px solid var(--line-soft); }
+  .book-note a { color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
+  .book-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 18px; border-top: 1px solid var(--ink); margin-top: -1px; }
+  .book-total span { font-weight: 600; }
+  .book-total b {
+    font-size: 2.5rem; line-height: 1; letter-spacing: -0.035em; color: var(--warn); font-variant-numeric: tabular-nums;
+    padding-bottom: 6px; border-bottom: 3px double var(--ink);
+  }
+  .tally { display: block; height: 26px; width: auto; }
+  .tally .s { fill: var(--ink); }
+  .tally .u { fill: var(--warn); }
+  .tally .g { stroke: var(--accent-fill); }
+  .tally .g.u { stroke: var(--warn); fill: none; }
+  .book-cap { margin-top: 14px; text-align: center; }
+  @media (max-width: 520px) {
+    .book { padding: 22px 18px 24px; }
+    .book-row { grid-template-columns: 1fr auto; row-gap: 8px; }
+    .book-row .tally { grid-row: 2; }
+  }
 
-  /* ── Pain list ── */
-  .pain { list-style: none; padding: 0; margin: 0; }
-  .pain li {
-    padding: 13px 0 13px 32px; border-bottom: 1px solid var(--line); position: relative;
-    color: var(--ink-dim); font-size: 1rem;
-  }
-  .pain li::before {
-    content: '✕'; position: absolute; left: 4px; top: 13px; color: var(--warn); font-weight: 700;
-  }
-  .pain li:last-child { border-bottom: none; }
+  /* Section heads: a big claim on the left, the plain explanation on the right. */
+  .sec-head { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 32px 80px; align-items: end; margin-bottom: 56px; }
+  @media (max-width: 860px) { .sec-head { grid-template-columns: 1fr; } }
 
-  /* ── Phone / WhatsApp ── */
-  .phone {
-    width: 100%; max-width: 320px; margin: 0 auto; background: #0b141a; border-radius: 30px;
-    padding: 12px 10px 18px; box-shadow: var(--sh-3); border: 1px solid #223;
-  }
-  .wa-top { display: flex; align-items: center; gap: 9px; padding: 6px 8px 12px; color: #e9edef; }
-  .wa-av { width: 30px; height: 30px; border-radius: 50%; background: #6b7c85; display: grid; place-items: center; font-size: 0.8rem; }
-  .wa-name { font-size: 0.86rem; font-weight: 600; }
-  .wa-body { background: #0b141a; padding: 6px 6px 0; min-height: 190px; }
-  .bub {
-    background: #005c4b; color: #e9edef; padding: 9px 11px; border-radius: 12px 12px 3px 12px;
-    font-size: 0.83rem; line-height: 1.45; margin-left: auto; max-width: 92%; box-shadow: 0 1px 1px rgba(0,0,0,.3);
-  }
-  .bub .tick { display: block; text-align: right; font-size: 0.63rem; color: #8fd6c2; margin-top: 3px; }
-  .typing { display: inline-block; }
-  .caret { display: inline-block; width: 2px; height: 1em; background: #8fd6c2; vertical-align: text-bottom; animation: blink 1s steps(2) infinite; }
+  /* How it works: three real artefacts on one baseline. */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+  .step { display: flex; flex-direction: column; gap: 22px; }
+  .step .art { min-height: 230px; display: flex; align-items: flex-end; }
+  .step .txt { display: flex; flex-direction: column; gap: 8px; padding-top: 20px; border-top: 1px solid var(--ink); }
+  .step .n { font-size: .875rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
+  @media (max-width: 900px) { .steps { grid-template-columns: 1fr; gap: 64px; } .step .art { min-height: 0; } }
+  .panel { width: 100%; padding: 18px; background: var(--card); border: 1px solid var(--line); border-radius: 16px; }
+  .panel-t { font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .ev { display: flex; gap: 10px; padding: 10px 12px; margin-top: 8px; border-radius: 10px; background: #e8f0fe; color: #174ea6; }
+  .ev::before { content: ''; width: 3px; border-radius: 2px; background: #1a73e8; flex: none; }
+  .ev b { display: block; font-size: .875rem; font-weight: 600; }
+  .ev span { font-size: .75rem; color: #3c5a9a; }
+  .mini { display: grid; grid-template-columns: 62px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: .875rem; }
+  .mini b { font-weight: 600; }
+  .mini .tally { height: 20px; }
+  .mini .st { font-size: .82rem; font-weight: 700; }
+  .panel .rule2 { padding-bottom: 8px; border-bottom: 3px double var(--line); }
+  .wa { width: 100%; padding: 18px; border-radius: 16px; background: #efeae2; color: #111b21; display: flex; flex-direction: column; gap: 10px; }
+  .wa-name { font-size: .82rem; font-weight: 600; }
+  .bub { align-self: flex-end; max-width: 94%; padding: 10px 12px; border-radius: 10px 2px 10px 10px; background: #d9fdd3; font-size: .875rem; line-height: 1.45; min-height: 64px; }
+  .bub .tick { display: block; text-align: right; font-size: .7rem; color: #54656f; padding-top: 4px; }
+  .caret { display: inline-block; width: 2px; height: 1em; background: #111b21; vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
+  .bub.done .caret { display: none; }
   @keyframes blink { 50% { opacity: 0; } }
 
-  /* ── Screenshot slots ── */
-  .shot {
-    border: 2px dashed var(--gold); border-radius: var(--r-lg); background: var(--gold-light);
-    padding: 28px 22px; text-align: center; color: var(--gold);
-  }
-  .shot b { display: block; font-size: 0.95rem; margin-bottom: 5px; }
-  .shot span { font-size: 0.82rem; opacity: .85; }
+  /* The problem, as a list of things that actually happen. */
+  .leaks { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 80px; align-items: start; }
+  .leaks ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
+  .leaks li { display: grid; grid-template-columns: 44px 1fr; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--line); font-size: 1.08rem; line-height: 1.5; }
+  .leaks li svg { width: 34px; height: 26px; margin-top: 1px; }
+  @media (max-width: 860px) { .leaks { grid-template-columns: 1fr; gap: 40px; } }
 
-  /* ── Offer ── */
-  .offer {
-    background: linear-gradient(165deg, var(--card) 0%, var(--card-2) 100%);
-    border: 1px solid var(--line); border-radius: var(--r-xl); padding: 34px; box-shadow: var(--sh-3);
-    position: relative; overflow: hidden;
+  /* Parent page: a phone showing the real thing. */
+  .split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 80px; align-items: center; }
+  @media (max-width: 860px) { .split { grid-template-columns: 1fr; gap: 48px; } }
+  .split .copy { display: flex; flex-direction: column; gap: 24px; align-items: flex-start; }
+  .phone {
+    display: block; max-width: 340px; margin: 0 auto; padding: 26px 22px 24px; border-radius: 36px;
+    background: var(--card); border: 1px solid var(--line); text-decoration: none; color: inherit;
+    box-shadow: 0 1px 2px rgba(22,21,15,.05), 0 24px 48px -24px rgba(22,21,15,.22);
   }
-  .offer::before {
-    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
-    background: linear-gradient(90deg, var(--gold), var(--accent-2));
-  }
-  .price { display: flex; align-items: baseline; gap: 8px; margin: 6px 0 4px; }
-  .price .amt { font-size: 3.4rem; font-weight: 780; letter-spacing: -0.05em; }
-  .price .per { color: var(--muted); font-weight: 600; }
-  .stack { list-style: none; padding: 0; margin: 20px 0; }
-  .stack li { padding: 9px 0 9px 30px; position: relative; border-bottom: 1px dashed var(--line); font-size: 0.95rem; }
-  .stack li:last-child { border-bottom: none; }
-  .stack li::before { content: '✓'; position: absolute; left: 3px; color: var(--accent); font-weight: 800; }
-  .stack .val { float: right; color: var(--muted); font-size: 0.86rem; }
+  .phone .ph-title { font-size: 1.3rem; font-weight: 700; letter-spacing: -0.025em; }
+  .phone .group { margin-top: 18px; padding-bottom: 6px; border-bottom: 3px double var(--line); font-size: .75rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+  .phone .r { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line-soft); font-size: .95rem; }
+  .phone .r:last-child { border-bottom: 0; }
+  .tag { font-size: .75rem; font-weight: 600; padding: 3px 10px; border-radius: 20px; background: var(--card-2); color: var(--ink-dim); }
+  .tag.paid { background: var(--good-light); color: var(--good); }
 
-  .try {
-    margin-top: 26px; background: var(--card); border: 1px solid var(--line);
-    border-radius: var(--r-lg); padding: 24px 26px; box-shadow: var(--sh-2);
-    display: flex; gap: 20px; align-items: center; flex-wrap: wrap;
-  }
-  .try > div { flex: 1 1 340px; }
+  /* Demo band: the one dark block on the page. */
+  .demo { background: var(--ink); color: var(--bg); border-radius: var(--r-xl); padding: 56px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: center; }
+  .demo h2 { color: inherit; }
+  .demo p { color: color-mix(in srgb, var(--bg) 72%, transparent); margin-top: 14px; max-width: 36em; font-size: 1.08rem; }
+  @media (max-width: 760px) { .demo { grid-template-columns: 1fr; padding: 36px 28px; } }
 
-  .banner {
-    background: var(--accent-light); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-    border-radius: var(--r-lg); padding: 18px 20px; color: var(--accent); font-weight: 600;
+  /* Pricing as a ledger: two columns, the rows say what you get. */
+  .prices { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--ink); }
+  .plan { padding: 36px 40px 40px 0; display: flex; flex-direction: column; gap: 10px; }
+  .plan + .plan { padding: 36px 0 40px 40px; border-left: 1px solid var(--line); }
+  .plan .amt { font-size: 4rem; line-height: 1; font-weight: 700; letter-spacing: -0.045em; font-variant-numeric: tabular-nums; }
+  .plan .amt small { font-size: 1rem; font-weight: 500; letter-spacing: 0; color: var(--muted); margin-left: 6px; }
+  .plan ul { list-style: none; margin: 18px 0 26px; padding: 0; border-top: 3px double var(--line); }
+  .plan li { display: flex; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--line-soft); }
+  .plan li span { color: var(--muted); font-size: .9rem; white-space: nowrap; }
+  .plan .btn { align-self: flex-start; }
+  @media (max-width: 760px) {
+    .prices { grid-template-columns: 1fr; }
+    .plan, .plan + .plan { padding: 32px 0; border-left: 0; }
+    .plan + .plan { border-top: 1px solid var(--line); }
   }
+  .fit { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 72px; }
+  .fit > div { padding-top: 18px; border-top: 1px solid var(--line); }
+  .fit b { display: block; font-size: 1.05rem; margin-bottom: 6px; }
+  @media (max-width: 760px) { .fit { grid-template-columns: 1fr; gap: 28px; } }
 
-  /* ── Referral ── */
-  .ref-step {
-    display: flex; gap: 14px; align-items: flex-start; padding: 16px 0; border-bottom: 1px solid var(--line);
-  }
-  .ref-step:last-child { border-bottom: none; }
-  .ref-n {
-    flex: 0 0 32px; height: 32px; border-radius: 50%; background: var(--accent-fill); color: var(--on-accent);
-    display: grid; place-items: center; font-weight: 700; font-size: 0.9rem;
-  }
-
-  /* ── FAQ ── */
-  details {
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md);
-    padding: 15px 18px; margin-bottom: 10px; overflow: hidden;
-  }
-  details[open] { border-color: color-mix(in srgb, var(--accent) 35%, var(--line)); }
-  summary { cursor: pointer; font-weight: 640; list-style: none; font-size: 0.98rem; }
+  /* FAQ */
+  .faq { max-width: 820px; border-top: 1px solid var(--ink); }
+  details { border-bottom: 1px solid var(--line); }
+  summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 20px; padding: 22px 0; font-size: 1.12rem; font-weight: 600; }
   summary::-webkit-details-marker { display: none; }
-  summary::after { content: '+'; float: right; color: var(--accent); font-weight: 700; }
-  details[open] summary::after { content: '-'; }
-  .faq-answer { display:grid; grid-template-rows:0fr; transition:grid-template-rows .23s ease; }
-  .faq-answer p { overflow:hidden; margin:0; color:var(--ink-dim); font-size:.94rem; opacity:0; transform:translateY(-5px); transition:opacity .18s ease, transform .18s ease, margin .23s ease; }
-  details[open] .faq-answer { grid-template-rows:1fr; }
-  details[open] .faq-answer p { margin:11px 0 0; opacity:1; transform:none; }
+  summary::after { content: '+'; font-weight: 400; font-size: 1.5rem; line-height: 1; color: var(--muted); transition: transform .2s var(--ease); }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p { padding: 0 0 22px; max-width: 40em; color: var(--ink-dim); font-size: 1.02rem; line-height: 1.6; }
 
-  footer { border-top: 1px solid var(--line); padding: 34px 0; color: var(--muted); font-size: 0.86rem; }
+  /* Close */
+  .close { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+  .close .tally { height: 44px; }
+  .close .cta-row { justify-content: center; }
+  .close a.wa-link { color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
+  footer { padding: 32px 0 48px; border-top: 1px solid var(--line); font-size: .9rem; color: var(--ink-dim); }
+  footer .wrap { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; }
+  footer a { text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  footer .wm { font-size: 1.1rem; margin-right: 8px; }
+  footer .signin { margin-left: auto; color: var(--accent); font-weight: 600; }
 
-  .ico { width:44px; height:44px; display:inline-grid !important; place-items:center; background:var(--accent-light); color:var(--accent); border-radius:14px; }
-  .ico .app-icon { width:24px; height:24px; }
-  .card { border-radius:20px; }
-  .btn { border-radius:14px; }
-  .lede { line-height:1.65; }
+  /* Reveal on scroll, from an already-visible default when JS is off. */
+  .js .rv { opacity: 0; transform: translateY(14px); transition: opacity .6s var(--ease), transform .6s var(--ease); }
+  .js .rv.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) { .js .rv { opacity: 1; transform: none; transition: none; } .caret { animation: none; } }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.40.0">
+<link rel="stylesheet" href="ux.css?v=6.41.0">
 </head>
 <body>
 
-<nav>
+<nav id="nav">
   <div class="wrap nav-in">
-    <div class="logo"><img class="brandmark" src="brand/tutortally-mark.svg" alt="" aria-hidden="true">Tutor<span>Tally</span></div>
-    <a href="#how" class="btn btn-ghost btn-sm" style="display:none" id="navHow">How it works</a>
-    <a href="/?signup=1" class="btn btn-primary btn-sm">Start free</a>
+    <a class="wm" href="/app" aria-label="TutorTally"><svg viewBox="0 0 64 72" aria-hidden="true"><rect x="24" y="14" width="15" height="58" rx="3" fill="currentColor"/><path d="M7 24L57 10" stroke="currentColor" stroke-width="13" stroke-linecap="round" fill="none"/></svg><span>utor</span><span class="gap"></span><svg viewBox="0 0 64 72" aria-hidden="true"><rect x="24" y="14" width="15" height="58" rx="3" fill="currentColor"/><path d="M7 24L57 10" stroke="var(--accent-fill)" stroke-width="13" stroke-linecap="round" fill="none"/></svg><span>ally</span></a>
+    <a class="nav-link opt" href="#how">How it works</a>
+    <a class="nav-link opt" href="#price">Pricing</a>
+    <a class="nav-link" href="/">Sign in</a>
+    <a class="btn btn-primary" href="/?signup=1">Start free</a>
   </div>
 </nav>
 
-<!-- ══ HERO ══ -->
 <header class="hero">
   <div class="wrap hero-grid">
-    <div>
-      <div class="eyebrow">For solo tutors</div>
-      <h1>Your calendar already knows <span class="hl">what you taught.</span></h1>
-      <p class="lede">
-        TutorTally turns it into accurate lesson records, tells you exactly who
-        owes what, and writes the WhatsApp message to chase it.
-      </p>
+    <div class="hero-copy">
+      <h1>Your calendar already knows what you taught.</h1>
+      <p class="lede">TutorTally turns it into lesson records, tells you exactly who owes what, and writes the WhatsApp message to chase it.</p>
       <div class="cta-row">
-        <a href="/?signup=1" class="btn btn-primary btn-lg">Get started free</a>
-        <a href="/?demo=1" class="btn btn-ghost btn-lg">Try the real demo</a>
+        <a href="/?signup=1" class="btn btn-primary btn-lg">Start free</a>
+        <a href="/?demo=1" class="btn btn-ghost btn-lg">Try the demo</a>
       </div>
-      <p class="cta-note">No card. Built by a working tutor who got fed up of tracking this manually.</p>
-
-      <div class="trust">
-        <div><b>3 min</b>to set up</div>
-        <div><b>Free</b>up to 3 active students</div>
-        <div><b>0</b>lessons retyped by hand</div>
-      </div>
+      <p class="small">Free for up to 3 students. No card. Built by a working tutor who got fed up of tracking this by hand.</p>
     </div>
 
     <div>
-      <div class="mock">
-        <div class="mock-bar">
-          <div>
-            <div class="mock-title">Sam's TutorTally</div>
-            <div class="mock-sub">7 active · synced 2 min ago</div>
-          </div>
-          <div class="pill-btn">+ Add</div>
-        </div>
-        <div class="mock-stats">
-          <div><b class="owed">£270</b><span>Owed to you · 2 families</span></div>
-          <div><b>£640</b><span>Paid this month</span></div>
-        </div>
-        <div class="mock-week"><span class="mock-week-t">This week</span><span><i>Today</i> 4pm Amira</span><span><i>Wed</i> 5:30pm Joe</span><span><i>Thu</i> 6pm Priya</span></div>
-
-        <button type="button" class="srow demo-student" data-student="amira"><span class="dot ok"></span><span class="sname">Amira K.</span>
-          <span class="spacer"></span><span class="chip">Paid up</span><span class="chip neutral">Y11</span></button>
-        <button type="button" class="srow demo-student" data-student="joe"><span class="dot warn"></span><span class="sname">Joe F.</span>
-          <span class="spacer"></span><span class="chip warn">Owes £180</span><span class="chip chase">Chase</span></button>
-        <button type="button" class="srow demo-student" data-student="priya"><span class="dot ok"></span><span class="sname">Priya S.</span>
-          <span class="spacer"></span><span class="chip">Paid up</span><span class="chip neutral">Y13</span></button>
-        <button type="button" class="srow demo-student" data-student="tom"><span class="dot warn"></span><span class="sname">Tom B.</span>
-          <span class="spacer"></span><span class="chip warn">Owes £90</span><span class="chip chase">Chase</span></button>
-        <div id="demoDetail" class="demo-detail" aria-live="polite"></div>
+      <div class="book" aria-label="Example: a term of lessons for four students">
+        <div class="book-head"><b>Autumn term</b><span class="small">Lessons taught</span></div>
+        <button type="button" class="book-row" data-student="amira" aria-expanded="false">
+          <span class="who"><b>Amira Khan</b><span>Year 11 · Tue 4pm</span></span><svg class="tally" viewBox="0 0 113 26" style="height:26px;width:113px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="49" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="56" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="63" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M39 20L69 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="82" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="89" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st good">Paid up</span>
+        </button>
+        <button type="button" class="book-row" data-student="joe" aria-expanded="false">
+          <span class="who"><b>Joe Fletcher</b><span>Year 11 · Wed 5:30pm</span></span><svg class="tally" viewBox="0 0 73 26" style="height:26px;width:73px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="49" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="56" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="63" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st warn">Owes £180</span>
+        </button>
+        <button type="button" class="book-row" data-student="priya" aria-expanded="false">
+          <span class="who"><b>Priya Shah</b><span>Year 13 · Thu 6pm</span></span><svg class="tally" viewBox="0 0 73 26" style="height:26px;width:73px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="49" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st good">Paid up</span>
+        </button>
+        <button type="button" class="book-row" data-student="tom" aria-expanded="false">
+          <span class="who"><b>Tom Bennett</b><span>Year 9 · Mon 5pm</span></span><svg class="tally" viewBox="0 0 73 26" style="height:26px;width:73px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g u" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="u" x="42" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st warn">Owes £90</span>
+        </button>
+        <div class="book-total"><span>Owed to you</span><b>£270</b></div>
       </div>
-      <p class="cta-note" style="text-align:center">2 of them owe you £270. Tap a name to see the useful bit.</p>
+      <p class="small book-cap">Red strokes are lessons not paid for yet. Tap a name.</p>
     </div>
   </div>
 </header>
 
-<!-- ══ PAIN ══ -->
-<section style="background:var(--bg-tint)">
+<section id="how" class="ruled">
   <div class="wrap">
-    <div class="grid g2" style="align-items:center;gap:44px">
-      <div class="rv">
-        <div class="eyebrow">Built for one-person tutor businesses</div>
-        <h2>Most tutors track money in their head. It leaks.</h2>
-        <p class="lede">
-          Not because you're disorganised. Once there are 5 or more regular
-          students, 3 reschedules a week, and a bank app that just says
-          "FASTER PAYMENT", your head stops being a system.
-        </p>
-      </div>
-      <ul class="pain rv">
-        <li>You think someone's 2 lessons behind but you're not certain enough to ask.</li>
-        <li>A parent says "I paid you in September" and you have no way to check.</li>
-        <li>You write it in Notes, then stop updating Notes by week 3.</li>
-        <li>You cancel a lesson and forget to take it off the total.</li>
-        <li>You quietly write off money every term because chasing it feels awkward.</li>
-      </ul>
-    </div>
-  </div>
-</section>
-
-<!-- ══ HOW ══ -->
-<section id="how">
-  <div class="wrap">
-    <div class="rv" style="max-width:640px">
-      <div class="eyebrow">How it works</div>
+    <div class="sec-head rv">
       <h2>You already did the admin when you booked the lesson.</h2>
-      <p class="lede">Connect your calendar once: Google, Apple or Outlook. TutorTally keeps lesson records and balances right as plans change.</p>
+      <p class="body" style="font-size:1.12rem">Connect Google, Apple or Outlook once. Lessons, balances and chasers follow from what is already in your diary.</p>
     </div>
-
-    <div class="flow rv" style="margin-top:34px">
-      <div class="flow-card">
-        <div class="mock-sub" style="margin-bottom:9px">Your teaching calendar</div>
-        <div class="cal-ev">Amira maths lesson · Tue 16:00</div>
-        <div class="cal-ev">Joe maths lesson · Wed 17:30</div>
-        <div class="cal-ev">Priya maths lesson · Thu 18:00</div>
+    <div class="steps">
+      <div class="step rv">
+        <div class="art"><div class="panel">
+          <div class="panel-t">Your calendar</div>
+          <div class="ev"><div><b>Amira maths</b><span>Tue 16:00 – 17:00</span></div></div>
+          <div class="ev"><div><b>Joe maths</b><span>Wed 17:30 – 18:30</span></div></div>
+          <div class="ev"><div><b>Priya maths</b><span>Thu 18:00 – 19:00</span></div></div>
+        </div></div>
+        <div class="txt"><span class="n">1</span><h3>It reads your calendar</h3>
+          <p class="body">Names in your event titles become students. Book, move or cancel a lesson and the record follows.</p></div>
       </div>
-      <div class="arrow">→</div>
-      <div class="flow-card">
-        <div class="mock-sub" style="margin-bottom:9px">TutorTally, minutes later</div>
-        <div class="srow" style="margin-bottom:6px"><span class="dot ok"></span><span class="sname">Amira</span><span class="spacer"></span><span class="chip">Paid</span></div>
-        <div class="srow" style="margin-bottom:6px"><span class="dot warn"></span><span class="sname">Joe</span><span class="spacer"></span><span class="chip warn">Owes £180</span></div>
-        <div class="srow" style="margin-bottom:0"><span class="dot ok"></span><span class="sname">Priya</span><span class="spacer"></span><span class="chip">Paid</span></div>
+      <div class="step rv">
+        <div class="art"><div class="panel">
+          <div class="panel-t rule2">TutorTally</div>
+          <div class="mini"><b>Amira</b><svg class="tally" viewBox="0 0 113 26" style="height:20px;width:87px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="49" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="56" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="63" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M39 20L69 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="82" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="89" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st good">Paid</span></div>
+          <div class="mini"><b>Joe</b><svg class="tally" viewBox="0 0 73 26" style="height:20px;width:56px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="49" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="56" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="63" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st warn">£180</span></div>
+          <div class="mini" style="border-bottom:0"><b>Priya</b><svg class="tally" viewBox="0 0 73 26" style="height:20px;width:56px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="49" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st good">Paid</span></div>
+        </div></div>
+        <div class="txt"><span class="n">2</span><h3>It keeps the tally</h3>
+          <p class="body">Every payment settles the oldest unpaid lesson first, so each balance is simply what that family owes. Change a rate and the history stays right.</p></div>
       </div>
-    </div>
-
-    <div class="grid g3" style="margin-top:34px">
-      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2"/></svg></span><h3>It reads your calendar</h3>
-        <p class="muted" style="font-size:.93rem">It finds the names in your event titles and offers to make each one a student. Book, move or cancel a lesson in your calendar and TutorTally keeps the record right.</p></div>
-      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M12 3v18 M6 21h12 M3 7h18 M6 7l-4 8h8z M18 7l-4 8h8z"/></svg></span><h3>It does the arithmetic</h3>
-        <p class="muted" style="font-size:.93rem">Every payment settles the oldest unpaid lesson first, so the number on each card is simply what that family still owes. Change someone's rate and it recalculates the history properly.</p></div>
-      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z M7 10h10 M7 14h6"/></svg></span><h3>It writes the awkward message</h3>
-        <p class="muted" style="font-size:.93rem">One tap opens WhatsApp with the amount, the number of lessons and a polite ask already written. You just press send.</p></div>
+      <div class="step rv">
+        <div class="art"><div class="wa">
+          <div class="wa-name">Karen (Joe's mum)</div>
+          <div class="bub" id="bub"><span id="waText"></span><span class="caret"></span><span class="tick">17:42 ✓✓</span></div>
+        </div></div>
+        <div class="txt"><span class="n">3</span><h3>It writes the awkward message</h3>
+          <p class="body">One tap opens WhatsApp with the amount and the lessons written out. Nothing sends until you press send.</p></div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- ══ WHATSAPP ══ -->
-<section style="background:var(--bg-tint)">
-  <div class="wrap grid g2" style="align-items:center;gap:44px">
-    <div class="rv">
-      <div class="eyebrow">The bit everyone hates</div>
-      <h2>Asking for money, without the stomach drop.</h2>
-      <p class="lede">
-        You press one button. It counts the unpaid lessons, adds them up, and opens
-        WhatsApp with it written out. Nothing sends until you tap send.
-      </p>
-      <p class="muted" style="font-size:.93rem">
-        Most tutors put this off for weeks. It takes 4 seconds.
-      </p>
+<section class="ruled">
+  <div class="wrap leaks">
+    <div class="rv" style="display:flex;flex-direction:column;gap:24px">
+      <h2>Most tutors track money in their head. It leaks.</h2>
+      <p class="lede">Not because you're disorganised. Once there are 5 or more regular students, 3 reschedules a week, and a bank app that just says "FASTER PAYMENT", your head stops being a system.</p>
     </div>
+    <ul class="rv">
+      <li><svg class="tally" viewBox="0 0 33 26" style="height:26px;width:33px" aria-hidden="true"><rect class="u" x="2" y="2" width="3.4" height="22" rx="1.7"/></svg><span>You think someone's 2 lessons behind but you're not certain enough to ask.</span></li>
+      <li><svg class="tally" viewBox="0 0 33 26" style="height:26px;width:33px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="9" y="2" width="3.4" height="22" rx="1.7"/></svg><span>A parent says "I paid you in September" and you have no way to check.</span></li>
+      <li><svg class="tally" viewBox="0 0 33 26" style="height:26px;width:33px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="16" y="2" width="3.4" height="22" rx="1.7"/></svg><span>You write it in Notes, then stop updating Notes by week 3.</span></li>
+      <li><svg class="tally" viewBox="0 0 33 26" style="height:26px;width:33px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="23" y="2" width="3.4" height="22" rx="1.7"/></svg><span>You cancel a lesson and forget to take it off the total.</span></li>
+      <li><svg class="tally" viewBox="0 0 33 26" style="height:26px;width:33px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g u" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/></svg><span>You quietly write off money every term because chasing it feels awkward.</span></li>
+    </ul>
+  </div>
+</section>
 
+<section class="ruled">
+  <div class="wrap split">
+    <div class="copy rv">
+      <h2>Every parent gets their own page.</h2>
+      <p class="lede">A private link showing their child's upcoming lessons and exactly what has been paid. No login or app needed. It answers the parent before they have to ask you.</p>
+      <a class="btn btn-ghost" href="/student.html?t=demo-amira">Open Amira's sample page</a>
+      <p class="small">Each family only ever sees their own child. Pupils get a page of their own with just their lessons, no money.</p>
+    </div>
     <div class="rv">
-      <div class="phone">
-        <div class="wa-top">
-          <div class="wa-av">K</div>
-          <div><div class="wa-name">Karen (Joe's mum)</div><div style="font-size:.68rem;opacity:.6">online</div></div>
-        </div>
-        <div class="wa-body">
-          <div class="bub"><span id="waText" class="typing"></span><span class="caret"></span>
-            <span class="tick">17:42 ✓✓</span>
-          </div>
-        </div>
-      </div>
-      <p class="cta-note" style="text-align:center">Written for you. Sent by you.</p>
+      <a class="phone" href="/student.html?t=demo-amira" aria-label="Open Amira's sample parent page">
+        <div class="ph-title">Amira's Lessons</div>
+        <div class="small">Lessons and payment status</div>
+        <div class="group">Upcoming</div>
+        <div class="r"><span data-tue="0">Tue · 16:00</span><span class="tag">Upcoming</span></div>
+        <div class="r"><span data-tue="1">Tue · 16:00</span><span class="tag">Upcoming</span></div>
+        <div class="group">Recent</div>
+        <div class="r"><span data-tue="-1">Tue · 16:00</span><span class="tag paid">Paid</span></div>
+        <div class="r"><span data-tue="-2">Tue · 16:00</span><span class="tag paid">Paid</span></div>
+      </a>
     </div>
   </div>
 </section>
 
-<!-- ══ WORKFLOW ══ -->
-<section>
+<section style="padding-top:0">
   <div class="wrap">
-    <div class="rv" style="max-width:640px">
-      <div class="eyebrow">Inside</div>
-      <h2>Everything you need before you ask for money.</h2>
-      <p class="lede">Each student has the answers in one place. You can try the real app with dummy data before signing up.</p>
-    </div>
-
-    <div class="grid g2" style="margin-top:30px">
-      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 4h18v5H3z M5 9v11h14V9 M10 13h4"/></svg></span><h3>Money first</h3>
-        <p class="muted" style="font-size:.93rem">It opens on what you are owed and what came in this month. Each student shows the next lesson, what has been paid and what actually needs chasing.</p></div>
-      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z M7 10h10 M7 14h6"/></svg></span><h3>Payment requests</h3>
-        <p class="muted" style="font-size:.93rem">Tap once and WhatsApp opens with the amount, the lesson count and the dates already written in human language.</p></div>
-      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2"/></svg></span><h3>Changes stay accurate</h3>
-        <p class="muted" style="font-size:.93rem">Your teaching calendar stays the source of truth, so cancellations and rescheduled lessons do not leave a wrong balance behind.</p></div>
-      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2 M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/></svg></span><h3>Parent pages</h3>
-        <p class="muted" style="font-size:.93rem">Every family gets a private lesson page, and the pupil gets their own with just their lessons and no money. Shared links show the child's name, like "Amira's Lessons".</p></div>
-      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 5h16v16H4z M8 3v4 M16 3v4 M4 10h16 M8 14h2 M14 14h2 M8 17h2"/></svg></span><h3>This week at a glance</h3>
-        <p class="muted" style="font-size:.93rem">Every lesson in the next seven days on one strip, so you know who is next without opening anything.</p></div>
-      <div class="card rv"><span class="ico"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9 M10 21h4"/></svg></span><h3>Needs attention</h3>
-        <p class="muted" style="font-size:.93rem">Who has owed for over a week, and who has nothing booked. Chase from right there in one tap, and undo a payment you logged by mistake.</p></div>
-    </div>
-
-    <div class="try rv">
+    <div class="demo rv">
       <div>
-        <h3 style="margin-bottom:6px">Have a proper poke around first.</h3>
-        <p class="muted" style="font-size:.95rem;margin:0">
-          The demo is the real app with made-up students. Add a payment, chase someone,
-          open a parent page or change a rate. Nothing is saved and nothing is real.
-        </p>
+        <h2>Have a proper poke around first.</h2>
+        <p>The demo is the real app with made-up students. Log a payment, chase someone, open a parent page or change a rate. Nothing is saved and nothing is real.</p>
       </div>
       <a class="btn btn-primary btn-lg" href="/?demo=1">Open the demo</a>
     </div>
   </div>
 </section>
 
-<!-- ══ PARENT PAGE ══ -->
-<section style="background:var(--bg-tint)">
-  <div class="wrap grid g2" style="align-items:center;gap:44px">
-    <div class="rv">
-      <div class="eyebrow">A page parents can trust</div>
-      <h2>Every parent gets their own page.</h2>
-      <p class="lede">
-        A private link showing their child's upcoming lessons and exactly what has been
-        paid. No login or app needed. It answers the parent before they have to ask you.
-      </p>
-      <a class="btn btn-primary" href="/student.html?t=demo-amira">Open Amira's sample parent page</a>
-      <p class="cta-note">Tap a paid lesson to see the payment date.</p>
-    </div>
-    <div class="rv">
-      <a class="mock" href="/student.html?t=demo-amira" style="display:block;max-width:340px;margin:0 auto;text-decoration:none;color:inherit">
-        <div style="font-weight:750;font-size:1.05rem;letter-spacing:-.02em">Amira</div>
-        <div class="mock-sub" style="margin-bottom:14px">Lessons and payment status</div>
-        <div class="mock-sub" style="margin:0 0 8px">UPCOMING</div>
-        <div class="srow"><span class="sname" style="font-weight:560" data-tue="0">Tue · 16:00</span><span class="spacer"></span><span class="chip neutral">Upcoming</span></div>
-        <div class="srow"><span class="sname" style="font-weight:560" data-tue="1">Tue · 16:00</span><span class="spacer"></span><span class="chip neutral">Upcoming</span></div>
-        <div class="mock-sub" style="margin:14px 0 8px">RECENT</div>
-        <div class="srow"><span class="sname" style="font-weight:560" data-tue="-1">Tue · 16:00</span><span class="spacer"></span><span class="chip">Paid</span></div>
-        <div class="srow" style="margin-bottom:0"><span class="sname" style="font-weight:560" data-tue="-2">Tue · 16:00</span><span class="spacer"></span><span class="chip">Paid</span></div>
-      </a>
-    </div>
-  </div>
-</section>
-
-<!-- ══ OFFER ══ -->
-<section id="price">
+<section id="price" class="ruled">
   <div class="wrap">
-    <div class="rv" style="max-width:640px">
-      <div class="eyebrow">The offer</div>
+    <div class="sec-head rv">
       <h2>Start free. Pay when tutoring gets busy.</h2>
-      <p class="lede">
-        Free forever for up to 3 active students. When you are teaching 4 or more,
-        TutorTally Pro is £5 a month for everything.
-      </p>
+      <p class="body" style="font-size:1.12rem">Free forever for up to 3 active students. From your 4th, Pro is £5 a month for everything.</p>
     </div>
-
-    <div class="grid g2" style="margin-top:30px;align-items:start">
-      <div class="offer rv">
-        <div class="eyebrow" style="margin-bottom:6px">Free forever</div>
-        <div class="price"><span class="amt">£0</span><span class="per">/ month</span></div>
-        <p class="muted" style="font-size:.9rem">For up to 3 active students. No card needed.</p>
-
-        <ul class="stack">
-          <li>Lessons from your teaching calendar <span class="val">automatic</span></li>
-          <li>Every unpaid lesson behind a balance <span class="val">clear</span></li>
-          <li>Ready-to-send WhatsApp chasers <span class="val">1 tap</span></li>
-          <li>A private page for every parent <span class="val">included</span></li>
-          <li>Payment history and cash receipts <span class="val">organised</span></li>
-          <li>Up to 3 active students <span class="val">free</span></li>
+    <div class="prices rv">
+      <div class="plan">
+        <h3>Free</h3>
+        <div class="amt">£0<small>forever</small></div>
+        <p class="body">For up to 3 active students. No card needed.</p>
+        <ul>
+          <li>Lessons from your calendar<span>automatic</span></li>
+          <li>Balances and unpaid lessons<span>always right</span></li>
+          <li>WhatsApp chasers<span>1 tap</span></li>
+          <li>Parent and pupil pages<span>included</span></li>
+          <li>Payment history and cash receipts<span>included</span></li>
         </ul>
-
-        <a href="/?signup=1" class="btn btn-primary btn-lg" style="width:100%">Create my free account</a>
-        <p class="cta-note" style="text-align:center">Upgrade only when you add your 4th active student.</p>
+        <a href="/?signup=1" class="btn btn-primary btn-lg">Create my free account</a>
       </div>
-
-      <div class="rv">
-        <div class="banner" style="margin-bottom:18px">
-          <b>TutorTally Pro is simple.</b> £5 a month once you have 4 or more active students.
-          Unlimited students and parent pages.
-        </div>
-
-        <div class="card">
-          <div class="eyebrow">Built for tutors who</div>
-          <h3 style="margin-bottom:12px">Already use an online calendar.</h3>
-          <div class="ref-step"><div class="ref-n">1</div><div>
-            <b>Put lessons in an online calendar.</b>
-            <div class="muted" style="font-size:.9rem">Google, Apple Calendar or Outlook. That is what TutorTally reads. A paper diary is not a match yet.</div></div></div>
-          <div class="ref-step"><div class="ref-n">2</div><div>
-            <b>Get paid by bank transfer or cash.</b>
-            <div class="muted" style="font-size:.9rem">You record payments. TutorTally does the sums.</div></div></div>
-          <div class="ref-step"><div class="ref-n">3</div><div>
-            <b>Want an answer before chasing.</b>
-            <div class="muted" style="font-size:.9rem">The message is written for you. You decide when to send it.</div></div></div>
-        </div>
+      <div class="plan">
+        <h3>Pro</h3>
+        <div class="amt">£5<small>a month</small></div>
+        <p class="body">Once you have 4 or more active students.</p>
+        <ul>
+          <li>Everything in Free<span>✓</span></li>
+          <li>Active students<span>unlimited</span></li>
+          <li>Parent pages<span>unlimited</span></li>
+          <li>Cancel any time<span>keep your records</span></li>
+        </ul>
+        <p class="small">Upgrade only when you add your 4th active student.</p>
       </div>
+    </div>
+    <div class="fit rv">
+      <div><b>Your lessons are in an online calendar.</b><p class="body">Google, Apple Calendar or Outlook. That is what TutorTally reads. A paper diary is not a match yet.</p></div>
+      <div><b>You get paid by bank transfer or cash.</b><p class="body">You record payments in a couple of taps. TutorTally does the sums.</p></div>
+      <div><b>You want to be sure before you chase.</b><p class="body">The message is written for you. You decide when to send it.</p></div>
     </div>
   </div>
 </section>
 
-<!-- ══ FAQ ══ -->
-<section style="background:var(--bg-tint)">
-  <div class="wrap" style="max-width:760px">
-    <div class="rv"><div class="eyebrow">Questions</div><h2>The things people ask.</h2></div>
-    <div class="rv" style="margin-top:24px">
+<section class="ruled">
+  <div class="wrap">
+    <h2 class="rv" style="margin-bottom:40px">The things people ask.</h2>
+    <div class="faq rv">
       <details><summary>Do I have to change how I book lessons?</summary>
-        <div class="faq-answer"><p>No. Keep using your teaching calendar. Google Calendar connects directly. Apple Calendar, Outlook and most other calendars connect with a private share link, and the app shows you where to find it.</p></div></details>
+        <p>No. Keep using your teaching calendar. Google Calendar connects directly. Apple Calendar, Outlook and most other calendars connect with a private share link, and the app shows you where to find it.</p></details>
       <details><summary>What if I teach something other than maths?</summary>
-        <div class="faq-answer"><p>It does not care what you teach. Lessons, students and money owed work the same way for English, languages, DT or any other subject.</p></div></details>
+        <p>It does not care what you teach. Lessons, students and money owed work the same way for English, languages, DT or any other subject.</p></details>
       <details><summary>Does it connect to my bank?</summary>
-        <div class="faq-answer"><p>No. You record payments yourself, which takes a few seconds, and TutorTally does the arithmetic from there. It will never quietly assume that a bank transfer belongs to a lesson.</p></div></details>
+        <p>No. You record payments yourself, which takes a few seconds, and TutorTally does the arithmetic from there. It will never quietly assume that a bank transfer belongs to a lesson.</p></details>
       <details><summary>Can parents see each other's information?</summary>
-        <div class="faq-answer"><p>No. Each parent's link only shows their own child's lessons and payments. They cannot see your other students, your rates or anything else.</p></div></details>
+        <p>No. Each parent's link only shows their own child's lessons and payments. They cannot see your other students, your rates or anything else.</p></details>
       <details><summary>What happens to my data if I stop paying?</summary>
-        <div class="faq-answer"><p>Nothing is deleted. You keep read access to your records and can export them.</p></div></details>
+        <p>Nothing is deleted. You keep read access to your records and can export them.</p></details>
       <details><summary>Is it actually £5, or £5 and then more later?</summary>
-        <div class="faq-answer"><p>TutorTally Lite is free forever for up to 3 active students. TutorTally Pro is £5 a month when you have 4 or more active students, with everything included and no student limit.</p></div></details>
+        <p>Free forever for up to 3 active students. Pro is £5 a month when you have 4 or more active students, with everything included and no student limit.</p></details>
     </div>
   </div>
 </section>
 
-<!-- ══ FINAL CTA ══ -->
-<section id="start">
-  <div class="wrap" style="text-align:center;max-width:680px">
-    <div class="rv">
-      <h2>Stop wondering who owes you.</h2>
-      <p class="lede" style="margin:0 auto 6px">
-        3 minutes to set up. Free forever for your first 3 active students.
-        Upgrade only when you add a 4th.
-      </p>
-      <div class="cta-row" style="justify-content:center">
-        <a class="btn btn-primary btn-lg" href="/?signup=1">Get started free</a>
-        <a class="btn btn-ghost btn-lg" href="/?demo=1">Try the real demo</a>
-      </div>
-      <p class="cta-note">
-        No card. Or if you would rather I set it up with you,
-        <a href="https://wa.me/447407437292?text=Hi%20Daniel%2C%20I%27d%20like%20to%20try%20TutorTally." style="color:var(--accent)">message me on WhatsApp</a>
-        and I will walk you through it.
-      </p>
+<section class="ruled">
+  <div class="wrap close rv">
+    <svg class="tally" viewBox="0 0 33 26" style="height:44px;width:56px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/></svg>
+    <h2>Stop wondering who owes you.</h2>
+    <p class="lede">3 minutes to set up. Free forever for your first 3 active students.</p>
+    <div class="cta-row">
+      <a class="btn btn-primary btn-lg" href="/?signup=1">Start free</a>
+      <a class="btn btn-ghost btn-lg" href="/?demo=1">Try the demo</a>
     </div>
+    <p class="small">Rather set it up together? <a class="wa-link" href="https://wa.me/447407437292?text=Hi%20Daniel%2C%20I%27d%20like%20to%20try%20TutorTally.">Message me on WhatsApp</a> and I will walk you through it.</p>
   </div>
 </section>
 
 <footer>
-  <div class="wrap" style="display:flex;gap:16px;flex-wrap:wrap;align-items:center">
-    <div>© <span id="yr"></span> TutorTally</div>
-    <a href="/terms" style="color:var(--ink-dim);text-decoration:none">Terms</a>
-    <a href="/privacy" style="color:var(--ink-dim);text-decoration:none">Privacy</a>
-    <a href="mailto:daniel@bowermaths.co.uk" style="color:var(--ink-dim);text-decoration:none">Contact</a>
-    <div style="margin-left:auto"><a href="/" style="color:var(--accent);text-decoration:none">Already have an account? Sign in →</a></div>
+  <div class="wrap">
+    <a class="wm" href="/app" aria-label="TutorTally"><svg viewBox="0 0 64 72" aria-hidden="true"><rect x="24" y="14" width="15" height="58" rx="3" fill="currentColor"/><path d="M7 24L57 10" stroke="currentColor" stroke-width="13" stroke-linecap="round" fill="none"/></svg><span>utor</span><span class="gap"></span><svg viewBox="0 0 64 72" aria-hidden="true"><rect x="24" y="14" width="15" height="58" rx="3" fill="currentColor"/><path d="M7 24L57 10" stroke="var(--accent-fill)" stroke-width="13" stroke-linecap="round" fill="none"/></svg><span>ally</span></a>
+    <span>© <span id="yr"></span></span>
+    <a href="/terms">Terms</a>
+    <a href="/privacy">Privacy</a>
+    <a href="mailto:daniel@bowermaths.co.uk">Contact</a>
+    <a class="signin" href="/">Already have an account? Sign in →</a>
   </div>
 </footer>
 
@@ -602,82 +459,87 @@
     el.textContent = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · 16:00';
   });
 })();
-  document.getElementById('yr').textContent = new Date().getFullYear();
+document.getElementById('yr').textContent = new Date().getFullYear();
 
-  // Reveal on scroll. Falls back to everything visible if unsupported, so the
-  // page can never end up blank because an observer didn't fire.
-  const items = Array.from(document.querySelectorAll('.rv'));
-  if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver((entries) => {
-      entries.forEach((e, i) => {
-        if (!e.isIntersecting) return;
-        setTimeout(() => e.target.classList.add('in'), i * 70);
-        io.unobserve(e.target);
-      });
-    }, { rootMargin: '0px 0px -60px 0px', threshold: 0.08 });
-    items.forEach(el => io.observe(el));
+// A hairline under the nav once the page has moved, not before.
+const nav = document.getElementById('nav');
+addEventListener('scroll', () => nav.classList.toggle('scrolled', scrollY > 8), { passive: true });
 
-    // Observer callbacks get throttled when a tab is backgrounded, and can be
-    // outrun by a fast scroll on a slow phone. Either way the reader would be
-    // looking at an empty screen, so a cheap scroll check sweeps up anything
-    // the observer hasn't got to yet.
-    const sweep = () => {
-      for (const el of items) {
-        if (el.classList.contains('in')) continue;
-        const r = el.getBoundingClientRect();
-        if (r.top < innerHeight && r.bottom > 0) el.classList.add('in');
-      }
-    };
-    let queued = false;
-    addEventListener('scroll', () => {
-      if (queued) return;
-      queued = true;
-      requestAnimationFrame(() => { queued = false; sweep(); });
-    }, { passive: true });
-    addEventListener('resize', sweep, { passive: true });
-  } else {
-    items.forEach(el => el.classList.add('in'));
-  }
-
-  // The real message the app generates, typed out once the phone scrolls into
-  // view. Word by word rather than character by character so it reads like a
-  // message arriving instead of a gimmick.
-  const MSG = "Hi Karen! Just a note that we have 2 outstanding sessions totalling £160. Please could you settle this when you get the chance? Thanks!";
-  const target = document.getElementById('waText');
-  let typed = false;
-  function typeIt() {
-    if (typed) return; typed = true;
-    const words = MSG.split(' ');
-    let i = 0;
-    (function next() {
-      if (i >= words.length) return;
-      target.textContent += (i ? ' ' : '') + words[i++];
-      setTimeout(next, 55 + Math.random() * 45);
-    })();
-  }
-  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-    target.textContent = MSG;
-  } else if ('IntersectionObserver' in window) {
-    const io2 = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) typeIt(); }), { threshold: 0.4 });
-    io2.observe(target.closest('.phone'));
-  } else {
-    target.textContent = MSG;
-  }
-
-  const demoStudents = {
-    amira: { name: 'Amira Khan', year: 'Year 11', summary: 'Paid up. Next lesson: Tuesday at 16:00.', link: '/?demo=1' },
-    joe: { name: 'Joe Fletcher', year: 'Year 11', summary: '3 lessons unpaid, £180 outstanding, the oldest from 3 weeks ago. One tap to chase.', link: '/?demo=1' },
-    priya: { name: 'Priya Shah', year: 'Year 13', summary: 'Paid up. Online lesson: Thursday at 18:00.', link: '/?demo=1' },
-    tom: { name: 'Tom Bennett', year: 'Year 9', summary: '2 lessons unpaid, £90 outstanding. Next lesson: Monday at 17:00.', link: '/?demo=1' },
+// Reveal on scroll. Falls back to everything visible if unsupported, so the
+// page can never end up blank because an observer didn't fire.
+const items = Array.from(document.querySelectorAll('.rv'));
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e, i) => {
+      if (!e.isIntersecting) return;
+      setTimeout(() => e.target.classList.add('in'), i * 70);
+      io.unobserve(e.target);
+    });
+  }, { rootMargin: '0px 0px -60px 0px', threshold: 0.08 });
+  items.forEach(el => io.observe(el));
+  // Observer callbacks get throttled when a tab is backgrounded, and can be
+  // outrun by a fast scroll on a slow phone, so a cheap scroll check sweeps up
+  // anything the observer hasn't got to yet.
+  const sweep = () => {
+    for (const el of items) {
+      if (el.classList.contains('in')) continue;
+      const r = el.getBoundingClientRect();
+      if (r.top < innerHeight && r.bottom > 0) el.classList.add('in');
+    }
   };
-  const detail = document.getElementById('demoDetail');
-  function showDemoStudent(key) {
-    const student = demoStudents[key];
-    if (!student || !detail) return;
-    detail.innerHTML = `<div class="demo-detail-title"><span>${student.name}</span><span class="mock-sub">${student.year}</span></div><p class="demo-detail-copy">${student.summary}</p><a class="btn btn-primary" href="${student.link}">Open this student in the demo</a>`;
-  }
-  document.querySelectorAll('.demo-student').forEach(button => button.addEventListener('click', () => showDemoStudent(button.dataset.student)));
-  showDemoStudent('joe');
+  let queued = false;
+  addEventListener('scroll', () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => { queued = false; sweep(); });
+  }, { passive: true });
+  addEventListener('resize', sweep, { passive: true });
+} else {
+  items.forEach(el => el.classList.add('in'));
+}
+
+// The real message the app generates, typed out once it scrolls into view.
+// Word by word rather than character by character so it reads like a message
+// arriving instead of a gimmick.
+const MSG = "Hi Karen! Just a note that we have 3 outstanding sessions totalling £180. Please could you settle this when you get the chance? Thanks!";
+const target = document.getElementById('waText');
+const bub = document.getElementById('bub');
+let typed = false;
+function typeIt() {
+  if (typed) return; typed = true;
+  const words = MSG.split(' ');
+  let i = 0;
+  (function next() {
+    if (i >= words.length) { bub.classList.add('done'); return; }
+    target.textContent += (i ? ' ' : '') + words[i++];
+    setTimeout(next, 55 + Math.random() * 45);
+  })();
+}
+if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
+  target.textContent = MSG; bub.classList.add('done');
+} else {
+  const io2 = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) typeIt(); }), { threshold: 0.4 });
+  io2.observe(bub);
+}
+
+// Tapping a name in the tally book says what the app would tell you about them.
+const notes = {
+  amira: 'Paid up for all 12 lessons. Next lesson Tuesday at 16:00.',
+  joe: 'His last 3 lessons are unpaid, £180, the oldest from 3 weeks ago. One tap writes the message to Karen.',
+  priya: 'Paid up. Online lesson Thursday at 18:00.',
+  tom: '2 lessons unpaid, £90. Next lesson Monday at 17:00.',
+};
+document.querySelectorAll('.book-row').forEach(row => row.addEventListener('click', () => {
+  const open = row.getAttribute('aria-expanded') === 'true';
+  document.querySelectorAll('.book-row').forEach(r => r.setAttribute('aria-expanded', 'false'));
+  document.querySelectorAll('.book-note').forEach(n => n.remove());
+  if (open) return;
+  row.setAttribute('aria-expanded', 'true');
+  const note = document.createElement('div');
+  note.className = 'book-note';
+  note.innerHTML = notes[row.dataset.student] + ' <a href="/?demo=1">See it in the demo →</a>';
+  row.after(note);
+}));
 </script>
 </body>
 </html>
