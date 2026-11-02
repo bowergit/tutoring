@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <meta name="theme-color" content="#ffa500">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tokens.css?v=6.41.1">
+<link rel="stylesheet" href="tokens.css?v=6.41.2">
 <style>
   /* Admin-only: the amber stage colour and the dark help tooltip. */
   :root {
@@ -182,7 +182,9 @@
   .btn {
     font-family: inherit; font-size: 0.8rem; font-weight: 650; cursor: pointer;
     padding: 8px 13px; border-radius: var(--r-sm); border: 1px solid var(--line);
-    background: var(--card-2); color: var(--ink); text-decoration: none; display: inline-block;
+    background: var(--card-2); color: var(--ink); text-decoration: none;
+    /* ux.css gives every .btn a 44px minimum height; flex keeps the label centred in it. */
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   }
   .btn.primary { background: var(--accent-fill); border-color: transparent; color: #15211f; }
   .btn.danger { color: var(--warn); }
@@ -401,7 +403,7 @@
   .peek b { color: var(--ink); }
   .foot-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line); }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.41.1">
+<link rel="stylesheet" href="ux.css?v=6.41.2">
 </head>
 <body>
 <div class="wrap" id="app"><div class="empty">Loading…</div></div>
@@ -416,7 +418,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.40.0';
+const VERSION = 'v6.41.2';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
