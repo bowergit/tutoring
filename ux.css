@@ -2,6 +2,11 @@
 html { color-scheme: light dark; scroll-padding-top: 110px; }
 body { line-height: 1.5; font-feature-settings: "ss01"; }
 button, input, select, textarea { font-family: inherit; }
+/* The parts the browser draws, themed so they don't fall back to default blue. */
+::selection { background: color-mix(in srgb, var(--accent-fill) 32%, transparent); color: var(--ink); }
+input, textarea, [contenteditable] { caret-color: var(--accent); }
+html { scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent; }
+a { text-underline-offset: .18em; }
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 h1, h2, h3, .header-title, .student-name { text-wrap: balance; }
 h1, h2, h3 { letter-spacing: -.035em; }

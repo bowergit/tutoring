@@ -33,6 +33,13 @@ Bump the `?v=` on both links whenever either file changes, or phones keep the ol
 6. **Phone first.** Most use is a tutor on a phone between lessons. Design at 375px wide, then let it widen. Tap targets at least 44px. Inputs at 16px so iOS doesn't zoom.
 7. **Cards are records, not adverts.** Quiet borders, one shadow level (`--sh-2`), no gradients, no decorative illustrations.
 8. **Numbers line up.** Money and counts use `font-variant-numeric: tabular-nums`.
+9. **Look like a ledger, not a template.** A box is named by its heading, which sits over a double rule (`border-bottom: 3px double var(--line)`), the way a ledger closes a column. No coloured side stripes on cards or alerts, no glowing status dots, no coloured glows, no gradient or shimmering text.
+10. **Only money gets a pill.** On a record, the one pill is the money state (Paid up, Owes, Overdue, In credit). Other details (next lesson, year, rate) go on one line of `.meta` text separated by middots.
+
+Impeccable (`~/.claude/skills/impeccable`) checks for these tells. Run
+`~/.claude/skills/impeccable/scripts/impeccable detect --json <file>` after
+changing a page. The stripes on "booked" revenue bars are deliberate: they
+separate booked from earned without relying on colour.
 
 ## Colour
 
@@ -87,7 +94,8 @@ These exist in `index.html` and `ux.css`. Reuse the class names on new pages so 
 - **Sheet** `.overlay` › `.sheet`, with `.sheet-close`, `h2`, `.field`s and a `.btn-row`. Bottom sheet on phones, centred dialog from 760px.
 - **Field** `.field` › `label` + `input`/`select`/`textarea`.
 - **Tool row** `.tools-row` with `.tools-icon`, `.tools-row-main`, `.tools-row-sub` and `.tools-chevron`. Settings-style list row; add `.danger` for destructive ones.
-- **Attention box** `.attn` (red left edge) for things to chase, and `.cand` (orange left edge) for calendar events to confirm.
+- **Attention box** `.attn` (red heading) for things to chase, and `.cand` (orange heading) for calendar events to confirm. Both are plain cards with the double rule under the heading.
+- **Meta line** `.status-row .meta`. Quiet record details after the money pill, separated by middots.
 - **Empty state** `.empty` with an icon, a `strong` line, and one sentence saying what to do next.
 - **Toast** `.toast-in`. Brief confirmation with an Undo where possible.
 

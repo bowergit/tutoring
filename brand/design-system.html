@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TutorTally Design System</title>
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="../tokens.css?v=6.38.0">
+<link rel="stylesheet" href="../tokens.css?v=6.39.0">
 <style>
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; }
   main { max-width: 880px; margin: 0 auto; padding: var(--s-8) var(--s-4) var(--s-10); }
   header { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-2); }
-  header svg { width: 40px; height: 30px; }
+  header svg { width: 40px; height: 31px; flex: none; }
   h1 { font-size: var(--t-xl); margin: 0; }
   h1 span { color: var(--accent); }
   .lede { color: var(--ink-dim); margin: 0 0 var(--s-8); font-size: var(--t-sm); }
@@ -51,7 +51,10 @@
   .field label { display: block; color: var(--ink-dim); font-size: .8rem; font-weight: 600; margin-bottom: 7px; }
   .field input { width: 100%; max-width: 320px; min-height: 46px; padding: 10px 12px; font: 400 var(--t-md) var(--font); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: var(--r-md); }
   .field input:focus { outline: none; border-color: var(--accent); box-shadow: var(--ring); }
-  .attn { background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: var(--r-lg); padding: var(--s-4); max-width: 420px; font-size: var(--t-sm); }
+  .attn { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); padding: var(--s-4); max-width: 420px; font-size: var(--t-sm); }
+  .attn .section-label { padding-bottom: var(--s-2); border-bottom: 3px double var(--line); margin-bottom: var(--s-3); }
+  .meta { font-size: .78rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+  .meta + .meta::before { content: '·'; margin: 0 6px 0 1px; color: var(--muted); }
   .empty { background: var(--card); border: 1px dashed var(--line); border-radius: var(--r-lg); padding: var(--s-8) var(--s-5); text-align: center; color: var(--muted); max-width: 420px; font-size: var(--t-sm); }
   .empty strong { display: block; color: var(--ink); font-size: 1rem; margin-bottom: 5px; }
   .note { color: var(--muted); font-size: var(--t-xs); margin-top: var(--s-2); }
@@ -60,7 +63,12 @@
 <body>
 <main>
   <header>
-    <svg viewBox="0 0 40 30" aria-hidden="true"><path d="M10 4v22M18 4v22" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/><path d="M5 22L33 8" stroke="#ffa500" stroke-width="3.4" stroke-linecap="round"/></svg>
+    <!-- Same drawing as the dashboard header, so the strokes take the theme's ink. -->
+    <svg viewBox="0 0 900 700" aria-hidden="true">
+      <path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)" stroke-width="94" stroke-linecap="round"/>
+      <rect x="292" y="48" width="100" height="604" rx="14" fill="var(--ink)"/>
+      <rect x="512" y="48" width="100" height="604" rx="14" fill="var(--ink)"/>
+    </svg>
     <h1>Tutor<span>Tally</span> design system</h1>
   </header>
   <p class="lede">Every value here comes from <code>tokens.css</code>. Switch your device to dark mode to see the other theme. Rules and usage are in <code>DESIGN_SYSTEM.md</code>.</p>
@@ -116,6 +124,7 @@
       <div><div class="name">Amelia Hart</div><div class="sub">GCSE Maths · Thursdays 4pm</div></div>
       <span class="pill warn">Owes £70</span>
     </div>
+    <div style="margin-top:var(--s-2)"><span class="meta">Next 6 Nov</span><span class="meta">Y11</span><span class="meta">£35</span></div>
     <p class="big">£70.00</p>
     <div class="sub">2 lessons since the last payment</div>
   </div>

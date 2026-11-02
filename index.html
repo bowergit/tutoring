@@ -15,7 +15,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<link rel="stylesheet" href="tokens.css?v=6.38.0">
+<link rel="stylesheet" href="tokens.css?v=6.39.0">
 <style>
 
   * { box-sizing: border-box; }
@@ -131,13 +131,13 @@
     box-shadow: var(--sh-2);
     transition: box-shadow .25s var(--ease), transform .25s var(--ease), border-color .25s var(--ease);
   }
-  /* The student just added, or just jumped to, lit the way the walkthrough
-     lights a control: a solid orange edge and a soft glow, long enough to find
-     it on the page and then gone. The old faint ring was easy to miss on a
-     phone mid-scroll. */
+  /* The student just added, or just jumped to: a solid orange edge and a
+     lifted shadow, long enough to find it on the page and then gone. The old
+     faint ring was easy to miss on a phone mid-scroll; the orange glow that
+     replaced it read as decoration. */
   .card.spotlit {
     border-color: var(--accent-fill);
-    box-shadow: 0 0 0 2px var(--accent-fill), 0 0 26px 4px rgba(255,165,0,.45), var(--sh-2);
+    box-shadow: 0 0 0 2px var(--accent-fill), var(--sh-3);
   }
   .card.is-open { box-shadow: var(--sh-3); border-color: color-mix(in srgb, var(--accent) 26%, var(--line)); }
   @media (hover:hover) { .card:hover { box-shadow: var(--sh-3); } }
@@ -152,12 +152,12 @@
     font-weight: 650; font-size: 1.02rem; color: var(--ink); letter-spacing: -0.015em;
     display: flex; align-items: center; gap: 7px;
   }
-  /* Coloured dot carries paid/owing state before any text is read. */
-  .dot { width: 7px; height: 7px; border-radius: 4px; flex-shrink: 0; }
-  .dot.ok { background: var(--accent-2); box-shadow: 0 0 0 3px var(--accent-light); }
-  .dot.warn { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-light); }
-  .dot.idle { background: var(--muted); opacity: .55; }
-  .status-row { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; }
+  .status-row { display: flex; gap: 5px; margin-top: 7px; flex-wrap: wrap; align-items: center; }
+  /* Only money gets a pill. The rest of the record (next lesson, year, rate)
+     reads as one line of detail, so the pill is the one thing that stands out. */
+  .status-row .meta { font-size: .78rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .status-row .meta + .meta::before { content: '·'; margin: 0 6px 0 1px; color: var(--muted); }
+  .status-row .pill + .meta { margin-left: 4px; }
   .pill {
     font-size: 0.665rem; padding: 3px 9px; border-radius: 20px; font-weight: 650;
     letter-spacing: 0.015em; line-height: 1.45; white-space: nowrap;
@@ -736,12 +736,7 @@
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     padding-left: 44px; font-size: 0.82rem; font-weight: 650; letter-spacing: 0.01em;
     pointer-events: none; color: var(--sc);
-    background: linear-gradient(100deg, var(--sc) 40%, color-mix(in srgb, var(--sc) 25%, #fff) 50%, var(--sc) 60%);
-    background-size: 300% 100%; -webkit-background-clip: text; background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: scShimmer 2.8s ease-in-out infinite;
   }
-  @keyframes scShimmer { from { background-position: 100% 0; } to { background-position: 0% 0; } }
   .slide-confirm .sc-knob {
     position: absolute; top: 3px; left: 3px; width: 40px; height: 40px; border-radius: 20px;
     background: var(--sc); color: #fff; display: grid; place-items: center;
@@ -837,7 +832,6 @@
   .student-name { font-size: 1.05rem; font-weight: 650; gap: 9px; }
   .status-row { gap: 6px; margin-top: 9px; }
   .pill { font-size: .7rem; padding: 4px 9px; font-weight: 600; }
-  .dot.ok { background:var(--good); box-shadow:0 0 0 3px var(--good-light); }
   /* Opens by growing, not by popping in: a grid row going 0fr to 1fr animates to the
      content's real height, which max-height and display:none cannot do. */
   .card-body { display:grid; grid-template-rows:0fr; max-height:none; overflow:visible; transition:grid-template-rows .38s cubic-bezier(0.4,0,0.2,1); }
@@ -857,14 +851,18 @@
   .search-wrap input { min-height:46px; font-size:.9rem; padding-left:40px; }
   .search-wrap .s-icon { display:flex; align-items:center; }
   .sort-wrap select { min-height:46px; background:var(--card); }
-  .attn { background:var(--card); border-color:var(--line); border-left:3px solid var(--warn); padding:0; }
+  /* Boxes are told apart by their heading, not a coloured side stripe. The
+     heading sits over a double rule, the way a ledger closes off a column. */
+  .attn { background:var(--card); border-color:var(--line); padding:0; }
+  .attn.open .attn-head { box-shadow: inset 0 -3px 0 -2px var(--line); border-bottom: 1px solid var(--line); margin-bottom: 2px; }
   .attn-head { padding:15px 17px; }
   .attn-body-inner { padding:0 17px; }
   .attn.open .attn-body-inner { padding-bottom:6px; }
   .attn-title, .cand-title { display:flex; align-items:center; gap:8px; font-size:.72rem; }
   .attn-item { min-height:42px; border-bottom:1px solid var(--line-soft); }
   .attn-item:last-child { border-bottom:0; }
-  .cand { background:var(--card); border-color:var(--line); border-left:3px solid var(--accent-fill); padding:15px 17px; }
+  .cand { background:var(--card); border-color:var(--line); padding:15px 17px; }
+  .cand-disclosure[open] summary { border-bottom: 3px double var(--line); margin-bottom: 4px; }
   .cand-item + .cand-item { border-top-color:var(--line); }
   .cand-name { font-size:.92rem; }
   .cand-sub { font-size:.8rem; }
@@ -952,11 +950,12 @@
 
   /* ── This week ── */
   .week {
-    background: var(--card); border: 1px solid var(--line); border-left: 3px solid var(--accent-fill);
+    background: var(--card); border: 1px solid var(--line);
     border-radius: var(--r-lg); padding: 14px 17px; margin-bottom: 12px; box-shadow: var(--sh-1);
   }
   .week-title {
-    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 9px;
+    border-bottom: 3px double var(--line);
     font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; font-weight: 700; color: var(--accent);
   }
   .week-days { display: flex; gap: 14px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
@@ -1013,7 +1012,7 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.38.0">
+<link rel="stylesheet" href="ux.css?v=6.39.0">
 </head>
 <body>
 <div id="root"></div>
@@ -7493,7 +7492,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
       <div className="card-header" data-wt="card" role="button" tabIndex={0} aria-expanded={open} aria-controls={`student-body-${student.id}`} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setOpen(!open); } }} onClick={() => setOpen(!open)}>
         <div style={{minWidth:0}}>
           <div className="student-name">
-            <span className={`dot ${balance > 0.005 ? 'warn' : nextLesson ? 'ok' : 'idle'}`} />
             {N(student.name, student.id)}{!student.active && ' (inactive)'}
           </div>
           <div className="status-row">
@@ -7515,13 +7513,13 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
             )}
             {balance >= -0.005 && balance <= 0.005 && <span className="pill ok">Paid up</span>}
             {nextLesson && (
-              <span className="pill neutral">Next: {new Date(nextLesson.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+              <span className="meta">Next {new Date(nextLesson.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
             )}
-            {displayYear && <span className="pill neutral">Y{displayYear}</span>}
+            {displayYear && <span className="meta">Y{displayYear}</span>}
             {hourlyPlanNow
-              ? <span className="pill neutral">{M(Number(hourlyPlanNow.hourly_rate), student.id + ':hrate')}/h</span>
-              : <span className="pill neutral">{M(currentRate, student.id + ':rate')}</span>}
-            {lessonPills.map(label => <span className="pill neutral" key={label}>{label}</span>)}
+              ? <span className="meta">{M(Number(hourlyPlanNow.hourly_rate), student.id + ':hrate')}/h</span>
+              : <span className="meta">{M(currentRate, student.id + ':rate')}</span>}
+            {lessonPills.map(label => <span className="meta" key={label}>{label}</span>)}
           </div>
         </div>
         <span className={`chevron ${open ? 'open' : ''}`}>›</span>
@@ -8886,7 +8884,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.38.0</div>}
+        {!loading && <div className="version-tag">v6.39.0</div>}
       </div>
 
       {showAddModal && (
