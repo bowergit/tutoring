@@ -1097,7 +1097,7 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.37.3">
+<link rel="stylesheet" href="ux.css?v=6.37.4">
 </head>
 <body>
 <div id="root"></div>
@@ -2527,8 +2527,19 @@ function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
   // quietly took 40% off anyone not paying cash, which made this account's
   // numbers mean something different from every other tutor's and impossible
   // to check against the revenue chart sitting a tap away.
-  const weeklyGross = active.reduce(
-    (sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
+  // Hourly students are worth what their week actually holds: their weekly
+  // slots if set, otherwise the lessons in the calendar over the next 7 days,
+  // rather than one lesson at a per-lesson rate they do not have.
+  const weekEnd = new Date(Date.parse(TTHourly.today() + 'T12:00:00Z') + 6 * 86400000).toISOString().slice(0, 10);
+  const weeklyValue = s => {
+    const hp = TTHourly.currentPlan(s.id);
+    if (!hp) return getCurrentRate(s.id, rateHistory);
+    if ((hp.slots || []).length) return hp.slots.reduce((t, x) => t + TTHourly.price(hp.hourly_rate, x.minutes), 0);
+    const week = lessons.filter(l => l.student_id === s.id && l.status !== 'cancelled' && !l.is_complimentary
+      && l.lesson_date >= TTHourly.today() && l.lesson_date <= weekEnd);
+    return week.length ? week.reduce((t, l) => t + Number(l.rate_charged || 0), 0) : TTHourly.price(hp.hourly_rate, hp.default_minutes);
+  };
+  const weeklyGross = active.reduce((sum, s) => sum + weeklyValue(s), 0);
   const annualGross = weeklyGross * 40;
   const fmt = n => n >= 1000000 ? `£${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
 
@@ -8959,7 +8970,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.37.3</div>}
+        {!loading && <div className="version-tag">v6.37.4</div>}
       </div>
 
       {showAddModal && (
