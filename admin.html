@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <meta name="theme-color" content="#ffa500">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tokens.css?v=6.39.0">
+<link rel="stylesheet" href="tokens.css?v=6.40.0">
 <style>
   /* Admin-only: the amber stage colour and the dark help tooltip. */
   :root {
@@ -86,18 +86,7 @@
   .f-n { font-size: 0.78rem; color: var(--ink-dim); text-align: right; font-variant-numeric: tabular-nums; }
   .f-row:hover .f-label, .f-row:focus-visible .f-label { text-decoration: underline; }
 
-  /* The worklist. */
-  .q-item {
-    display: flex; gap: 10px; align-items: baseline; width: 100%;
-    padding: 10px 13px; border-radius: var(--r-md); margin-bottom: 7px;
-    background: var(--card); border: 1px solid var(--line); font: inherit; font-size: 0.85rem;
-    border-left: 3px solid var(--muted); cursor: pointer; text-align: left; color: var(--ink);
-  }
-  .q-item.bad  { border-left-color: var(--warn); }
-  .q-item.warn { border-left-color: var(--amber); }
-  .q-who { font-weight: 650; flex-shrink: 0; }
-  .q-why { color: var(--ink-dim); }
-  .q-tag { font-size: 0.68rem; color: var(--muted); margin-left: auto; flex-shrink: 0; }
+  /* The worklist; laid out with the ledger styles further down. */
   .q-empty {
     padding: 14px; border-radius: var(--r-md); background: var(--good-light);
     color: var(--good); font-size: 0.85rem; font-weight: 600; text-align: center;
@@ -140,8 +129,8 @@
   .acct.open .chev { transform: rotate(90deg); }
   .line2 { font-size: 0.78rem; color: var(--muted); margin-top: 3px; word-break: break-all; }
   .peek {
-    font-size: 0.78rem; color: var(--ink-dim); margin-top: 9px; padding-left: 9px;
-    border-left: 2px solid var(--line); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 0.78rem; color: var(--ink-dim); margin-top: 9px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .peek b { font-weight: 650; }
 
@@ -178,7 +167,9 @@
   .stat span { display: block; font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 1px; }
   .stat.quiet b { color: var(--muted); }
   /* Anything with an explanation behind it says so, quietly. */
-  [data-tip] > span, .kpi[data-tip] span {
+  /* The ledger sections (hero, strip, chart) show a help cursor instead, so
+     big numbers are not hung with dotted lines. */
+  .acct [data-tip] > span, .kpi[data-tip] span {
     text-decoration: underline dotted; text-underline-offset: 3px;
     text-decoration-color: color-mix(in srgb, var(--muted) 60%, transparent);
   }
@@ -281,16 +272,136 @@
   #tip .t-title.todo { color: var(--tip-todo); }
 
   .wrap { max-width:900px; }
-  h1 { font-size:1.6rem; }
-  .top { margin-bottom:20px; }
   .kpi { padding:19px 17px; }
   .kpi b { font-size:1.8rem; }
   .tab, .row-item, .q-item { min-height:44px; }
-  .q-item { padding:13px 15px; }
   .tabs { padding:5px; gap:5px; }
   .row-item { padding:13px 16px; }
+
+  /* ── The ledger layout (designed in Paper, file "TutorTally", page Admin) ──
+     Sections are named by a heading over a double rule, the way a ledger
+     closes a column, rather than boxed in cards. */
+  body { padding-top: 28px; }
+  .topbar { display: flex; align-items: center; gap: 12px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .topbar .brand { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; }
+  .topbar .brand svg { width: 34px; height: 26px; flex: none; }
+  .topbar .word { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; white-space: nowrap; }
+  .topbar .word span { color: var(--accent); }
+  .topbar .word em { font-style: normal; font-weight: 400; color: var(--ink-dim); }
+  .topbar .sub { text-align: right; }
+  @media (max-width: 640px) { .topbar .sub { display: none; } }
+
+  .sec-head {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    margin: 64px 0 0; padding-bottom: 13px; border-bottom: 3px double var(--line);
+  }
+  .sec-head h2 { margin: 0; font-size: var(--t-xl); font-weight: 700; letter-spacing: -0.025em; }
+  .sec-head h2 .n { color: var(--muted); font-weight: 400; margin-left: 4px; }
+  .sec-head .aside { font-size: var(--t-sm); color: var(--ink-dim); }
+  .caps { font-size: var(--t-xs); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-dim); }
+
+  /* Who's using it: the one big number, the regulars beside it. */
+  .hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 32px 48px; flex-wrap: wrap; padding: 52px 0 38px; }
+  .hero-main { display: flex; flex-direction: column; gap: 14px; }
+  .hero-num { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; }
+  .hero-num b { font-size: clamp(5rem, 15vw, 7.5rem); line-height: .82; font-weight: 700; letter-spacing: -0.045em; font-variant-numeric: tabular-nums; }
+  .hero-num span { font-size: var(--t-xl); letter-spacing: -0.02em; color: var(--ink-dim); }
+  .hero-side { display: flex; flex-direction: column; gap: 12px; max-width: 290px; }
+  .hero-side .caps { color: var(--accent); }
+  .hero-side .row { display: flex; align-items: flex-end; gap: 14px; }
+  .hero-side b { font-size: 4rem; line-height: .82; font-weight: 700; letter-spacing: -0.04em; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .hero-side p { margin: 0; font-size: 1.05rem; line-height: 1.4; color: var(--ink-dim); }
+  .hero [data-tip] { cursor: help; }
+
+  .strip { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--ink); border-bottom: 3px double var(--line); }
+  .strip > div { padding: 18px 20px 20px; border-left: 1px solid var(--line); cursor: help; }
+  .strip > div:first-child { padding-left: 0; border-left: 0; }
+  .strip b { display: block; font-size: var(--t-2xl); line-height: 1.15; font-weight: 700; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
+  .strip .l { display: block; font-size: .95rem; font-weight: 600; margin-top: 4px; text-decoration: none; }
+  .strip .s { display: block; font-size: .82rem; color: var(--muted); margin-top: 2px; text-decoration: none; }
+  .strip .quiet b { color: var(--muted); }
+  @media (max-width: 640px) {
+    .strip { grid-template-columns: 1fr 1fr; }
+    .strip > div:nth-child(3) { padding-left: 0; border-left: 0; }
+    .strip > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+  }
+
+  /* Signups per week, each bar split into who is still using it and who stopped. */
+  .chart-key { display: flex; gap: 18px; font-size: .82rem; color: var(--ink-dim); }
+  .chart-key i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 7px; vertical-align: -1px; }
+  .chart { display: flex; gap: 14px; align-items: flex-end; height: 168px; padding-top: 28px; border-bottom: 1px solid var(--ink); }
+  .bar { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; height: 100%; cursor: help; }
+  .bar .v { font-size: .82rem; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+  .bar .v.zero { color: var(--muted); }
+  .bar .stack { display: flex; flex-direction: column; border-radius: 4px 4px 0 0; overflow: hidden; }
+  .bar .gone { background: var(--line); }
+  .bar .kept { background: var(--ink); }
+  .bar.now .stack > * { background: var(--accent-fill); }
+  .chart-x { display: flex; gap: 14px; margin-top: 9px; }
+  .chart-x span { flex: 1; min-width: 0; text-align: center; font-size: .75rem; color: var(--muted); white-space: nowrap; }
+  .chart-x span.now { color: var(--accent); font-weight: 600; }
+  @media (max-width: 640px) {
+    .chart, .chart-x { gap: 5px; }
+    .chart-x span:nth-child(even):not(.now) { visibility: hidden; }
+  }
+
+  /* To do: ledger rows, the kind of problem in its own column. */
+  .q-item {
+    display: grid; grid-template-columns: 76px minmax(120px, 190px) 1fr auto; gap: 8px 20px; align-items: baseline;
+    width: 100%; padding: 15px 0; margin: 0; border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0;
+    background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer;
+  }
+  .q-kind { font-size: var(--t-xs); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+  .q-item.bad .q-kind { color: var(--warn); }
+  .q-item.warn .q-kind { color: var(--gold); }
+  .q-who { font-weight: 600; font-size: 1rem; }
+  .q-why { color: var(--ink-dim); font-size: 1rem; }
+  .q-go { font-size: var(--t-sm); font-weight: 600; color: var(--accent); white-space: nowrap; }
+  .q-tag { font-size: var(--t-xs); color: var(--muted); font-weight: 400; margin-left: 6px; }
+  @media (hover: hover) { .q-item:hover .q-who { text-decoration: underline; text-underline-offset: 3px; } }
+  @media (max-width: 640px) {
+    .q-item { grid-template-columns: 1fr auto; }
+    .q-kind { grid-column: 1 / -1; }
+    .q-why { grid-column: 1 / -1; font-size: .9rem; }
+    .q-go { grid-row: 2; grid-column: 2; }
+  }
+  .q-empty { margin-top: 14px; }
+
+  /* Funnel rows: step, bar, how many, how many dropped here. */
+  .funnel { padding: 0; border: 0; }
+  .f-row { grid-template-columns: 110px 1fr 48px 150px; gap: 20px; padding: 11px 0; border-bottom: 1px solid var(--line-soft); }
+  .f-label { font-size: .95rem; }
+  .f-track { height: 10px; border-radius: 5px; border: 0; background: var(--line-soft); }
+  .f-fill { background: var(--ink); border-radius: 5px; }
+  .f-row.worst .f-fill { background: var(--accent-fill); }
+  .f-n { font-size: .95rem; font-weight: 700; color: var(--ink); }
+  .f-drop { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .f-row.worst .f-drop { color: var(--accent); font-weight: 600; }
+  @media (max-width: 640px) { .f-row { grid-template-columns: 84px 1fr 34px; gap: 12px; } .f-drop { display: none; } }
+
+  /* Income keeps its numbers, but on the page rather than in a box. */
+  .income .kpis { background: none; gap: 0; border-bottom: 1px solid var(--line); }
+  .income .kpi { background: none; padding: 18px 20px 20px 0; }
+  .income .panel-note { border-top: 0; padding: 14px 0 0; }
+  .income .rows, .income .rows-head { border-top: 0; padding-left: 0; padding-right: 0; }
+  .income .row-item { padding-left: 0; padding-right: 0; border-top: 1px solid var(--line-soft); }
+
+  /* Accounts: rows in the ledger until opened. */
+  .acct-tools { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 16px 0 6px; }
+  .acct-tools .tabs { margin: 0; flex: none; }
+  .acct-tools .search { margin: 0; flex: 1; min-width: 200px; min-height: 44px; border-radius: var(--r-md); font-size: .95rem; padding: 10px 14px; }
+  .acct { background: none; border: 0; border-bottom: 1px solid var(--line-soft); border-radius: 0; box-shadow: none; margin: 0; overflow: visible; }
+  .acct-head { padding: 15px 0; }
+  .acct-head:focus-visible { border-radius: var(--r-sm); }
+  .acct.open { border-bottom-color: var(--line); }
+  .acct.open .body { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-2); margin-bottom: 18px; overflow: hidden; }
+  .acct.flash .acct-head { box-shadow: inset 0 0 0 2px var(--accent-fill); border-radius: var(--r-sm); }
+  .line1 .who { font-size: 1rem; font-weight: 600; }
+  .peek { border-left: 0; padding-left: 0; }
+  .peek b { color: var(--ink); }
+  .foot-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line); }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.39.0">
+<link rel="stylesheet" href="ux.css?v=6.40.0">
 </head>
 <body>
 <div class="wrap" id="app"><div class="empty">Loading…</div></div>
@@ -305,7 +416,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.22.0';
+const VERSION = 'v6.40.0';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -833,8 +944,8 @@ function incomeHTML() {
 
   if (!inc || !inc.available) {
     return `
-      <div class="section-label">Income</div>
-      <div class="panel"><div class="panel-note">${esc(inc?.problem || 'Income is not available right now.')}
+      <div class="sec-head"><h2>Income</h2></div>
+      <div class="income"><div class="panel-note">${esc(inc?.problem || 'Income is not available right now.')}
         The rest of the page is unaffected.</div></div>`;
   }
 
@@ -879,8 +990,8 @@ function incomeHTML() {
     }).join('')}</div>` : '';
 
   return `
-    <div class="section-label">Income ${modeBadge}</div>
-    <div class="panel">
+    <div class="sec-head"><h2>Income</h2>${modeBadge}</div>
+    <div class="income">
       <div class="kpis">
         <div class="kpi${inc.mrr_pence ? '' : ' quiet'}" data-tip-title="Monthly recurring" data-tip="What paying customers are billed every month, read live from Stripe. Test accounts are left out.">
           <b>${esc(money(inc.mrr_pence))}</b><span>a month</span></div>
@@ -899,47 +1010,124 @@ function incomeHTML() {
 
 // ---- Beta testers overview ---------------------------------------------
 
-function testersHTML(testers) {
-  const n = testers.length;
-  if (!n) {
-    return `<div class="section-label">Beta testers</div>
-      <div class="panel"><div class="panel-note">No beta testers yet. New sign-ups land here automatically.</div></div>`;
-  }
-  const active7 = testers.filter(a => daysSince(a.last_seen) !== null && daysSince(a.last_seen) <= 7).length;
-  const proper = testers.filter(usingItProperly).length;
-  const overLimit = testers.filter(wouldNeedPro).length;
+// ---- Who is using it ------------------------------------------------------
+//
+// Real tutors only: the beta-testers group, which is where every new sign-up
+// lands. The team and test accounts would only inflate the numbers.
+//
+// "Regular" is opened TutorTally in the last 7 days AND has lessons coming in
+// from the last 30. Opening it alone is not enough: someone poking at an empty
+// account is not using it. "Still using it" on the chart is looser, opened in
+// the last 14 days, because the question there is whether they stuck around.
+const isRegular = a => daysSince(a.last_seen) !== null && daysSince(a.last_seen) <= 7 && a.lessons_last_30 > 0;
+const stillUsing = a => daysSince(a.last_seen) !== null && daysSince(a.last_seen) <= 14;
+const CHART_WEEKS = 12;
 
-  const funnel = STEP_LABELS.map(([key, label]) => {
-    const done = testers.filter(a => stepsOf(a).find(s => s.key === key).state === 'done').length;
-    const pct = Math.round((done / n) * 100);
-    const stuck = n - done;
-    return `
-      <button class="f-row" data-missing="${key}"
-        aria-label="${esc(`${done} of ${n} beta testers have done ${label}. Show the ${stuck} who have not.`)}">
-        <span class="f-label">${esc(label)}</span>
-        <span class="f-track"><span class="f-fill" style="width:${pct}%"></span></span>
-        <span class="f-n">${done}/${n}</span>
-      </button>`;
+// Monday 00:00 local of the week containing d.
+function weekStart(d) {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+  return x;
+}
+
+function growthHTML(people) {
+  const n = people.length;
+  if (!n) {
+    return `<div class="hero"><div class="hero-main"><div class="caps">Since launch</div>
+      <div class="hero-num"><b>0</b><span>tutors have signed up yet</span></div></div></div>`;
+  }
+  const regulars = people.filter(isRegular).length;
+  const thisWeekStart = weekStart(Date.now());
+  const lastWeekStart = new Date(thisWeekStart); lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+  const joinedAt = a => a.joined ? new Date(a.joined) : null;
+  const joinedThis = people.filter(a => joinedAt(a) >= thisWeekStart).length;
+  const joinedLast = people.filter(a => joinedAt(a) >= lastWeekStart && joinedAt(a) < thisWeekStart).length;
+  const opened30 = people.filter(a => daysSince(a.last_seen) !== null && daysSince(a.last_seen) <= 30).length;
+  const proper = people.filter(usingItProperly).length;
+  const paying = data.accounts.filter(a => a.segment !== 'test' && isPaying(a)).length;
+  const mrr = data.income?.available ? data.income.mrr_pence : null;
+
+  const vsLast = joinedThis === joinedLast ? 'same as last week'
+    : joinedThis > joinedLast ? `${joinedThis - joinedLast} more than last week`
+    : `${joinedLast - joinedThis} fewer than last week`;
+  const cell = (val, label, sub, title, tip) =>
+    `<div class="${val ? '' : 'quiet'}" tabindex="0" data-tip-title="${esc(title)}" data-tip="${esc(tip)}">
+      <b>${esc(val)}</b><span class="l">${esc(label)}</span><span class="s">${esc(sub)}</span></div>`;
+
+  // One bar per week, oldest first, split by whether they are still around.
+  const weeks = [];
+  for (let i = CHART_WEEKS - 1; i >= 0; i--) {
+    const start = new Date(thisWeekStart); start.setDate(start.getDate() - 7 * i);
+    const end = new Date(start); end.setDate(end.getDate() + 7);
+    const joined = people.filter(a => joinedAt(a) >= start && joinedAt(a) < end);
+    weeks.push({ start, n: joined.length, kept: joined.filter(stillUsing).length, now: i === 0 });
+  }
+  const peak = Math.max(1, ...weeks.map(w => w.n));
+  const px = v => Math.round((v / peak) * 120);
+  const bars = weeks.map(w => {
+    const label = w.now ? 'This week' : 'Week of ' + fmtShort(w.start);
+    const tip = w.n
+      ? `${plural(w.n, 'tutor')} joined. ${w.kept} still using it, ${w.n - w.kept} stopped (not opened in 14 days).`
+      : 'Nobody joined this week.';
+    return `<div class="bar${w.now ? ' now' : ''}" tabindex="0" data-tip-title="${esc(label)}" data-tip="${esc(tip)}">
+      <span class="v${w.n ? '' : ' zero'}">${w.n}</span>
+      <span class="stack">${w.n - w.kept ? `<span class="gone" style="height:${px(w.n - w.kept)}px"></span>` : ''}${w.kept ? `<span class="kept" style="height:${px(w.kept)}px"></span>` : ''}</span>
+    </div>`;
   }).join('');
+  const xLabels = weeks.map(w => `<span${w.now ? ' class="now"' : ''}>${w.now ? 'This week' : esc(fmtShort(w.start))}</span>`).join('');
 
   return `
-    <div class="section-label">Beta testers</div>
-    <div class="panel">
-      <div class="kpis">
-        <div class="kpi" data-tip-title="Beta testers" data-tip="Everyone not in Team or Test accounts. Move an account between groups from inside its card.">
-          <b>${n}</b><span>beta testers</span></div>
-        <div class="kpi${active7 ? '' : ' quiet'}" data-tip-title="Used it this week" data-tip="Had TutorTally open in the last 7 days.">
-          <b>${active7}</b><span>used it this week</span></div>
-        <div class="kpi${proper ? '' : ' quiet'}" data-tip-title="Using it properly" data-tip="Has students, lessons coming in, and has logged at least one payment. The point where TutorTally is doing its job for them.">
-          <b>${proper}</b><span>using it properly</span></div>
-        <div class="kpi${overLimit ? '' : ' quiet'}" data-tip-title="Over the free limit" data-tip="More active students than the free plan allows, and not paying. These are the testers who would need Pro if their free access stopped.">
-          <b>${overLimit}</b><span>over the free limit</span></div>
+    <div class="hero">
+      <div class="hero-main">
+        <div class="caps">Since launch</div>
+        <div class="hero-num" data-tip-title="Signed up" data-tip="Every tutor in the beta testers group, which is where new sign-ups land. Team and test accounts are left out.">
+          <b>${n}</b><span>${n === 1 ? 'tutor has' : 'tutors have'} signed up</span></div>
       </div>
-      <div class="funnel">
-        <div class="f-head">How far they got. Tap a step to see who is stuck before it.</div>
-        ${funnel}
+      <div class="hero-side" data-tip-title="Regulars" data-tip="Opened TutorTally in the last 7 days and has had lessons come in during the last 30. Opening an empty account does not count.">
+        <div class="caps">This week</div>
+        <div class="row"><b>${regulars}</b>
+          <p>${regulars === 1 ? 'uses' : 'use'} it regularly. That's ${Math.round((regulars / n) * 100)}% of everyone who joined.</p></div>
       </div>
-    </div>`;
+    </div>
+    <div class="strip">
+      ${cell(joinedThis, 'joined this week', vsLast, 'Joined this week', 'Signed up since Monday.')}
+      ${cell(opened30, 'opened it', 'last 30 days', 'Opened it', 'Had TutorTally open at least once in the last 30 days.')}
+      ${cell(proper, 'using it properly', 'students, lessons, payments', 'Using it properly', 'Has students, lessons coming in, and has logged at least one payment. The point where TutorTally is doing its job for them.')}
+      ${cell(paying, 'paying', mrr != null ? `${money(mrr)} a month` : 'income unavailable', 'Paying', 'Live Pro subscriptions, team included, test accounts left out.')}
+    </div>
+    <div class="sec-head"><h2>Signups, week by week</h2>
+      <div class="chart-key"><span><i style="background:var(--ink)"></i>Still using it</span><span><i style="background:var(--line)"></i>Stopped</span></div>
+    </div>
+    <div class="chart" role="img" aria-label="${esc(weeks.map(w => `${w.now ? 'This week' : fmtShort(w.start)}: ${w.n} joined, ${w.kept} still using it`).join('. '))}">${bars}</div>
+    <div class="chart-x" aria-hidden="true">${xLabels}</div>`;
+}
+
+function funnelHTML(testers) {
+  const n = testers.length;
+  if (!n) return '';
+  let prev = n;
+  const rows = STEP_LABELS.map(([key, label]) => {
+    const done = testers.filter(a => stepsOf(a).find(s => s.key === key).state === 'done').length;
+    const drop = prev - done;
+    prev = done;
+    return { key, label, done, drop };
+  });
+  const worst = Math.max(...rows.map(r => r.drop));
+  return `
+    <div class="sec-head"><h2>How far they get</h2>
+      <div class="aside">Of ${plural(n, 'tutor')}. Click a step to see who stopped before it.</div></div>
+    <div class="funnel">${rows.map(r => {
+      const isWorst = worst > 0 && r.drop === worst;
+      return `
+      <button class="f-row${isWorst ? ' worst' : ''}" data-missing="${r.key}"
+        aria-label="${esc(`${r.done} of ${n} have done ${r.label}. Show the ${n - r.done} who have not.`)}">
+        <span class="f-label">${esc(r.label)}</span>
+        <span class="f-track"><span class="f-fill" style="width:${Math.round((r.done / n) * 100)}%"></span></span>
+        <span class="f-n">${r.done}</span>
+        <span class="f-drop">${r.drop ? `−${r.drop}${isWorst ? ' · biggest drop' : ''}` : '—'}</span>
+      </button>`;
+    }).join('')}</div>`;
 }
 
 // ---- Needs attention ----------------------------------------------------
@@ -996,16 +1184,15 @@ function buildQueue(list) {
 
 function queueHTML(list) {
   const items = buildQueue(list);
-  if (!items.length) {
-    return '<div class="section-label">Needs attention</div>'
-      + '<div class="q-empty">Nothing needs chasing today.</div>';
-  }
-  return `<div class="section-label">Needs attention · ${items.length}</div>`
-    + items.map(q => `
+  const head = `<div class="sec-head"><h2>To do${items.length ? `<span class="n">${items.length}</span>` : ''}</h2>
+    <div class="aside">Worked out from the accounts below. Clears itself when fixed.</div></div>`;
+  if (!items.length) return head + '<div class="q-empty">Nothing needs chasing today.</div>';
+  return head + items.map(q => `
         <button class="q-item ${q.tone}" data-jump="${esc(q.a.owner_id)}">
-          <span class="q-who">${esc(nameOf(q.a))}</span>
+          <span class="q-kind">${q.tone === 'bad' ? 'Broken' : 'Nudge'}</span>
+          <span class="q-who">${esc(nameOf(q.a))}${q.a.segment === 'team' ? '<span class="q-tag">team</span>' : ''}</span>
           <span class="q-why">${esc(q.why)}</span>
-          ${q.a.segment === 'team' ? '<span class="q-tag">team</span>' : ''}
+          <span class="q-go">Open →</span>
         </button>`).join('');
 }
 
@@ -1156,22 +1343,30 @@ function render() {
   hideTip();
   const testers = data.accounts.filter(a => a.segment === 'tester');
   app.innerHTML = `
-    <div class="top">
-      <div>
-        <h1>TutorTally admin</h1>
-        <div class="sub">Signed in as ${esc(data.me || '?')} · loaded ${esc(fmtDateTime(data.loadedAt))}</div>
+    <div class="topbar">
+      <div class="brand">
+        <svg viewBox="0 0 900 700" aria-hidden="true">
+          <path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)" stroke-width="94" stroke-linecap="round"/>
+          <rect x="292" y="48" width="100" height="604" rx="14" fill="var(--ink)"/>
+          <rect x="512" y="48" width="100" height="604" rx="14" fill="var(--ink)"/>
+        </svg>
+        <h1 class="word">Tutor<span>Tally</span> <em>admin</em></h1>
       </div>
+      <div class="sub">Loaded ${esc(fmtDateTime(data.loadedAt))} · ${esc(data.me || '?')}</div>
       <button class="btn" data-act="refresh">Refresh</button>
     </div>
-    <div class="hint">Hover over, or tap, anything underlined or any setup step to see what it means.</div>
-    ${incomeHTML()}
-    ${testersHTML(testers)}
+    ${growthHTML(testers)}
     ${queueHTML(data.accounts)}
-    <div class="section-label" id="accounts">Accounts</div>
-    ${tabsHTML()}
-    <input type="search" class="search" id="q" placeholder="Search by name or email" value="${esc(ui.q)}" autocomplete="off">
+    ${funnelHTML(testers)}
+    ${incomeHTML()}
+    <div class="sec-head" id="accounts"><h2>Accounts</h2>
+      <div class="aside">Hover over, or tap, anything underlined to see what it means.</div></div>
+    <div class="acct-tools">
+      ${tabsHTML()}
+      <input type="search" class="search" id="q" placeholder="Search by name or email" value="${esc(ui.q)}" autocomplete="off">
+    </div>
     <div id="list">${listHTML()}</div>
-    <div class="btn-row" style="margin-top:22px">
+    <div class="foot-row">
       <a class="btn" href="/">← Back to TutorTally</a>
       <button class="btn" data-act="signout">Sign out</button>
     </div>

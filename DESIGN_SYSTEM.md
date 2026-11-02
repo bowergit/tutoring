@@ -4,7 +4,10 @@ The rules for how every TutorTally screen looks. Read this before building or
 restyling a page. Voice, positioning and logo live in `BRAND.md`.
 
 Visual reference: open `brand/design-system.html` in a browser to see every
-token and component in light and dark.
+token and component in light and dark. Designs are drafted in Paper first, in
+the "TutorTally" file, which has these tokens loaded (one page per screen; the
+admin page is on "Admin"). Paper can't load General Sans, so mockups use DM
+Sans as a stand-in.
 
 ## Files
 
@@ -110,7 +113,7 @@ function, so they never see another family's data.
 | `index.html` | Tutor dashboard | `tutoring_students`, `tutoring_lessons`, `tutoring_payments`, `tutoring_payment_allocations`, `tutoring_hourly_plans`, `tutoring_weekly_plans`, `tutoring_calendar_candidates`, `tutoring_invoices`, RPC `reallocate_student_payments` |
 | `student.html` | Parent page | `student-portal` edge function: lessons, payments, balances, weekly plan and acceptance |
 | `lessons.html` | Pupil page | `student-portal` edge function: lessons, notes, past papers, grade boundaries |
-| `admin.html` | Owner admin | `admin-portal` edge function |
+| `admin.html` | Owner admin | `admin-portal` edge function. Signups, regulars and the weekly chart are worked out in the page from each account's `joined`, `last_seen` and `lessons_last_30` |
 | `app.html` | Marketing / landing | none |
 | `privacy.html`, `terms.html`, `weekly-terms.html` | Legal | none |
 
