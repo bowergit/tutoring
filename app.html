@@ -13,11 +13,11 @@
 <meta property="og:type" content="website">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script>document.documentElement.classList.add('js')</script>
-<link rel="stylesheet" href="tokens.css?v=6.41.2">
+<link rel="stylesheet" href="tokens.css?v=6.41.3">
 <style>
   /* Designed in Paper first (file "TutorTally", page Landing). The page is a
      ledger: sections open on a rule rather than a label, and the pictures are
-     the real things (a calendar, the tally, a WhatsApp message), not icons. */
+     the real things (a calendar, the dashboard, a WhatsApp message), not icons. */
   * { box-sizing: border-box; }
   html { scroll-behavior: smooth; }
   body {
@@ -79,45 +79,52 @@
   .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 72px; align-items: start; }
   .hero-copy { display: flex; flex-direction: column; gap: 28px; padding-top: 24px; }
   .cta-row { display: flex; gap: 12px; flex-wrap: wrap; padding-top: 6px; }
-  @media (max-width: 1020px) { .hero-grid { grid-template-columns: 1fr; gap: 56px; } .book { max-width: 560px; } }
+  @media (max-width: 1020px) { .hero-grid { grid-template-columns: 1fr; gap: 56px; } .dash { max-width: 560px; } }
 
-  /* The tally book: lessons as tally marks, unpaid strokes in red, a
-     double-ruled total. The whole page hangs off this one picture. */
-  .book {
-    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg);
-    padding: 28px 32px 30px; box-shadow: 0 1px 2px rgba(22,21,15,.05), 0 24px 48px -24px rgba(22,21,15,.22);
+  /* The hero picture is the real dashboard, drawn small: the same overview
+     numbers, the same student cards with one money pill and a line of detail. */
+  .dash {
+    background: var(--bg); border: 1px solid var(--line); border-radius: 28px; padding: 18px 16px 10px;
+    box-shadow: 0 1px 2px rgba(22,21,15,.05), 0 24px 48px -24px rgba(22,21,15,.22);
   }
-  .book-head { display: flex; justify-content: space-between; align-items: baseline; padding-bottom: 12px; border-bottom: 3px double var(--line); }
-  .book-head b { font-size: 1.12rem; }
-  .book-row {
-    display: grid; grid-template-columns: 150px 1fr auto; gap: 20px; align-items: center; width: 100%;
-    padding: 16px 0; border: 0; border-bottom: 1px solid var(--line-soft); background: none;
-    font: inherit; color: inherit; text-align: left; cursor: pointer;
+  .dash-top { display: flex; align-items: center; gap: 11px; padding: 4px 4px 16px; }
+  .dash-top svg { width: 32px; height: 25px; flex: none; }
+  .dash-top b { display: block; font-size: 1.1rem; letter-spacing: -0.025em; }
+  .dash-top span { display: block; font-size: .75rem; color: var(--muted); }
+  .dash-over {
+    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px;
+    padding: 18px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-2);
   }
-  .book-row .who b { display: block; font-weight: 600; }
-  .book-row .who span { font-size: .82rem; color: var(--muted); }
-  .book-row .st { font-weight: 700; font-size: .95rem; font-variant-numeric: tabular-nums; text-align: right; }
-  .st.good { color: var(--good); } .st.warn { color: var(--warn); }
-  @media (hover: hover) { .book-row:hover .who b { text-decoration: underline; text-underline-offset: 3px; } }
-  .book-row[aria-expanded="true"] .who b { color: var(--accent); }
-  .book-note { font-size: .9rem; color: var(--ink-dim); padding: 0 0 14px; border-bottom: 1px solid var(--line-soft); }
-  .book-note a { color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
-  .book-total { display: flex; justify-content: space-between; align-items: baseline; padding-top: 18px; border-top: 1px solid var(--ink); margin-top: -1px; }
-  .book-total span { font-weight: 600; }
-  .book-total b {
-    font-size: 2.5rem; line-height: 1; letter-spacing: -0.035em; color: var(--warn); font-variant-numeric: tabular-nums;
-    padding-bottom: 6px; border-bottom: 3px double var(--ink);
+  .dash-over b { display: block; font-size: 1.75rem; line-height: 1.1; font-weight: 700; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; }
+  .dash-over b.owed { color: var(--warn); }
+  .dash-over span { display: block; font-size: .8rem; color: var(--ink-dim); margin-top: 4px; }
+  .scard {
+    display: block; margin-bottom: 10px; padding: 15px 16px; cursor: pointer;
+    background: var(--card); border: 1px solid var(--line); border-radius: var(--r-lg); box-shadow: var(--sh-2);
+    transition: box-shadow .2s var(--ease), border-color .2s var(--ease);
   }
-  .tally { display: block; height: 26px; width: auto; }
-  .tally .s { fill: var(--ink); }
-  .tally .u { fill: var(--warn); }
-  .tally .g { stroke: var(--accent-fill); }
-  .tally .g.u { stroke: var(--warn); fill: none; }
-  .book-cap { margin-top: 14px; text-align: center; }
+  .scard:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .scard[aria-expanded="true"] { box-shadow: var(--sh-3); border-color: color-mix(in srgb, var(--accent) 26%, var(--line)); }
+  .scard-head { display: flex; align-items: center; gap: 10px; }
+  .scard-main { flex: 1; min-width: 0; }
+  .scard .name { font-weight: 650; font-size: 1.02rem; letter-spacing: -0.015em; }
+  .scard .row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 7px; }
+  .scard .chev { color: var(--muted); font-size: 1.35rem; line-height: 1; transition: transform .2s var(--ease); }
+  .scard[aria-expanded="true"] .chev { transform: rotate(90deg); }
+  .scard-note { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: .9rem; color: var(--ink-dim); }
+  .scard-note a { color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
+  .pill { font-size: .72rem; padding: 4px 9px; border-radius: 20px; font-weight: 600; white-space: nowrap; }
+  .pill.ok { background: var(--good-light); color: var(--good); }
+  .pill.warn { background: var(--warn-light); color: var(--warn); }
+  .pill.neutral { background: var(--card-2); color: var(--ink-dim); border: 1px solid var(--line); }
+  .meta { font-size: .8rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .meta + .meta::before { content: '·'; margin: 0 6px 0 1px; color: var(--muted); }
+  .pill + .meta { margin-left: 4px; }
+  .dash-cap { margin-top: 14px; text-align: center; }
   @media (max-width: 520px) {
-    .book { padding: 22px 18px 24px; }
-    .book-row { grid-template-columns: 1fr auto; row-gap: 8px; }
-    .book-row .tally { grid-row: 2; }
+    .dash { padding: 14px 10px 6px; border-radius: 22px; }
+    .dash-over { padding: 14px; gap: 8px; }
+    .dash-over b { font-size: 1.35rem; }
   }
 
   /* Section heads: a big claim on the left, the plain explanation on the right. */
@@ -137,11 +144,8 @@
   .ev::before { content: ''; width: 3px; border-radius: 2px; background: #1a73e8; flex: none; }
   .ev b { display: block; font-size: .875rem; font-weight: 600; }
   .ev span { font-size: .75rem; color: #3c5a9a; }
-  .mini { display: grid; grid-template-columns: 62px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: .875rem; }
+  .mini { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line-soft); font-size: .9rem; }
   .mini b { font-weight: 600; }
-  .mini .tally { height: 20px; }
-  .mini .st { font-size: .82rem; font-weight: 700; }
-  .panel .rule2 { padding-bottom: 8px; border-bottom: 3px double var(--line); }
   .wa { width: 100%; padding: 18px; border-radius: 16px; background: #efeae2; color: #111b21; display: flex; flex-direction: column; gap: 10px; }
   .wa-name { font-size: .82rem; font-weight: 600; }
   .bub { align-self: flex-end; max-width: 94%; padding: 10px 12px; border-radius: 10px 2px 10px 10px; background: #d9fdd3; font-size: .875rem; line-height: 1.45; min-height: 64px; }
@@ -153,8 +157,7 @@
   /* The problem, as a list of things that actually happen. */
   .leaks { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 80px; align-items: start; }
   .leaks ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
-  .leaks li { display: grid; grid-template-columns: 44px 1fr; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--line); font-size: 1.08rem; line-height: 1.5; }
-  .leaks li svg { width: 34px; height: 26px; margin-top: 1px; }
+  .leaks li { padding: 20px 0; border-bottom: 1px solid var(--line); font-size: 1.08rem; line-height: 1.5; }
   @media (max-width: 860px) { .leaks { grid-template-columns: 1fr; gap: 40px; } }
 
   /* Parent page: a phone showing the real thing. */
@@ -210,7 +213,6 @@
 
   /* Close */
   .close { text-align: center; display: flex; flex-direction: column; align-items: center; gap: 22px; }
-  .close .tally { height: 44px; }
   .close .cta-row { justify-content: center; }
   .close a.wa-link { color: var(--accent); font-weight: 600; text-underline-offset: 3px; }
   footer { padding: 32px 0 48px; border-top: 1px solid var(--line); font-size: .9rem; color: var(--ink-dim); }
@@ -225,7 +227,7 @@
   .js .rv.in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) { .js .rv { opacity: 1; transform: none; transition: none; } .caret { animation: none; } }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.41.2">
+<link rel="stylesheet" href="ux.css?v=6.41.3">
 </head>
 <body>
 
@@ -252,23 +254,31 @@
     </div>
 
     <div>
-      <div class="book" aria-label="Example: a term of lessons for four students">
-        <div class="book-head"><b>Autumn term</b><span class="small">Lessons taught</span></div>
-        <button type="button" class="book-row" data-student="amira" aria-expanded="false">
-          <span class="who"><b>Amira Khan</b><span>Year 11 · Tue 4pm</span></span><svg class="tally" viewBox="0 0 113 26" style="height:26px;width:113px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="49" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="56" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="63" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M39 20L69 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="82" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="89" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st good">Paid up</span>
-        </button>
-        <button type="button" class="book-row" data-student="joe" aria-expanded="false">
-          <span class="who"><b>Joe Fletcher</b><span>Year 11 · Wed 5:30pm</span></span><svg class="tally" viewBox="0 0 73 26" style="height:26px;width:73px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="49" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="56" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="63" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st warn">Owes £180</span>
-        </button>
-        <button type="button" class="book-row" data-student="priya" aria-expanded="false">
-          <span class="who"><b>Priya Shah</b><span>Year 13 · Thu 6pm</span></span><svg class="tally" viewBox="0 0 73 26" style="height:26px;width:73px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="49" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st good">Paid up</span>
-        </button>
-        <button type="button" class="book-row" data-student="tom" aria-expanded="false">
-          <span class="who"><b>Tom Bennett</b><span>Year 9 · Mon 5pm</span></span><svg class="tally" viewBox="0 0 73 26" style="height:26px;width:73px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g u" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="u" x="42" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st warn">Owes £90</span>
-        </button>
-        <div class="book-total"><span>Owed to you</span><b>£270</b></div>
+      <div class="dash" aria-label="Example of the TutorTally dashboard">
+        <div class="dash-top"><svg viewBox="0 0 900 700" aria-hidden="true"><path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)" stroke-width="94" stroke-linecap="round"/><rect x="292" y="48" width="100" height="604" rx="14" fill="currentColor"/><rect x="512" y="48" width="100" height="604" rx="14" fill="currentColor"/></svg><div><b>Sam's TutorTally</b><span>7 active · synced 2 min ago</span></div></div>
+        <div class="dash-over">
+          <div><b class="owed">£270</b><span>Owed to you</span></div>
+          <div><b>£640</b><span>Paid this month</span></div>
+          <div><b>7</b><span>Active students</span></div>
+        </div>
+        <div class="scard" role="button" tabindex="0" data-student="joe" aria-expanded="false">
+          <div class="scard-head"><div class="scard-main"><div class="name">Joe Fletcher</div>
+            <div class="row"><span class="pill warn">Overdue £180</span><span class="meta" data-next="3">Next 5 Nov</span><span class="meta">Y11</span><span class="meta">£60</span></div></div><span class="chev" aria-hidden="true">›</span></div>
+        </div>
+        <div class="scard" role="button" tabindex="0" data-student="tom" aria-expanded="false">
+          <div class="scard-head"><div class="scard-main"><div class="name">Tom Bennett</div>
+            <div class="row"><span class="pill neutral">Owes £90</span><span class="meta" data-next="8">Next 10 Nov</span><span class="meta">Y9</span><span class="meta">£45</span></div></div><span class="chev" aria-hidden="true">›</span></div>
+        </div>
+        <div class="scard" role="button" tabindex="0" data-student="amira" aria-expanded="false">
+          <div class="scard-head"><div class="scard-main"><div class="name">Amira Khan</div>
+            <div class="row"><span class="pill ok">Paid up</span><span class="meta" data-next="2">Next 4 Nov</span><span class="meta">Y11</span><span class="meta">£60</span></div></div><span class="chev" aria-hidden="true">›</span></div>
+        </div>
+        <div class="scard" role="button" tabindex="0" data-student="priya" aria-expanded="false">
+          <div class="scard-head"><div class="scard-main"><div class="name">Priya Shah</div>
+            <div class="row"><span class="pill ok">Paid up</span><span class="meta" data-next="4">Next 6 Nov</span><span class="meta">Y13</span><span class="meta">£55</span></div></div><span class="chev" aria-hidden="true">›</span></div>
+        </div>
       </div>
-      <p class="small book-cap">Red strokes are lessons not paid for yet. Tap a name.</p>
+      <p class="small dash-cap">This is the real dashboard. Tap a student.</p>
     </div>
   </div>
 </header>
@@ -276,7 +286,7 @@
 <section id="how" class="ruled">
   <div class="wrap">
     <div class="sec-head rv">
-      <h2>You already did the admin when you booked the lesson.</h2>
+      <h2>You didn't get into tutoring to do loads of admin.</h2>
       <p class="body" style="font-size:1.12rem">Connect Google, Apple or Outlook once. Lessons, balances and chasers follow from what is already in your diary.</p>
     </div>
     <div class="steps">
@@ -292,10 +302,10 @@
       </div>
       <div class="step rv">
         <div class="art"><div class="panel">
-          <div class="panel-t rule2">TutorTally</div>
-          <div class="mini"><b>Amira</b><svg class="tally" viewBox="0 0 113 26" style="height:20px;width:87px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="49" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="56" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="63" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M39 20L69 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="82" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="89" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st good">Paid</span></div>
-          <div class="mini"><b>Joe</b><svg class="tally" viewBox="0 0 73 26" style="height:20px;width:56px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="49" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="56" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="63" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st warn">£180</span></div>
-          <div class="mini" style="border-bottom:0"><b>Priya</b><svg class="tally" viewBox="0 0 73 26" style="height:20px;width:56px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/><rect class="s" x="42" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="49" y="2" width="3.4" height="22" rx="1.7"/></svg><span class="st good">Paid</span></div>
+          <div class="panel-t" style="margin-bottom:10px">TutorTally</div>
+          <div class="mini"><b>Joe Fletcher</b><span class="pill warn">Overdue £180</span></div>
+          <div class="mini"><b>Amira Khan</b><span class="pill ok">Paid up</span></div>
+          <div class="mini" style="border-bottom:0"><b>Priya Shah</b><span class="pill ok">Paid up</span></div>
         </div></div>
         <div class="txt"><span class="n">2</span><h3>It keeps the tally</h3>
           <p class="body">Every payment settles the oldest unpaid lesson first, so each balance is simply what that family owes. Change a rate and the history stays right.</p></div>
@@ -319,11 +329,11 @@
       <p class="lede">Not because you're disorganised. Once there are 5 or more regular students, 3 reschedules a week, and a bank app that just says "FASTER PAYMENT", your head stops being a system.</p>
     </div>
     <ul class="rv">
-      <li><svg class="tally" viewBox="0 0 33 26" style="height:26px;width:33px" aria-hidden="true"><rect class="u" x="2" y="2" width="3.4" height="22" rx="1.7"/></svg><span>You think someone's 2 lessons behind but you're not certain enough to ask.</span></li>
-      <li><svg class="tally" viewBox="0 0 33 26" style="height:26px;width:33px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="9" y="2" width="3.4" height="22" rx="1.7"/></svg><span>A parent says "I paid you in September" and you have no way to check.</span></li>
-      <li><svg class="tally" viewBox="0 0 33 26" style="height:26px;width:33px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="16" y="2" width="3.4" height="22" rx="1.7"/></svg><span>You write it in Notes, then stop updating Notes by week 3.</span></li>
-      <li><svg class="tally" viewBox="0 0 33 26" style="height:26px;width:33px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="u" x="23" y="2" width="3.4" height="22" rx="1.7"/></svg><span>You cancel a lesson and forget to take it off the total.</span></li>
-      <li><svg class="tally" viewBox="0 0 33 26" style="height:26px;width:33px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g u" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/></svg><span>You quietly write off money every term because chasing it feels awkward.</span></li>
+      <li>You think someone's 2 lessons behind but you're not certain enough to ask.</li>
+      <li>A parent says "I paid you in September" and you have no way to check.</li>
+      <li>You write it in Notes, then stop updating Notes by week 3.</li>
+      <li>You cancel a lesson and forget to take it off the total.</li>
+      <li>You quietly write off money every term because chasing it feels awkward.</li>
     </ul>
   </div>
 </section>
@@ -397,8 +407,8 @@
       </div>
     </div>
     <div class="fit rv">
-      <div><b>Your lessons are in an online calendar.</b><p class="body">Google, Apple Calendar or Outlook. That is what TutorTally reads. A paper diary is not a match yet.</p></div>
-      <div><b>You get paid by bank transfer or cash.</b><p class="body">You record payments in a couple of taps. TutorTally does the sums.</p></div>
+      <div><b>Your lessons are in an online calendar.</b><p class="body">Google, Apple Calendar or Outlook. That is what TutorTally reads.</p></div>
+      <div><b>You get paid by bank transfer or cash.</b><p class="body">You record payments in a couple of taps. TutorTally does the maths.</p></div>
       <div><b>You want to be sure before you chase.</b><p class="body">The message is written for you. You decide when to send it.</p></div>
     </div>
   </div>
@@ -410,8 +420,6 @@
     <div class="faq rv">
       <details><summary>Do I have to change how I book lessons?</summary>
         <p>No. Keep using your teaching calendar. Google Calendar connects directly. Apple Calendar, Outlook and most other calendars connect with a private share link, and the app shows you where to find it.</p></details>
-      <details><summary>What if I teach something other than maths?</summary>
-        <p>It does not care what you teach. Lessons, students and money owed work the same way for English, languages, DT or any other subject.</p></details>
       <details><summary>Does it connect to my bank?</summary>
         <p>No. You record payments yourself, which takes a few seconds, and TutorTally does the arithmetic from there. It will never quietly assume that a bank transfer belongs to a lesson.</p></details>
       <details><summary>Can parents see each other's information?</summary>
@@ -426,7 +434,6 @@
 
 <section class="ruled">
   <div class="wrap close rv">
-    <svg class="tally" viewBox="0 0 33 26" style="height:44px;width:56px" aria-hidden="true"><rect class="s" x="2" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="9" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="16" y="2" width="3.4" height="22" rx="1.7"/><rect class="s" x="23" y="2" width="3.4" height="22" rx="1.7"/><path class="g" d="M-1 20L29 6" stroke-width="3.4" stroke-linecap="round" fill="none"/></svg>
     <h2>Stop wondering who owes you.</h2>
     <p class="lede">3 minutes to set up. Free forever for your first 3 active students.</p>
     <div class="cta-row">
@@ -459,6 +466,11 @@
   });
 })();
 document.getElementById('yr').textContent = new Date().getFullYear();
+// The dashboard sample's next lessons are a few days from today, never in the past.
+document.querySelectorAll('[data-next]').forEach(function (el) {
+  var d = new Date(); d.setDate(d.getDate() + Number(el.getAttribute('data-next')));
+  el.textContent = 'Next ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+});
 
 // A hairline under the nav once the page has moved, not before.
 const nav = document.getElementById('nav');
@@ -521,24 +533,28 @@ if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('Intersec
   io2.observe(bub);
 }
 
-// Tapping a name in the tally book says what the app would tell you about them.
+// Tapping a student opens their card, the way it does in the app.
 const notes = {
-  amira: 'Paid up for all 12 lessons. Next lesson Tuesday at 16:00.',
+  amira: 'Paid up for every lesson so far. Next lesson Tuesday at 16:00.',
   joe: 'His last 3 lessons are unpaid, £180, the oldest from 3 weeks ago. One tap writes the message to Karen.',
   priya: 'Paid up. Online lesson Thursday at 18:00.',
   tom: '2 lessons unpaid, £90. Next lesson Monday at 17:00.',
 };
-document.querySelectorAll('.book-row').forEach(row => row.addEventListener('click', () => {
-  const open = row.getAttribute('aria-expanded') === 'true';
-  document.querySelectorAll('.book-row').forEach(r => r.setAttribute('aria-expanded', 'false'));
-  document.querySelectorAll('.book-note').forEach(n => n.remove());
+const cards = document.querySelectorAll('.scard');
+function toggleCard(card) {
+  const open = card.getAttribute('aria-expanded') === 'true';
+  cards.forEach(c => { c.setAttribute('aria-expanded', 'false'); c.querySelector('.scard-note')?.remove(); });
   if (open) return;
-  row.setAttribute('aria-expanded', 'true');
+  card.setAttribute('aria-expanded', 'true');
   const note = document.createElement('div');
-  note.className = 'book-note';
-  note.innerHTML = notes[row.dataset.student] + ' <a href="/?demo=1">See it in the demo →</a>';
-  row.after(note);
-}));
+  note.className = 'scard-note';
+  note.innerHTML = notes[card.dataset.student] + ' <a href="/?demo=1">See it in the demo →</a>';
+  card.append(note);
+}
+cards.forEach(card => {
+  card.addEventListener('click', e => { if (!e.target.closest('a')) toggleCard(card); });
+  card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCard(card); } });
+});
 </script>
 </body>
 </html>
