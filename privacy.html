@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0f766e">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tokens.css?v=6.41.0">
+<link rel="stylesheet" href="tokens.css?v=6.41.1">
 <style>
   * { box-sizing: border-box; }
   body {
@@ -36,7 +36,15 @@
   a { color: var(--accent); }
   strong { color: var(--ink); font-weight: 650; }
   .tablewrap { overflow-x: auto; margin: 0 0 15px; }
-  table { border-collapse: collapse; width: 100%; min-width: 460px; }
+  table { border-collapse: collapse; width: 100%; }
+  /* On a phone each row stacks, heading over its description, rather than
+     forcing a wide table that has to be scrolled sideways to read. */
+  @media (max-width: 560px) {
+    table, tbody, tr, th, td { display: block; width: 100%; }
+    tr { padding: 12px 0; border-bottom: 1px solid var(--line); }
+    table th, table td { padding: 0; border-bottom: 0; }
+    table th { margin-bottom: 4px; }
+  }
   th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 0.91rem; }
   th { color: var(--ink); font-weight: 650; }
   .note {

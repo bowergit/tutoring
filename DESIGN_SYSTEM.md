@@ -38,6 +38,9 @@ Bump the `?v=` on both links whenever either file changes, or phones keep the ol
 8. **Numbers line up.** Money and counts use `font-variant-numeric: tabular-nums`.
 9. **Look like a ledger, not a template.** A box is named by its heading, which sits over a double rule (`border-bottom: 3px double var(--line)`), the way a ledger closes a column. No coloured side stripes on cards or alerts, no glowing status dots, no coloured glows, no gradient or shimmering text.
 10. **Only money gets a pill.** On a record, the one pill is the money state (Paid up, Owes, Overdue, In credit). Other details (next lesson, year, rate) go on one line of `.meta` text separated by middots.
+11. **Show the real thing, not an icon of it.** Marketing pages picture an actual calendar, the tally, a WhatsApp message or a parent page. No grids of icon tiles, and no small label above a heading.
+12. **Tally marks mean lessons.** Lessons are drawn in groups of five: four ink uprights closed by an orange stroke, as in the logo. Unpaid lessons are red, the closing stroke included. Use them only where they count something.
+13. **The wordmark stays as it is:** the logo mark, then "Tutor" in ink and "Tally" in `--accent`. Redrawn T's were tried and turned down.
 
 Impeccable (`~/.claude/skills/impeccable`) checks for these tells. Run
 `~/.claude/skills/impeccable/scripts/impeccable detect --json <file>` after

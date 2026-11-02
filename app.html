@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script>document.documentElement.classList.add('js')</script>
-<link rel="stylesheet" href="tokens.css?v=6.41.0">
+<link rel="stylesheet" href="tokens.css?v=6.41.1">
 <style>
   /* Designed in Paper first (file "TutorTally", page Landing). The page is a
      ledger: sections open on a rule rather than a label, and the pictures are
@@ -37,11 +37,10 @@
   section { padding: 120px 0; }
   .ruled { border-top: 1px solid var(--line); }
 
-  /* The wordmark. Each T is drawn: an ink upright crossed by the logo's
-     rising stroke, orange on the T of Tally. */
-  .wm { display: inline-flex; align-items: baseline; font-weight: 700; letter-spacing: -0.035em; color: var(--ink); text-decoration: none; white-space: nowrap; }
-  .wm svg { width: .63em; height: .71em; flex: none; }
-  .wm .gap { width: .04em; }
+  /* The logo mark, drawn inline so its strokes take the theme's ink, then the name. */
+  .wm { display: inline-flex; align-items: center; gap: .45em; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); text-decoration: none; white-space: nowrap; }
+  .wm .mark { width: 1.3em; height: 1em; flex: none; }
+  .wm .name span { color: var(--accent); }
 
   /* Buttons */
   .btn {
@@ -63,14 +62,14 @@
   nav { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--bg) 90%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
   nav.scrolled { box-shadow: 0 1px 0 var(--line); }
   .nav-in { display: flex; align-items: center; gap: 4px; height: 76px; }
-  .nav-in .wm { font-size: 1.6rem; margin-right: auto; }
+  .nav-in .wm { font-size: 1.35rem; margin-right: auto; }
   .nav-link { padding: 10px 16px; border-radius: var(--r-sm); font-weight: 600; font-size: .95rem; text-decoration: none; color: var(--ink); }
   @media (hover: hover) { .nav-link:hover { background: var(--card-2); } }
   .nav-in .btn { min-height: 44px; padding: 10px 20px; font-size: .95rem; margin-left: 8px; }
   .nav-link { white-space: nowrap; }
   @media (max-width: 720px) { .nav-link.opt { display: none; } }
   @media (max-width: 420px) {
-    .nav-in .wm { font-size: 1.3rem; }
+    .nav-in .wm { font-size: 1.15rem; }
     .nav-link { padding: 10px 10px; }
     .nav-in .btn { padding: 10px 16px; margin-left: 2px; }
   }
@@ -226,13 +225,13 @@
   .js .rv.in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) { .js .rv { opacity: 1; transform: none; transition: none; } .caret { animation: none; } }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.41.0">
+<link rel="stylesheet" href="ux.css?v=6.41.1">
 </head>
 <body>
 
 <nav id="nav">
   <div class="wrap nav-in">
-    <a class="wm" href="/app" aria-label="TutorTally"><svg viewBox="0 0 64 72" aria-hidden="true"><rect x="24" y="14" width="15" height="58" rx="3" fill="currentColor"/><path d="M7 24L57 10" stroke="currentColor" stroke-width="13" stroke-linecap="round" fill="none"/></svg><span>utor</span><span class="gap"></span><svg viewBox="0 0 64 72" aria-hidden="true"><rect x="24" y="14" width="15" height="58" rx="3" fill="currentColor"/><path d="M7 24L57 10" stroke="var(--accent-fill)" stroke-width="13" stroke-linecap="round" fill="none"/></svg><span>ally</span></a>
+    <a class="wm" href="/app" aria-label="TutorTally"><svg class="mark" viewBox="0 0 900 700" aria-hidden="true"><path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)" stroke-width="94" stroke-linecap="round"/><rect x="292" y="48" width="100" height="604" rx="14" fill="currentColor"/><rect x="512" y="48" width="100" height="604" rx="14" fill="currentColor"/></svg><span class="name">Tutor<span>Tally</span></span></a>
     <a class="nav-link opt" href="#how">How it works</a>
     <a class="nav-link opt" href="#price">Pricing</a>
     <a class="nav-link" href="/">Sign in</a>
@@ -440,7 +439,7 @@
 
 <footer>
   <div class="wrap">
-    <a class="wm" href="/app" aria-label="TutorTally"><svg viewBox="0 0 64 72" aria-hidden="true"><rect x="24" y="14" width="15" height="58" rx="3" fill="currentColor"/><path d="M7 24L57 10" stroke="currentColor" stroke-width="13" stroke-linecap="round" fill="none"/></svg><span>utor</span><span class="gap"></span><svg viewBox="0 0 64 72" aria-hidden="true"><rect x="24" y="14" width="15" height="58" rx="3" fill="currentColor"/><path d="M7 24L57 10" stroke="var(--accent-fill)" stroke-width="13" stroke-linecap="round" fill="none"/></svg><span>ally</span></a>
+    <a class="wm" href="/app" aria-label="TutorTally"><svg class="mark" viewBox="0 0 900 700" aria-hidden="true"><path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)" stroke-width="94" stroke-linecap="round"/><rect x="292" y="48" width="100" height="604" rx="14" fill="currentColor"/><rect x="512" y="48" width="100" height="604" rx="14" fill="currentColor"/></svg><span class="name">Tutor<span>Tally</span></span></a>
     <span>© <span id="yr"></span></span>
     <a href="/terms">Terms</a>
     <a href="/privacy">Privacy</a>
