@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script>document.documentElement.classList.add('js')</script>
-<link rel="stylesheet" href="tokens.css?v=6.41.4">
+<link rel="stylesheet" href="tokens.css?v=6.42.0">
 <style>
   /* Designed in Paper first (file "TutorTally", page Landing). The page is a
      ledger: sections open on a rule rather than a label, and the pictures are
@@ -78,6 +78,7 @@
   .hero { padding: 64px 0 120px; }
   .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr) 520px; gap: 72px; align-items: start; }
   .hero-copy { display: flex; flex-direction: column; gap: 28px; padding-top: 24px; }
+  .hero-copy .lede + .lede { margin-top: -12px; }
   .cta-row { display: flex; gap: 12px; flex-wrap: wrap; padding-top: 6px; }
   @media (max-width: 1020px) { .hero-grid { grid-template-columns: 1fr; gap: 56px; } .dash { max-width: 560px; } }
 
@@ -227,7 +228,7 @@
   .js .rv.in { opacity: 1; transform: none; }
   @media (prefers-reduced-motion: reduce) { .js .rv { opacity: 1; transform: none; transition: none; } .caret { animation: none; } }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.41.4">
+<link rel="stylesheet" href="ux.css?v=6.42.0">
 </head>
 <body>
 
@@ -244,21 +245,22 @@
 <header class="hero">
   <div class="wrap hero-grid">
     <div class="hero-copy">
-      <h1>Your calendar already knows what you taught.</h1>
-      <p class="lede">TutorTally turns it into lesson records, tells you exactly who owes what, and writes the WhatsApp message to chase it.</p>
+      <h1>You didn't get into tutoring to do admin.</h1>
+      <p class="lede">You wanted to teach, earn money and enjoy the flexibility. Not spend your evenings checking calendars, matching bank transfers to lessons and chasing parents for payments.</p>
+      <p class="lede">TutorTally turns your calendar into lesson records, tracks who's paid and prepares the WhatsApp messages to chase what's owed.</p>
       <div class="cta-row">
         <a href="/?signup=1" class="btn btn-primary btn-lg">Start free</a>
         <a href="/?demo=1" class="btn btn-ghost btn-lg">Try the demo</a>
       </div>
-      <p class="small">Free for up to 3 students. No card. Built by a working tutor who got fed up of tracking this by hand.</p>
+      <p class="small">Free for up to 3 students. No card required. Built by a tutor who got fed up of doing this by hand.</p>
     </div>
 
     <div>
       <div class="dash" aria-label="Example of the TutorTally dashboard">
         <div class="dash-top"><svg viewBox="0 0 900 700" aria-hidden="true"><path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)" stroke-width="94" stroke-linecap="round"/><rect x="292" y="48" width="100" height="604" rx="14" fill="currentColor"/><rect x="512" y="48" width="100" height="604" rx="14" fill="currentColor"/></svg><div><b>Sam's TutorTally</b><span>7 active · synced 2 min ago</span></div></div>
         <div class="dash-over">
-          <div><b class="owed">£270</b><span>Owed to you</span></div>
-          <div><b>£640</b><span>Paid this month</span></div>
+          <div><b class="owed">£270</b><span>Still to collect</span></div>
+          <div><b>£640</b><span>Collected this month</span></div>
           <div><b>7</b><span>Active students</span></div>
         </div>
         <div class="scard" role="button" tabindex="0" data-student="joe" aria-expanded="false">
@@ -278,7 +280,7 @@
             <div class="row"><span class="pill ok">Paid up</span><span class="meta" data-next="4">Next 6 Nov</span><span class="meta">Y13</span><span class="meta">£55</span></div></div><span class="chev" aria-hidden="true">›</span></div>
         </div>
       </div>
-      <p class="small dash-cap">This is the real dashboard. Tap a student.</p>
+      <p class="small dash-cap">See exactly who's paid, who owes you and who's up next. Tap a student to explore.</p>
     </div>
   </div>
 </header>
@@ -286,8 +288,8 @@
 <section id="how" class="ruled">
   <div class="wrap">
     <div class="sec-head rv">
-      <h2>You didn't get into tutoring to do loads of admin.</h2>
-      <p class="body" style="font-size:1.12rem">Connect Google, Apple or Outlook once. Lessons, balances and chasers follow from what is already in your diary.</p>
+      <h2>From lesson to payment, without the spreadsheet.</h2>
+      <p class="body" style="font-size:1.12rem">Your calendar handles the lessons. TutorTally handles the admin.</p>
     </div>
     <div class="steps">
       <div class="step rv">
@@ -297,8 +299,8 @@
           <div class="ev"><div><b>Joe maths</b><span>Wed 17:30 – 18:30</span></div></div>
           <div class="ev"><div><b>Priya maths</b><span>Thu 18:00 – 19:00</span></div></div>
         </div></div>
-        <div class="txt"><span class="n">1</span><h3>It reads your calendar</h3>
-          <p class="body">Names in your event titles become students. Book, move or cancel a lesson and the record follows.</p></div>
+        <div class="txt"><span class="n">1</span><h3>Teach as normal.</h3>
+          <p class="body">Keep using your existing calendar. TutorTally turns your lessons into records.</p></div>
       </div>
       <div class="step rv">
         <div class="art"><div class="panel">
@@ -307,16 +309,16 @@
           <div class="mini"><b>Amira Khan</b><span class="pill ok">Paid up</span></div>
           <div class="mini" style="border-bottom:0"><b>Priya Shah</b><span class="pill ok">Paid up</span></div>
         </div></div>
-        <div class="txt"><span class="n">2</span><h3>It keeps the tally</h3>
-          <p class="body">Every payment settles the oldest unpaid lesson first, so each balance is simply what that family owes. Change a rate and the history stays right.</p></div>
+        <div class="txt"><span class="n">2</span><h3>See what you're owed.</h3>
+          <p class="body">Track payments and outstanding balances without cross checking spreadsheets.</p></div>
       </div>
       <div class="step rv">
         <div class="art"><div class="wa">
           <div class="wa-name">Karen (Joe's mum)</div>
           <div class="bub" id="bub"><span id="waText"></span><span class="caret"></span><span class="tick">17:42 ✓✓</span></div>
         </div></div>
-        <div class="txt"><span class="n">3</span><h3>It writes the awkward message</h3>
-          <p class="body">One tap opens WhatsApp with the amount and the lessons written out. Nothing sends until you press send.</p></div>
+        <div class="txt"><span class="n">3</span><h3>Chase payments in seconds.</h3>
+          <p class="body">Get a ready to send WhatsApp message showing exactly what needs paying.</p></div>
       </div>
     </div>
   </div>
