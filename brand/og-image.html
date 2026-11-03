@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="UTF-8">
+<title>TutorTally social image</title>
+<!-- Source for brand/og-image.png, the picture shown when a TutorTally link is
+     shared. Rendered at exactly 1200x630 with headless Chrome; re-render after
+     editing (the command is in DESIGN_SYSTEM.md). Light theme only, because a
+     shared image does not follow the viewer's dark mode. -->
+<link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f8f4; --card: #ffffff; --card-2: #f5f7f6; --line: #dfe7e3; --ink: #15211f; --ink-dim: #596965; --muted: #63736d;
+    --accent: #a15c00; --accent-fill: #ffa500; --good: #0f7a35; --good-light: #e3f7e9; --warn: #c0362c; --warn-light: #fdecea;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: 'General Sans', sans-serif; -webkit-font-smoothing: antialiased;
+    display: grid; grid-template-columns: 1fr 440px; gap: 56px; padding: 64px 72px;
+  }
+  .copy { display: flex; flex-direction: column; }
+  .brand { display: flex; align-items: center; gap: 14px; font-size: 30px; font-weight: 700; letter-spacing: -0.03em; }
+  .brand svg { width: 48px; height: 37px; }
+  .brand span { color: var(--accent); }
+  h1 { margin-top: 56px; font-size: 68px; line-height: 1.02; font-weight: 700; letter-spacing: -0.045em; text-wrap: balance; }
+  .sub { margin-top: 26px; font-size: 25px; line-height: 1.4; color: var(--ink-dim); max-width: 560px; }
+  .foot { margin-top: auto; display: flex; gap: 18px; align-items: center; font-size: 21px; font-weight: 600; }
+  .foot .free { color: var(--muted); font-weight: 500; }
+
+  /* The dashboard, as it really looks. */
+  .dash { align-self: center; background: var(--card); border: 1px solid var(--line); border-radius: 30px; padding: 26px 24px 14px;
+    box-shadow: 0 1px 2px rgba(22,21,15,.05), 0 30px 60px -28px rgba(22,21,15,.28); }
+  .over { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 4px 6px 22px; border-bottom: 3px double var(--line); }
+  .over b { display: block; font-size: 44px; line-height: 1; font-weight: 700; letter-spacing: -0.04em; }
+  .over b.owed { color: var(--warn); }
+  .over span { display: block; margin-top: 8px; font-size: 17px; color: var(--ink-dim); }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 18px 6px; border-bottom: 1px solid #edf1ef; }
+  .row:last-child { border-bottom: 0; }
+  .row b { font-size: 21px; font-weight: 600; letter-spacing: -0.015em; }
+  .row small { display: block; margin-top: 4px; font-size: 15px; color: var(--muted); }
+  .pill { font-size: 15px; font-weight: 600; padding: 6px 13px; border-radius: 20px; white-space: nowrap; }
+  .pill.warn { background: var(--warn-light); color: var(--warn); }
+  .pill.ok { background: var(--good-light); color: var(--good); }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <div class="brand">
+      <svg viewBox="0 0 900 700" aria-hidden="true"><path d="M86 440L812 220" fill="none" stroke="#ffa500" stroke-width="94" stroke-linecap="round"/><rect x="292" y="48" width="100" height="604" rx="14" fill="#15211f"/><rect x="512" y="48" width="100" height="604" rx="14" fill="#15211f"/></svg>
+      <div>Tutor<span>Tally</span></div>
+    </div>
+    <h1>You didn't get into tutoring to do admin.</h1>
+    <p class="sub">Your calendar becomes lesson records, balances and ready to send WhatsApp chasers.</p>
+    <div class="foot"><span>tutortally.co.uk</span><span class="free">Free for up to 3 students</span></div>
+  </div>
+  <div class="dash">
+    <div class="over">
+      <div><b class="owed">£270</b><span>Still to collect</span></div>
+      <div><b>£640</b><span>Collected this month</span></div>
+    </div>
+    <div class="row"><div><b>Joe Fletcher</b><small>Y11 · £60</small></div><span class="pill warn">Overdue £180</span></div>
+    <div class="row"><div><b>Amira Khan</b><small>Y11 · £60</small></div><span class="pill ok">Paid up</span></div>
+    <div class="row"><div><b>Priya Shah</b><small>Y13 · £55</small></div><span class="pill ok">Paid up</span></div>
+  </div>
+</body>
+</html>

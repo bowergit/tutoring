@@ -9,13 +9,24 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
 <link rel="manifest" href="manifest.json"> 
+<meta name="description" content="TutorTally turns your teaching calendar into lesson records, tracks who's paid and prepares the WhatsApp messages to chase what's owed. Free for up to 3 students.">
+<meta property="og:site_name" content="TutorTally">
+<meta property="og:title" content="TutorTally - the tiny finance desk for solo tutors">
+<meta property="og:description" content="You didn't get into tutoring to do admin. TutorTally turns your calendar into lesson records, tracks who's paid and prepares the WhatsApp messages to chase what's owed.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://tutortally.co.uk/">
+<meta property="og:image" content="https://tutortally.co.uk/brand/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="TutorTally: You didn't get into tutoring to do admin. A dashboard showing £270 still to collect.">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="theme-color" content="#ffa500">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<link rel="stylesheet" href="tokens.css?v=6.43.0">
+<link rel="stylesheet" href="tokens.css?v=6.43.1">
 <style>
 
   * { box-sizing: border-box; }
@@ -1027,7 +1038,7 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.43.0">
+<link rel="stylesheet" href="ux.css?v=6.43.1">
 </head>
 <body>
 <div id="root"></div>
@@ -9007,7 +9018,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.43.0</div>}
+        {!loading && <div className="version-tag">v6.43.1</div>}
       </div>
 
       {showAddModal && (

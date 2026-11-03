@@ -132,3 +132,13 @@ Paste something like this:
 Good prompts name the page, the person using it, and the one thing they need
 to see first. For example: "a parent opening this from WhatsApp wants to know
 if they owe anything".
+
+## Social sharing image
+
+`brand/og-image.png` (1200×630) is what shows when a link to tutortally.co.uk or /app is shared on WhatsApp, iMessage, Facebook, LinkedIn or X. Its source is `brand/og-image.html`, which uses the real font and colours. After editing the HTML, re-render the PNG:
+
+```bash
+"/c/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --window-size=1200,630 --virtual-time-budget=6000 --screenshot="$(cygpath -w "$PWD/brand/og-image.png")" "file:///$(cygpath -m "$PWD/brand/og-image.html")"
+```
+
+Apps cache link previews for days or weeks. To see a new image straight away on Facebook or LinkedIn, paste the link into their sharing debugger; WhatsApp picks it up for newly pasted links.
