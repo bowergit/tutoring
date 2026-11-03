@@ -26,7 +26,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<link rel="stylesheet" href="tokens.css?v=6.43.1">
+<link rel="stylesheet" href="tokens.css?v=6.43.2">
 <style>
 
   * { box-sizing: border-box; }
@@ -1038,7 +1038,7 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.43.1">
+<link rel="stylesheet" href="ux.css?v=6.43.2">
 </head>
 <body>
 <div id="root"></div>
@@ -8718,7 +8718,12 @@ function App() {
         setTimeout(() => setRefreshNote(null), 7000);
       }
     } else {
-      await reload;
+      // The demo reloads instantly, so without a floor the button would finish
+      // before the spin ever drew and look as if it did nothing. A second is
+      // about what a real calendar sync takes.
+      await Promise.all([reload, new Promise(res => setTimeout(res, 1000))]);
+      setRefreshNote({ bad: false, text: 'Up to date. In your own account this also checks your calendar for new or moved lessons.' });
+      setTimeout(() => setRefreshNote(null), 5000);
     }
     setSyncingAll(false);
   }
@@ -9018,7 +9023,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.43.1</div>}
+        {!loading && <div className="version-tag">v6.43.2</div>}
       </div>
 
       {showAddModal && (
