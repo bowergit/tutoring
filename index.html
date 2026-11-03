@@ -15,7 +15,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<link rel="stylesheet" href="tokens.css?v=6.42.0">
+<link rel="stylesheet" href="tokens.css?v=6.43.0">
 <style>
 
   * { box-sizing: border-box; }
@@ -450,7 +450,7 @@
     display: block; font-size: 0.68rem; color: var(--muted);
     margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
   }
-  .field input[type="text"], .field input[type="time"], .field input[type="date"], .field input[type="number"], .field input[type="email"], .field input[type="password"], .field select, .field textarea {
+  .field input[type="text"], .field input[type="tel"], .field input[type="time"], .field input[type="date"], .field input[type="number"], .field input[type="email"], .field input[type="password"], .field select, .field textarea {
     width: 100%; padding: 11px 13px; border: 1px solid var(--line);
     border-radius: var(--r-md); font-size: 0.95rem; font-family: inherit;
     background: var(--card-2); color: var(--ink);
@@ -483,6 +483,21 @@
   .checkbox-row { display: flex; align-items: center; gap: 8px; }
   .checkbox-row input { width: 18px; height: 18px; accent-color: var(--accent); }
   .btn-row { display: flex; gap: 10px; margin-top: 18px; }
+
+  /* Demo only: the "see it on your own phone" sheet and the toast after a send. */
+  .demo-wa-p { margin: 0 0 10px; font-size: .92rem; color: var(--ink-dim); line-height: 1.5; }
+  .demo-wa-hint { margin: 0 0 16px; font-size: .84rem; color: var(--muted); }
+  .demo-wa-hint.strong { color: var(--accent); font-weight: 600; }
+  .demo-wa-consent { display: flex; gap: 10px; align-items: flex-start; font-size: .84rem; color: var(--ink-dim); line-height: 1.45; cursor: pointer; }
+  .demo-wa-consent input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; }
+  .demo-wa-err { color: var(--warn); font-size: .84rem; min-height: 1.2em; margin-top: 10px; }
+  .demo-wa-toast {
+    position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 90;
+    display: flex; align-items: center; gap: 14px; max-width: calc(100vw - 32px);
+    padding: 12px 14px 12px 18px; border-radius: var(--r-md); background: var(--ink); color: var(--bg);
+    font-size: .88rem; box-shadow: var(--sh-3);
+  }
+  .demo-wa-change { flex: none; min-height: 36px; padding: 6px 12px; border: 0; border-radius: var(--r-sm); background: color-mix(in srgb, var(--bg) 16%, transparent); color: inherit; font: 600 .82rem var(--font); cursor: pointer; }
   .btn.cancel { background: var(--card-2); color: var(--ink); border: 1px solid var(--line); flex: 0 0 auto; padding: 10px 18px; }
   .btn.save   { background: var(--accent-fill); color: var(--on-accent); }
   .session-list { margin: 10px 0; }
@@ -1012,7 +1027,7 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.42.0">
+<link rel="stylesheet" href="ux.css?v=6.43.0">
 </head>
 <body>
 <div id="root"></div>
@@ -1502,6 +1517,102 @@ if (DEMO_MODE) {
   };
 }
 
+// ---------- Demo: WhatsApp to your own phone ----------
+// Every WhatsApp button in the demo would otherwise message an invented
+// parent. Instead the first tap asks the visitor for their own mobile number,
+// and from then on every demo message opens addressed to that number, so they
+// see on their own phone exactly what a parent would receive.
+//
+// The number is saved so Daniel or Tom can ask how the demo went, unless the
+// visitor ticks the box saying they don't want to be contacted, in which case
+// it stays in this browser only. The wording they saw is stored with it. It
+// lands in tutoring_demo_leads, which the public key can add to but never
+// read; the admin panel lists it.
+const DEMO_WA_KEY = 'tt-demo-wa';
+const DEMO_CONSENT_TEXT = "Tick if you don't want to be contacted about your experience.";
+if (DEMO_MODE) {
+  const recallNum = () => { try { return localStorage.getItem(DEMO_WA_KEY) || ''; } catch { return ''; } };
+  const keepNum = n => { try { localStorage.setItem(DEMO_WA_KEY, n); } catch {} };
+  const onPhone = () => window.matchMedia('(pointer: coarse)').matches;
+  const pretty = n => n.startsWith('44') ? '0' + n.slice(2, 6) + ' ' + n.slice(6) : '+' + n;
+  const el = (tag, props = {}, kids = []) => {
+    const node = Object.assign(document.createElement(tag), props);
+    kids.forEach(k => node.append(k));
+    return node;
+  };
+
+  // The message text is kept; only who it goes to changes.
+  const sendTo = (href, num) => {
+    const text = new URL(href).searchParams.get('text');
+    window.open(`https://wa.me/${num}${text ? '?text=' + encodeURIComponent(text) : ''}`, '_blank', 'noopener');
+    sentToast(num);
+  };
+
+  function sentToast(num) {
+    document.getElementById('demo-wa-toast')?.remove();
+    const change = el('button', { type: 'button', className: 'demo-wa-change', textContent: 'Change number' });
+    const toast = el('div', { id: 'demo-wa-toast', className: 'demo-wa-toast', role: 'status' },
+      [el('span', { textContent: `Opening WhatsApp to ${pretty(num)}` }), change]);
+    change.onclick = () => { toast.remove(); askForNumber(null); };
+    document.body.append(toast);
+    setTimeout(() => toast.remove(), 6000);
+  }
+
+  function askForNumber(href) {
+    const input = el('input', { type: 'tel', id: 'demo-wa-num', inputMode: 'tel', autocomplete: 'tel', placeholder: '07700 900123', value: recallNum() ? pretty(recallNum()) : '' });
+    const consent = el('input', { type: 'checkbox', id: 'demo-wa-consent' });
+    const err = el('div', { className: 'demo-wa-err', role: 'alert' });
+    const go = el('button', { type: 'submit', className: 'btn save', textContent: href ? 'Open WhatsApp' : 'Save number' });
+    const cancel = el('button', { type: 'button', className: 'btn cancel', textContent: 'Cancel' });
+    const form = el('form', { className: 'sheet', noValidate: true }, [
+      el('h2', { textContent: 'See it on your own phone' }),
+      el('p', { className: 'demo-wa-p', textContent: 'Enter your mobile number and every WhatsApp button in the demo will open a message to you, written exactly as a parent would get it.' }),
+      el('p', { className: 'demo-wa-hint' + (onPhone() ? '' : ' strong'), textContent: onPhone()
+        ? 'Works best on your phone, where WhatsApp opens straight away.'
+        : 'This works best on your phone. On a computer it opens WhatsApp Web instead.' }),
+      el('div', { className: 'field' }, [el('label', { htmlFor: 'demo-wa-num', textContent: 'Your mobile number' }), input]),
+      el('label', { className: 'demo-wa-consent' }, [consent, el('span', { textContent: DEMO_CONSENT_TEXT })]),
+      err,
+      el('div', { className: 'btn-row' }, [cancel, go]),
+    ]);
+    const overlay = el('div', { className: 'overlay' }, [form]);
+    const close = () => overlay.remove();
+    cancel.onclick = close;
+    overlay.onclick = e => { if (e.target === overlay) close(); };
+    overlay.onkeydown = e => { if (e.key === 'Escape') close(); };
+    form.onsubmit = e => {
+      e.preventDefault();
+      const num = normaliseUKPhone(input.value);
+      if (!/^[1-9][0-9]{9,14}$/.test(num) || (num.startsWith('44') && num.length !== 12)) {
+        err.textContent = 'That does not look like a mobile number. Try something like 07700 900123.';
+        input.focus();
+        return;
+      }
+      keepNum(num);
+      if (!consent.checked) {
+        // Fire and forget: a failed save must never stop the demo working.
+        realSupabase.from('tutoring_demo_leads')
+          .insert({ phone: num, consent_text: 'Did not tick: ' + DEMO_CONSENT_TEXT, user_agent: navigator.userAgent.slice(0, 300) })
+          .then(({ error }) => { if (error) console.warn('demo lead not saved', error.message); });
+      }
+      close();
+      if (href) sendTo(href, num);
+    };
+    document.body.append(overlay);
+    input.focus();
+  }
+
+  // Capture phase, so it runs before the link's own navigation, for every
+  // WhatsApp link the demo renders now or later.
+  document.addEventListener('click', e => {
+    const a = e.target.closest?.('a[href^="https://wa.me/"]');
+    if (!a) return;
+    e.preventDefault();
+    const num = recallNum();
+    if (num) sendTo(a.href, num); else askForNumber(a.href);
+  }, true);
+}
+
 // Everything below this line talks to `supabase` without knowing or caring
 // which of the two it got.
 const supabase = DEMO_MODE ? makeDemoClient() : guardedClient(realSupabase);
@@ -1634,7 +1745,7 @@ function BillingBar({ entitlement, activeStudents, blockedOnce, suppressFreeProm
   if (DEMO_MODE) {
     return (
       <div className="billing-bar demo">
-        <span><b>Demo.</b> Invented students, invented money. Change whatever you like, nothing is saved.</span>
+        <span><b>Demo.</b> Invented students, invented money. Change whatever you like, nothing is saved. WhatsApp buttons message your own phone.</span>
         <a className="billing-btn" href="/?signup=1">Get your own</a>
       </div>
     );
@@ -8896,7 +9007,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.42.0</div>}
+        {!loading && <div className="version-tag">v6.43.0</div>}
       </div>
 
       {showAddModal && (

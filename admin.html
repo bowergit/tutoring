@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <meta name="theme-color" content="#ffa500">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tokens.css?v=6.42.0">
+<link rel="stylesheet" href="tokens.css?v=6.43.0">
 <style>
   /* Admin-only: the amber stage colour and the dark help tooltip. */
   :root {
@@ -402,8 +402,21 @@
   .peek { border-left: 0; padding-left: 0; }
   .peek b { color: var(--ink); }
   .foot-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 30px; padding-top: 18px; border-top: 1px solid var(--line); }
+
+  /* Demo visitors: one ledger row per number. */
+  .lead { display: grid; grid-template-columns: 170px minmax(0, 1fr) auto auto; gap: 8px 20px; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--line-soft); }
+  .lead-phone { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .lead-new { color: var(--ink-dim); font-size: .9rem; }
+  .lead-acct { border: 0; background: none; padding: 0; font: inherit; font-size: .9rem; font-weight: 600; color: var(--good); cursor: pointer; text-align: left; }
+  .lead-seen { font-size: .85rem; color: var(--muted); white-space: nowrap; }
+  .lead-acts { display: flex; gap: 8px; }
+  @media (max-width: 640px) {
+    .lead { grid-template-columns: 1fr auto; }
+    .lead-who, .lead-seen { grid-column: 1; }
+    .lead-acts { grid-column: 2; grid-row: 1 / span 3; flex-direction: column; }
+  }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.42.0">
+<link rel="stylesheet" href="ux.css?v=6.43.0">
 </head>
 <body>
 <div class="wrap" id="app"><div class="empty">Loading…</div></div>
@@ -418,7 +431,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.42.0';
+const VERSION = 'v6.43.0';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -444,7 +457,7 @@ const stepLabel = key => (STEP_LABELS.find(([k]) => k === key) || [])[1] || key;
 // was not counted, which matters when reading a zero.
 const PARENT_OPENS_COUNTED_FROM = '8 Oct 2026';
 
-let data = { accounts: [], income: null, me: null, loadedAt: null };
+let data = { accounts: [], income: null, me: null, loadedAt: null, leads: [] };
 const ui = {
   seg: recall('tt-admin-seg'),
   q: '',
@@ -1198,6 +1211,43 @@ function queueHTML(list) {
         </button>`).join('');
 }
 
+// ---- Demo visitors ------------------------------------------------------
+//
+// People who tried the demo and left their mobile number without ticking the
+// box saying they don't want to be contacted about their experience. Matched to an account when a tutor has the same
+// number in their settings, so someone who has since signed up shows as that
+// tutor. The opener asks about their experience, because that is what they
+// were told they might be contacted about.
+const LEAD_HELLO = "Hi, it's Daniel from TutorTally. I saw you tried the demo. How did you find it? Happy to help if anything didn't make sense.";
+
+function leadsHTML() {
+  const leads = data.leads || [];
+  const waiting = leads.filter(l => !l.owner_id).length;
+  const head = `<div class="sec-head"><h2>Demo visitors${leads.length ? `<span class="n">${leads.length}</span>` : ''}</h2>
+    <div class="aside">${leads.length
+      ? `${plural(waiting, 'person', 'people')} not signed up yet. People who ticked "don't contact me" are never saved.`
+      : 'People who try the demo and leave their number appear here.'}</div></div>`;
+  if (!leads.length) return head;
+  return head + leads.map(l => {
+    const who = l.owner_id
+      ? `<button class="lead-acct" data-jump="${esc(l.owner_id)}">Signed up as ${esc(l.owner_name || 'a tutor')}</button>`
+      : '<span class="lead-new">Not signed up</span>';
+    const seen = l.visits > 1
+      ? `${plural(l.visits, 'visit')}, last ${esc(agoLabel(l.last_seen))}`
+      : esc(agoLabel(l.last_seen));
+    return `
+      <div class="lead" data-phone="${esc(l.phone)}">
+        <span class="lead-phone">${esc(fmtPhone(l.phone))}</span>
+        <span class="lead-who">${who}</span>
+        <span class="lead-seen">${seen}</span>
+        <span class="lead-acts">
+          ${l.owner_id ? '' : `<a class="btn" href="https://wa.me/${esc(l.phone)}?text=${encodeURIComponent(LEAD_HELLO)}" target="_blank" rel="noopener">WhatsApp</a>`}
+          <button class="btn danger" data-act="forget-lead">Forget</button>
+        </span>
+      </div>`;
+  }).join('');
+}
+
 // ---- The account list ---------------------------------------------------
 
 function statsHTML(a) {
@@ -1359,6 +1409,7 @@ function render() {
     </div>
     ${growthHTML(testers)}
     ${queueHTML(data.accounts)}
+    ${leadsHTML()}
     ${funnelHTML(testers)}
     ${incomeHTML()}
     <div class="sec-head" id="accounts"><h2>Accounts</h2>
@@ -1600,6 +1651,17 @@ async function handleAct(btn) {
     return renderGate(null);
   }
 
+  if (act === 'forget-lead') {
+    const phone = btn.closest('[data-phone]')?.dataset.phone;
+    if (!phone || !confirm(`Forget ${fmtPhone(phone)}?
+
+Every record of this number is deleted. Do this if they ask not to be contacted.`)) return;
+    btn.disabled = true;
+    const r = await call('forget-lead', { phone });
+    if (!r.ok) { alert('Could not do that: ' + (r.problem || 'unknown')); btn.disabled = false; return; }
+    return load(true);
+  }
+
   const card = btn.closest('[data-owner]');
   if (!card) return;
   const ownerId = card.dataset.owner;
@@ -1660,7 +1722,7 @@ async function load(quiet = false) {
     return;
   }
   const y = window.scrollY;
-  data = { accounts: r.accounts || [], income: r.income || null, me: r.me, loadedAt: new Date().toISOString() };
+  data = { accounts: r.accounts || [], income: r.income || null, me: r.me, loadedAt: new Date().toISOString(), leads: r.leads || [] };
   render();
   if (quiet) window.scrollTo(0, y);
 }
