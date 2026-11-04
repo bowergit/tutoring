@@ -20,6 +20,12 @@ assert.equal(W.ledger([],[{student_id:'s',amount:80}],'s',l=>l.rate_charged)[1].
 W.set([{...plan,ends_before:'2026-12-29'}],fees);
 assert.equal(W.covers({student_id:'s',lesson_date:'2027-01-03'}),true,'Final weekly fee covers its whole period');
 assert.equal(W.covers({student_id:'s',lesson_date:'2027-01-04'}),false,'Coverage stops after final period');
+const dayShift=(d,n)=>{const x=new Date(d+'T12:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+const lessonDay=W.today(), lastWeek=dayShift(lessonDay,-7);
+W.set([{...plan,starts_on:lastWeek}],[{plan_id:'p',student_id:'s',charge_date:lastWeek,amount:80},{plan_id:'p',student_id:'s',charge_date:lessonDay,amount:80}]);
+const afterLesson=W.ledger([],[],'s',l=>l.rate_charged);
+assert.deepEqual(afterLesson.map(r=>r.due),[true,false],'This week is charged after its lesson, last week is due');
+assert.equal(W.financialLessons([],'s').filter(l=>l.status==='completed').length,1,'Only weeks whose lesson day has passed count as owed');
 W.set([{...plan,status:'proposed'}],[]);
 assert.equal(W.covers({student_id:'s',lesson_date:'2026-12-25'}),false,'Proposal does not alter billing');
 W.set([{...plan,status:'ended',acceptance:null}],[]);
@@ -37,4 +43,4 @@ assert(!rendered.includes('<img>'),'Tutor supplied slot is escaped');
 assert(rendered.includes('£80 a week') && !rendered.includes('${'),'Price renders as text, never as a raw template');
 const renderedAccepted=portalContext.window.renderWeekly({plan:{...plan,status:'active',terms_text:'x',lesson_slot:'Thu',weekly_fee:62.5,notice_days:7,terms_version:'t'},acceptance:{signer_name:'A',accepted_at:new Date().toISOString(),terms_version:'t'},entries:[],payments:[]});
 assert(renderedAccepted.includes('£62.50 a week') && !renderedAccepted.includes('${'),'Accepted card shows the chosen price');
-console.log('16 weekly billing assertions, portal escaping, parent page syntax and edge TypeScript syntax passed.');
+console.log('18 weekly billing assertions, portal escaping, parent page syntax and edge TypeScript syntax passed.');

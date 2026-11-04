@@ -451,6 +451,10 @@ Deno.serve(async (req) => {
     if(planErr || !plan) return json({ok:false,problem:'agreement_not_found'},404)
     if(body.action==='accept') {
       if(plan.status!=='proposed' || body.terms_version!==plan.terms_version || body.agree!==true || typeof body.signer_name!=='string' || body.signer_name.trim().length<2 || body.signer_name.trim().length>150) return json({ok:false,problem:'Please read and accept the current agreement.'},400)
+      // Signed late? The first payment moves to the next lesson day. The parent must see the new date before signing.
+      const {data:rolledStart,error:rollErr}=await supabase.rpc('tutoring_weekly_roll_forward',{p_plan_id:plan.id})
+      if(rollErr) return json({ok:false,problem:'Could not accept the agreement. Ask Daniel for help.'},400)
+      if(rolledStart!==plan.starts_on) return json({ok:false,problem:'The first payment date has moved to the next lesson. Please refresh the page and sign again.'},409)
       // The signing trail: where and on what the agreement was accepted.
       const signerIp=(req.headers.get('cf-connecting-ip')||req.headers.get('x-forwarded-for')||'').split(',')[0].trim().slice(0,64)||null
       const signerAgent=(req.headers.get('user-agent')||'').slice(0,300)||null
@@ -534,6 +538,11 @@ Deno.serve(async (req) => {
   const [{data:lessons},{data:rateHistoryRaw},{data:ownerUser},{data:hourlyPlans}]=accountReads
   let weeklyPlans:any[] = [], weeklyCharges:any[] = [], weeklyAcceptances:any[] = []
   if(student.owner_id===MONZO_SETTLE_OWNER) {
+    // Unsigned proposals whose first payment date has passed move to the next lesson day, so the link never goes stale.
+    if(!pupilView) {
+      const {data:stale}=await supabase.from('tutoring_weekly_plans').select('id').eq('student_id',student.id).eq('owner_id',student.owner_id).eq('status','proposed')
+      for(const p of stale || []) await supabase.rpc('tutoring_weekly_roll_forward',{p_plan_id:p.id})
+    }
     const results=await Promise.all([
       supabase.from('tutoring_weekly_plans').select('*').eq('student_id',student.id).eq('owner_id',student.owner_id).order('created_at'),
       supabase.from('tutoring_weekly_charges').select('*').eq('student_id',student.id).eq('owner_id',student.owner_id).order('charge_date'),
@@ -622,7 +631,8 @@ Deno.serve(async (req) => {
   const individualCharged = (lessons ?? [])
     .filter((l: any) => l.status === 'completed' && !l.is_complimentary && !l.pre_settled && !covered(l))
     .reduce((sum: number, l: any) => sum + rateForLesson(l, rateHistory), 0)
-  const charged=individualCharged+weeklyCharges.filter(c=>c.charge_date<=todayStr).reduce((sum,c)=>sum+Number(c.amount),0)
+  // A weekly charge falls due the day after that week's lesson day, never before the lesson.
+  const charged=individualCharged+weeklyCharges.filter(c=>c.charge_date<todayStr).reduce((sum,c)=>sum+Number(c.amount),0)
   const paidTotal = (payments ?? []).reduce((sum: number, p: any) => sum + Number(p.amount), 0)
   const balance = Math.round((charged - paidTotal) * 100) / 100
 
@@ -644,7 +654,7 @@ Deno.serve(async (req) => {
     let remaining=Math.round(paidTotal*100)
     const entries=[...(lessons || []).filter((l:any)=>!covered(l) && !l.pre_settled && !l.is_complimentary && l.status!=='cancelled').map((l:any)=>({date:l.lesson_date,kind:'Individual lesson',amount:rateForLesson(l,rateHistory),waived:false,reason:null})),
       ...weeklyCharges.map(c=>({date:c.charge_date,kind:'Weekly place',amount:Number(c.amount),waived:c.waived,reason:c.reason}))]
-      .sort((a,b)=>a.date.localeCompare(b.date)).map(c=>{const paid=Math.min(Math.max(remaining,0),Math.round(c.amount*100));remaining-=paid;return {...c,paid:paid/100,due:c.date<=todayStr}})
+      .sort((a,b)=>a.date.localeCompare(b.date)).map(c=>{const paid=Math.min(Math.max(remaining,0),Math.round(c.amount*100));remaining-=paid;return {...c,paid:paid/100,due:c.kind==='Weekly place'?c.date<todayStr:c.date<=todayStr}})
     const plan=weeklyPlans.find(p=>p.status!=='ended') || weeklyPlans[weeklyPlans.length-1]
     const acceptance=weeklyAcceptances.find(a=>a.plan_id===plan.id) || null
     return {plan:{id:plan.id,starts_on:plan.starts_on,ends_before:plan.ends_before,weekly_fee:plan.weekly_fee,lesson_slot:plan.lesson_slot,notice_days:plan.notice_days,status:plan.status,terms_version:plan.terms_version,terms_text:plan.terms_text,end_requested_at:plan.end_requested_at,review_required:plan.review_required},acceptance,

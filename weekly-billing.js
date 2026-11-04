@@ -9,7 +9,8 @@
     const ids = studentId ? new Set([studentId]) : new Set([...lessons.map(l => l.student_id), ...plans.map(p => p.student_id)]);
     return lessons.filter(l => !covers(l)).concat(charges.filter(c => ids.has(c.student_id)).map(c => ({
       id: 'weekly:' + c.plan_id + ':' + c.charge_date, student_id: c.student_id,
-      lesson_date: c.charge_date, status: c.charge_date <= today() ? 'completed' : 'scheduled',
+      // A week is paid for after its lesson: the charge falls due the day after the lesson day.
+      lesson_date: c.charge_date, status: c.charge_date < today() ? 'completed' : 'scheduled',
       rate_charged: Number(c.amount), is_complimentary: c.waived, pre_settled: false, is_weekly_charge: true, reason: c.reason,
     })));
   }
@@ -21,7 +22,7 @@
       .map(l => {
         const amount = l.is_complimentary ? 0 : Math.round(rate(l) * 100);
         const paid = Math.min(Math.max(remaining, 0), amount); remaining -= paid;
-        return { ...l, amount: amount / 100, paid: paid / 100, due: l.lesson_date <= today(), left: (amount - paid) / 100 };
+        return { ...l, amount: amount / 100, paid: paid / 100, due: l.is_weekly_charge ? l.lesson_date < today() : l.lesson_date <= today(), left: (amount - paid) / 100 };
       });
   }
   root.TTWeekly = { today, covers, financialLessons, ledger,
