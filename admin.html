@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <meta name="theme-color" content="#ffa500">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="tokens.css?v=6.44.0">
+<link rel="stylesheet" href="tokens.css?v=6.44.1">
 <style>
   /* Admin-only: the amber stage colour and the dark help tooltip. */
   :root {
@@ -191,6 +191,12 @@
   .btn:disabled { opacity: 0.5; cursor: default; }
   .btn-row { display: flex; gap: 7px; flex-wrap: wrap; }
   .move { display: flex; align-items: center; gap: 8px; margin-top: 11px; font-size: 0.78rem; color: var(--muted); }
+  .wa-help { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 11px; }
+  .wa-help label { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; font-size: 0.78rem; color: var(--muted); }
+  .wa-help input {
+    flex: 1; min-width: 0; font: inherit; font-size: 0.8rem; padding: 6px 9px; border-radius: var(--r-sm);
+    border: 1px solid var(--line); background: var(--card-2); color: var(--ink);
+  }
   .move select {
     font: inherit; font-size: 0.8rem; padding: 6px 9px; border-radius: var(--r-sm);
     border: 1px solid var(--line); background: var(--card-2); color: var(--ink);
@@ -416,7 +422,7 @@
     .lead-acts { grid-column: 2; grid-row: 1 / span 3; flex-direction: column; }
   }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.44.0">
+<link rel="stylesheet" href="ux.css?v=6.44.1">
 </head>
 <body>
 <div class="wrap" id="app"><div class="empty">Loading…</div></div>
@@ -431,7 +437,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.44.0';
+const VERSION = 'v6.44.1';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -1248,6 +1254,39 @@ function leadsHTML() {
   }).join('');
 }
 
+// ---- WhatsApp openers ---------------------------------------------------
+//
+// Two messages Daniel sends tutors by hand: a friendly check in, and an offer
+// of help with something specific. Signed with the admin's own first name.
+const waLink = (phone, text) => `https://wa.me/${String(phone).replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
+const firstWord = s => String(s || '').trim().split(/\s+/)[0] || '';
+const tutorFirst = a => firstWord(a.name);
+const myFirst = () => (data.me && !String(data.me).includes('@')) ? firstWord(data.me) : '';
+const greeting = a => tutorFirst(a) ? `Hi ${tutorFirst(a)}` : 'Hi';
+const signOff = () => myFirst() ? `Thanks, ${myFirst()}` : 'Thanks';
+
+function checkInText(a) {
+  return `${greeting(a)}, how are you getting on with TutorTally?\n\n${signOff()}`;
+}
+
+function helpText(a, issue) {
+  const what = String(issue || '').trim().replace(/[.!?]+$/, '') || '...';
+  return `${greeting(a)}, I see you're having issues with ${what}. Can I try to help you resolve it?\n\n${signOff()}`;
+}
+
+// A starting point for the help message, worded for the tutor, from the same
+// signals the To do list uses. Daniel can change it before sending.
+function issueFor(a) {
+  const b = a.billing || {};
+  const days = daysSince(a.joined);
+  if (a.calendar_error) return 'your calendar sync';
+  if (b.status === 'past_due') return 'your Pro payment';
+  if (a.active_students > 0 && a.total_lessons === 0 && days >= 3) return 'getting your lessons to come in from your calendar';
+  if (a.active_students === 0 && days >= 3) return 'adding your first student';
+  if (a.taught_chargeable >= 8 && (a.taught_chargeable - a.taught_paid) / a.taught_chargeable > 0.5) return 'logging payments';
+  return '';
+}
+
 // ---- The account list ---------------------------------------------------
 
 function statsHTML(a) {
@@ -1346,11 +1385,17 @@ function accountHTML(a) {
           <div class="foot">
             ${metaHTML(a)}
             <div class="btn-row">
-              ${a.phone ? `<a class="btn" href="https://wa.me/${esc(a.phone)}" target="_blank" rel="noopener">WhatsApp</a>` : ''}
+              ${a.phone ? `<a class="btn" href="${esc(waLink(a.phone, checkInText(a)))}" target="_blank" rel="noopener">WhatsApp: check in</a>` : ''}
               ${a.email ? `<a class="btn" href="mailto:${esc(a.email)}">Email</a>` : ''}
               ${!freeForever(a) ? '<button class="btn primary" data-act="grant">+1 month free</button>' : ''}
               ${freeActive(a) ? '<button class="btn danger" data-act="revoke">End free access</button>' : ''}
             </div>
+            ${a.phone ? `<div class="wa-help">
+              <label>Having issues with
+                <input type="text" data-wa-issue maxlength="120" value="${esc(issueFor(a))}" placeholder="what they are stuck on">
+              </label>
+              <a class="btn" data-wa-help href="${esc(waLink(a.phone, helpText(a, issueFor(a))))}" target="_blank" rel="noopener">WhatsApp: offer help</a>
+            </div>` : ''}
             <label class="move">Group
               <select data-seg-select>
                 ${SEGMENTS.map(([k, label]) => `<option value="${k}"${a.segment === k ? ' selected' : ''}>${esc(label)}</option>`).join('')}
@@ -1615,6 +1660,12 @@ app.addEventListener('keydown', (e) => {
 });
 
 app.addEventListener('input', (e) => {
+  if (e.target.matches?.('[data-wa-issue]')) {
+    const a = data.accounts.find(x => x.owner_id === e.target.closest('[data-owner]')?.dataset.owner);
+    const link = e.target.closest('.wa-help')?.querySelector('[data-wa-help]');
+    if (a && link) link.href = waLink(a.phone, helpText(a, e.target.value));
+    return;
+  }
   if (e.target.id !== 'q') return;
   ui.q = e.target.value;
   renderList();
