@@ -117,7 +117,7 @@ function cleanBody(html) {
   let h = html;
   h = h.replace(/<noscript>[\s\S]*?<\/noscript>/g, '').replace(/<style[\s\S]*?<\/style>/g, '').replace(/<script[\s\S]*?<\/script>/g, '');
   h = h.replace(/<figure[\s\S]*?<\/figure>/g, '').replace(/<img[^>]*>/g, '');
-  h = h.replace(/<\/?(div|span|u)[^>]*>/g, '');
+  h = h.replace(/<\/?(div|span|u)\b[^>]*>/g, '');
   h = h.replace(/<(p|h[1-6]|strong|em|ul|ol|li|blockquote)\b[^>]*>/g, '<$1>');
   h = h.replace(/<a\b[^>]*?href="([^"]*)"[^>]*>/g, (m, href) => {
     href = href.replace(/&amp;/g, '&');
