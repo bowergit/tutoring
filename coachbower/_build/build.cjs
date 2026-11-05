@@ -25,6 +25,8 @@ const INSTA = ['1781210367164-EJ343FQI36DEP803BC46', '1781194839987-K70VSI7YN7CW
   '1781023503315-HES6P68KGWMW98Y1ZV8Y', '1780953717954-WCK2ROSGGDCG6REOT7J5', '1780938565800-21FYQVR745ITHD6D9Z6F']
   .map((id, i) => img(CDN + id + '/image-asset.jpeg', `insta-${i + 1}.jpg`, 750));
 
+const FOCUS = { headshot: '50% 10%', coaching: '50% 62%', howard: '50% 25%', 'josee-anne': '50% 40%', richard: '50% 22%', pam: '50% 18%', fady: '50% 24%', gino: '50% 12%' };
+const fp = p => { const k = p.split('/').pop().replace(/.jpg$/, ''); return FOCUS[k] ? ` style="object-position:${FOCUS[k]}"` : ''; };
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 // ---------- icons (one stroke family, 24 grid, 1.75 stroke) ----------
@@ -287,7 +289,7 @@ const home = page({
 
 <section class="sec about">
   <div class="wrap about-grid">
-    <figure class="about-photo"><img src="${HEADSHOT}" alt="Coach Michael Bower" loading="lazy"></figure>
+    <figure class="about-photo"><img src="${HEADSHOT}" alt="Coach Michael Bower" loading="lazy"${fp(HEADSHOT)}></figure>
     <div class="about-copy">
       <h2>Hey! I’m Michael</h2>
       <p class="big">I’m a trainer who specialises in coaching adults who’ve found themselves sidelined from the activities they love because of pain.</p>
@@ -308,7 +310,7 @@ const home = page({
     </div>
     <div class="offers">
       <article class="offer offer-main">
-        <img src="${COACHING}" alt="Michael coaching a client in the gym" loading="lazy">
+        <img src="${COACHING}" alt="Michael coaching a client in the gym" loading="lazy"${fp(COACHING)}>
         <div class="offer-body">
           <h3>In-person coaching <span>Montreal</span></h3>
           <p>Hands-on coaching in the gym with me. For you if:</p>
@@ -346,7 +348,7 @@ const home = page({
     </div>
     <div class="story-strip">
       ${STORIES.slice(0, 4).map(s => `<a class="story-tile" href="client-stories/#${s.slug}">
-        <img src="${s.photo}" alt="${esc(s.name)}" loading="lazy">
+        <img src="${s.photo}" alt="${esc(s.name)}" loading="lazy"${fp(s.photo)}>
         <div><strong>${esc(s.name)}</strong><span>${esc(s.outcome)}</span></div>
       </a>`).join('\n      ')}
     </div>
@@ -383,7 +385,7 @@ const home = page({
       <a class="more-link" href="${IG}" ${ext}>${I.insta}@coachbower_</a>
     </div>
     <div class="insta">
-      ${INSTA.map(p => `<a href="${IG}" ${ext} aria-label="Instagram post on @coachbower_"><img src="${p}" alt="" loading="lazy"></a>`).join('\n      ')}
+      ${INSTA.map(p => `<a href="${IG}" ${ext} aria-label="Instagram post on @coachbower_"><img src="${p}" alt="" loading="lazy"${fp(p)}></a>`).join('\n      ')}
     </div>
   </div>
 </section>
@@ -406,7 +408,7 @@ const stories = page({
 ${STORIES.map((s, i) => `
 <article class="sec story${i % 2 ? ' tint' : ''}" id="${s.slug}">
   <div class="wrap story-grid${i % 2 ? ' flip' : ''}">
-    <figure class="story-photo"><img src="../${s.photo}" alt="${esc(s.name)}" loading="lazy"></figure>
+    <figure class="story-photo"><img src="../${s.photo}" alt="${esc(s.name)}" loading="lazy"${fp(s.photo)}></figure>
     <div class="story-copy">
       <h2>${esc(s.name)}</h2>
       <p class="story-outcome">${esc(s.outcome)}</p>
