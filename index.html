@@ -26,7 +26,7 @@
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-<link rel="stylesheet" href="tokens.css?v=6.44.1">
+<link rel="stylesheet" href="tokens.css?v=6.44.2">
 <style>
 
   * { box-sizing: border-box; }
@@ -1038,11 +1038,11 @@
   /* Room for the sticky header when an opened student is scrolled into view. */
   .card { scroll-margin-top: 92px; }
 </style>
-<link rel="stylesheet" href="ux.css?v=6.44.1">
+<link rel="stylesheet" href="ux.css?v=6.44.2">
 </head>
 <body>
 <div id="root"></div>
-<script src="weekly-billing.js?v=6.44.1"></script>
+<script src="weekly-billing.js?v=6.44.2"></script>
 <script src="hourly-billing.js"></script>
 <script type="text/babel">
 const { useState, useEffect } = React;
@@ -7705,20 +7705,27 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           {upcomingNext6.length > 0 && (
             <>
               <div className="section-label">Upcoming</div>
-              {(showAllUpcoming ? upcomingNext6 : upcomingNext6.slice(0, 5)).map(l => (
+              {(showAllUpcoming ? upcomingNext6 : upcomingNext6.slice(0, 5)).map(l => {
+                // A lesson inside the weekly plan is billed by the week, so it is
+                // neither paid nor unpaid on its own; saying "Prepaid" there read
+                // as money already received when that week might still be owed.
+                const inWeekly = weeklyActive && TTWeekly.covers(l);
+                const paidAhead = !inWeekly && lessonPayState(l).settled;
+                return (
                 <div className="lesson-row" key={l.id} onClick={() => setDetailLesson(l)}>
                   <span className="lesson-date">
                     {new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                     {l.start_time && <span style={{color:'var(--muted)'}}> · {l.start_time}</span>}
                   </span>
                   <span style={{display:'flex',alignItems:'center'}}>
-                    <span className="lesson-status scheduled" style={lessonPayState(l).settled ? {color:'var(--accent)'} : {}}>
-                      {lessonPayState(l).settled ? 'Prepaid' : 'Upcoming'}
+                    <span className="lesson-status scheduled" style={paidAhead ? {color:'var(--accent)'} : {}}>
+                      {inWeekly ? 'Weekly plan' : paidAhead ? (l.is_complimentary ? 'Free' : 'Paid already') : 'Upcoming'}
                     </span>
                     <span className="chev">›</span>
                   </span>
                 </div>
-              ))}
+                );
+              })}
               {upcomingNext6.length > 5 && (
                 <button onClick={() => setShowAllUpcoming(!showAllUpcoming)} style={{
                   display:'block', width:'100%', textAlign:'center', padding:'8px 0', marginTop:2,
@@ -9023,7 +9030,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.44.1</div>}
+        {!loading && <div className="version-tag">v6.44.2</div>}
       </div>
 
       {showAddModal && (
