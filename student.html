@@ -348,7 +348,7 @@
     return `<div class="lesson-note"><div class="lesson-note-label">Lesson notes</div>${esc(l.notes)}</div>`;
   }
   function renderList(lessons, prefix, scheduled) {
-    if (!lessons.length) return '<div class="empty">Nothing here.</div>';
+    if (!lessons.length) return `<div class="empty">${scheduled ? 'No lessons booked at the moment.' : 'No lessons yet.'}</div>`;
     return '<div class="card">' + lessons.map((l, i) => {
       const key = prefix + i;
       // Nothing to expand on a pupil's row: the detail is only ever which
@@ -771,15 +771,18 @@
   // Built here rather than server-side so the demo never touches the database.
   function demoPortalData(tok) {
     const spec = {
-      'demo-amira':  { name: 'Amira Khan',   weekday: 2, time: '16:00', owed: 0 },
-      'demo-joe':    { name: 'Joe Fletcher', weekday: 3, time: '17:30', owed: 3 },
-      'demo-priya':  { name: 'Priya Shah',   weekday: 4, time: '18:00', owed: 0 },
-      'demo-tom':    { name: 'Tom Bennett',  weekday: 1, time: '17:00', owed: 2 },
-      'demo-layla':  { name: 'Layla Ahmed',  weekday: 5, time: '16:30', owed: 0 },
-      'demo-ben':    { name: 'Ben Carter',   weekday: 6, time: '10:00', owed: 1 },
-      'demo-sofia':  { name: 'Sofia Rossi',  weekday: 2, time: '18:15', owed: 0 },
+      'demo-amira':  { name: 'Amira Khan',   weekday: 2, time: '16:00', owed: 0, rate: 60 },
+      'demo-joe':    { name: 'Joe Fletcher', weekday: 3, time: '17:30', owed: 3, rate: 60 },
+      'demo-priya':  { name: 'Priya Shah',   weekday: 4, time: '18:00', owed: 0, rate: 70 },
+      'demo-tom':    { name: 'Tom Bennett',  weekday: 1, time: '17:00', owed: 2, rate: 55 },
+      'demo-layla':  { name: 'Layla Ahmed',  weekday: 5, time: '16:30', owed: 0, rate: 60 },
+      'demo-ben':    { name: 'Ben Carter',   weekday: 6, time: '10:00', owed: 1, rate: 70 },
+      'demo-sofia':  { name: 'Sofia Rossi',  weekday: 2, time: '18:15', owed: 0, rate: 50 },
     };
-    const s = spec[tok] || spec['demo-amira'];
+    // The pupil's demo link is demo-pupil-<name>. It used to match nothing here,
+    // so every pupil link showed Amira, with the payment pills a pupil never sees.
+    const pupil = tok.startsWith('demo-pupil-');
+    const s = spec[pupil ? tok.replace('demo-pupil-', 'demo-') : tok] || spec['demo-amira'];
     const iso = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     const todayStr = iso(new Date());
     const offset = (s.weekday - new Date().getDay() + 7) % 7;
@@ -794,10 +797,22 @@
     const upcoming = all.filter(l => l.date >= todayStr);
     const unpaidFrom = past.length - s.owed;
 
+    // Each lesson carries its price and what was paid, as the real page's data
+    // does. Without them every demo lesson opened to "Nothing to pay on this
+    // one", paid or not, and the page had no balance at the top at all.
+    const rate = s.rate;
     const recent = past.map((l, i) => i < unpaidFrom
-      ? { ...l, pay_status: 'paid', paid_dates: [{ date: l.date }] }
-      : { ...l, pay_status: 'unpaid', paid_dates: [] }
+      ? { ...l, status: 'completed', rate, paid: rate, pay_status: 'paid', paid_dates: [{ date: l.date, amount: rate }] }
+      : { ...l, status: 'completed', rate, paid: 0, pay_status: 'unpaid', paid_dates: [] }
     ).reverse();
+
+    if (pupil) {
+      return {
+        ok: true, view: 'student', name: s.name, progress: null, grade: null,
+        upcoming: upcoming.map(l => ({ ...l, status: 'scheduled' })),
+        recent: recent.slice(0, 8).map(l => ({ date: l.date, time: l.time, status: l.status })),
+      };
+    }
 
     return {
       ok: true,
@@ -805,8 +820,11 @@
       tutor: { name: 'Sam', phone: '447700900100', email: 'sam@example.com' },
       spreadsheet_url: null,
       progress: null,
-      upcoming: upcoming.map(l => ({ ...l, pay_status: 'unpaid', paid_dates: [] })),
-      recent,
+      account: {
+        balance: s.owed * rate, owed: s.owed * rate, credit: 0, credit_covers: 0, unpaid_lessons: s.owed,
+      },
+      upcoming: upcoming.map(l => ({ ...l, status: 'scheduled', rate, paid: 0, pay_status: 'unpaid', paid_dates: [] })),
+      recent: recent.slice(0, 8),
     };
   }
 
@@ -815,21 +833,35 @@
     return;
   }
 
+  // A link that is wrong and a server that is having a bad minute are different
+  // problems. Both used to say "ask your tutor for a fresh one", which sent
+  // parents off to ask for a link that was already perfectly good.
+  const tryAgain = () => {
+    app.innerHTML = '<div class="state">Couldn\'t load your lessons right now.<br><button type="button" class="showmore" id="retry" style="margin-top:14px">Try again</button></div>';
+    document.getElementById('retry').addEventListener('click', () => window.location.reload());
+  };
+
   let data;
   if (token.startsWith('demo-')) {
     data = demoPortalData(token);
   } else {
+    let status = 0;
     try {
       const res = await fetch(`${FN_BASE}/student-portal?t=${encodeURIComponent(token)}`);
+      status = res.status;
       data = await res.json();
     } catch (e) {
-      app.innerHTML = '<div class="state">Couldn\'t load your lessons right now - try again shortly.</div>';
+      return tryAgain();
+    }
+    if (!data || !data.ok) {
+      if (status !== 400 && status !== 404) return tryAgain();
+      app.innerHTML = '<div class="state">This link doesn\'t look right. Ask your tutor to send it again.</div>';
       return;
     }
   }
 
-  if (!data.ok) {
-    app.innerHTML = '<div class="state">This link doesn\'t look right - ask your tutor for a fresh one.</div>';
+  if (!data.ok || !data.name) {
+    app.innerHTML = '<div class="state">This link doesn\'t look right. Ask your tutor to send it again.</div>';
     return;
   }
 
@@ -846,10 +878,13 @@
   const firstName = data.name.trim().split(/\s+/)[0];
   document.title = `${firstName}'s lessons`;
   const waMessage = `Hi ${tutorName}, I'm messaging about ${firstName}'s lessons.`;
-  const waLink = tutor.phone
-    ? `https://wa.me/${tutor.phone}?text=${encodeURIComponent(waMessage)}` : null;
+  // Built from what the tutor typed into their settings, so both are cleaned
+  // before they go anywhere near an href.
+  const waDigits = String(tutor.phone || '').replace(/\D/g, '');
+  const waLink = waDigits
+    ? `https://wa.me/${waDigits}?text=${encodeURIComponent(waMessage)}` : null;
   const mailLink = tutor.email
-    ? `mailto:${tutor.email}?subject=${encodeURIComponent(firstName + "'s lessons")}` : null;
+    ? esc(`mailto:${tutor.email}?subject=${encodeURIComponent(firstName + "'s lessons")}`) : null;
 
   // cal.com's own inline embed, driven by whatever link the tutor saved, so the
   // calendar appears on the page rather than sending a parent off to another

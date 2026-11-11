@@ -1,3 +1,9 @@
 worker.js
 wrangler.jsonc
 .assetsignore
+.gitignore
+supabase/
+*.sql
+*.md
+*.gs
+*.cjs

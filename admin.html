@@ -437,7 +437,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.44.1';
+const VERSION = 'v6.46.1';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -802,12 +802,18 @@ function markEmpty(box) {
 async function call(action, extra = {}) {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return { ok: false, problem: 'signed_out' };
-  const res = await fetch(FN_BASE + '/admin-portal', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
-    body: JSON.stringify({ action, ...extra }),
-  });
-  return res.json().catch(() => ({ ok: false, problem: 'bad_response' }));
+  // A dropped connection used to throw from here with nothing to catch it: the
+  // page sat on "Loading" for ever, and a button mid-action stayed greyed out.
+  try {
+    const res = await fetch(FN_BASE + '/admin-portal', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token },
+      body: JSON.stringify({ action, ...extra }),
+    });
+    return await res.json().catch(() => ({ ok: false, problem: 'bad_response' }));
+  } catch {
+    return { ok: false, problem: 'no connection' };
+  }
 }
 
 // ---- Sign in ------------------------------------------------------------
@@ -1224,7 +1230,8 @@ function queueHTML(list) {
 // number in their settings, so someone who has since signed up shows as that
 // tutor. The opener asks about their experience, because that is what they
 // were told they might be contacted about.
-const LEAD_HELLO = "Hi, it's Daniel from TutorTally. I saw you tried the demo. How did you find it? Happy to help if anything didn't make sense.";
+// Signed by whoever is sending it. It used to say Daniel whoever was signed in.
+const leadHello = () => `Hi, it's ${myFirst() || 'the team'} from TutorTally. I saw you tried the demo. How did you find it? Happy to help if anything didn't make sense.`;
 
 function leadsHTML() {
   const leads = data.leads || [];
@@ -1247,7 +1254,7 @@ function leadsHTML() {
         <span class="lead-who">${who}</span>
         <span class="lead-seen">${seen}</span>
         <span class="lead-acts">
-          ${l.owner_id ? '' : `<a class="btn" href="https://wa.me/${esc(l.phone)}?text=${encodeURIComponent(LEAD_HELLO)}" target="_blank" rel="noopener">WhatsApp</a>`}
+          ${l.owner_id ? '' : `<a class="btn" href="https://wa.me/${esc(l.phone)}?text=${encodeURIComponent(leadHello())}" target="_blank" rel="noopener">WhatsApp</a>`}
           <button class="btn danger" data-act="forget-lead">Forget</button>
         </span>
       </div>`;
@@ -1436,7 +1443,40 @@ function tabsHTML() {
   }).join('')}</div>`;
 }
 
-function render() {
+// Anything half typed survives a redraw. Granting a month on one card, moving
+// another to a different group, or typing in the search box all redraw the
+// list, and each used to wipe a note that was still being written.
+function withDrafts(redraw) {
+  const drafts = [];
+  app.querySelectorAll('.acct[data-owner]').forEach(card => {
+    const box = card.querySelector('[data-note-box]');
+    const issue = card.querySelector('[data-wa-issue]');
+    drafts.push({
+      id: card.dataset.owner,
+      note: box && box.dataset.empty === 'false' ? box.innerHTML : null,
+      issue: issue ? issue.value : null,
+    });
+  });
+  redraw();
+  drafts.forEach(d => {
+    const card = app.querySelector(`.acct[data-owner="${d.id}"]`);
+    if (!card) return;
+    const box = card.querySelector('[data-note-box]');
+    if (box && d.note != null) { box.innerHTML = d.note; markEmpty(box); }
+    const issue = card.querySelector('[data-wa-issue]');
+    if (issue && d.issue != null && issue.value !== d.issue) {
+      issue.value = d.issue;
+      const a = data.accounts.find(x => x.owner_id === d.id);
+      const link = card.querySelector('[data-wa-help]');
+      if (a && link) link.href = waLink(a.phone, helpText(a, d.issue));
+    }
+  });
+}
+
+function render() { withDrafts(drawPage); }
+function renderList() { withDrafts(drawList); }
+
+function drawPage() {
   hideTip();
   const testers = data.accounts.filter(a => a.segment === 'tester');
   app.innerHTML = `
@@ -1472,7 +1512,7 @@ function render() {
   playIntroOnce();
 }
 
-function renderList() {
+function drawList() {
   hideTip();
   document.getElementById('list').innerHTML = listHTML();
 }
@@ -1697,6 +1737,7 @@ async function handleAct(btn) {
   const act = btn.dataset.act;
 
   if (act === 'refresh') { btn.disabled = true; return load(true); }
+  if (act === 'retry') return load();
   if (act === 'signout') {
     await sb.auth.signOut();
     return renderGate(null);
@@ -1741,6 +1782,8 @@ Every record of this number is deleted. Do this if they ask not to be contacted.
     btn.disabled = true;
     const r = await call('note', { owner_id: ownerId, body });
     if (!r.ok) { alert('Could not save that note: ' + (r.problem || 'unknown')); btn.disabled = false; return; }
+    // Saved, so it is no longer a draft to carry across the redraw.
+    box.innerHTML = ''; box.dataset.empty = 'true';
     return load(true);
   }
 }
@@ -1769,7 +1812,17 @@ async function load(quiet = false) {
     return;
   }
   if (!r.ok) {
-    app.innerHTML = `<div class="empty">Could not load: ${esc(r.problem || 'unknown')}</div>`;
+    // After an action the page already on screen is still true enough to keep.
+    // Replacing it with an error threw away everything, including the scroll.
+    if (quiet && data.loadedAt) {
+      render();
+      alert('Could not refresh just now (' + (r.problem || 'unknown') + '). What you see was loaded ' + fmtDateTime(data.loadedAt) + '.');
+      return;
+    }
+    app.innerHTML = `<div class="gate"><h1>Could not load</h1>
+      <div class="sub" style="margin-bottom:16px">${esc(r.problem || 'unknown')}</div>
+      <div class="btn-row"><button class="btn primary" data-act="retry">Try again</button>
+      <button class="btn" data-act="signout">Sign out</button></div></div>`;
     return;
   }
   const y = window.scrollY;
