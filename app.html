@@ -157,7 +157,7 @@
   /* The chase, start to finish, in a WhatsApp chat drawn small. Without
      script (or with reduced motion) it simply shows how the story ends: sent,
      read, answered. With it, the same story plays once when it comes into view. */
-  .wa { width: 100%; height: 330px; border-radius: 16px; background: #efeae2; color: #111b21; display: flex; flex-direction: column; overflow: hidden; }
+  .wa { position: relative; width: 100%; height: 330px; border-radius: 16px; background: #efeae2; color: #111b21; display: flex; flex-direction: column; overflow: hidden; }
   .wa-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f0f2f5; border-bottom: 1px solid #d9dcdf; }
   .wa-av { width: 30px; height: 30px; border-radius: 50%; background: #c8d3da; color: #44545d; display: grid; place-items: center; font-size: .8rem; font-weight: 700; flex: none; }
   .wa-head b { display: block; font-size: .84rem; font-weight: 600; line-height: 1.2; }
@@ -179,6 +179,30 @@
 
   /* While it plays. Each stage adds a class; nothing here runs unless the
      script armed it, so a failed script can never leave the chat empty. */
+  /* It starts where the tutor starts: Joe's card in TutorTally. The tap on
+     Request payment is what opens WhatsApp, so that is what is shown. */
+  .tt { display: none; position: absolute; inset: 0; z-index: 2; flex-direction: column; gap: 12px; padding: 14px; background: var(--bg); color: var(--ink); }
+  .wa.armed .tt { display: flex; }
+  /* The chat's pale background would otherwise show as a hairline round the card's corners. */
+  .wa.armed:not(.launched) { background: var(--bg); box-shadow: inset 0 0 0 1px var(--line); }
+  .tt-top { display: flex; align-items: center; gap: 9px; font-size: .86rem; font-weight: 700; letter-spacing: -0.02em; }
+  .tt-top svg { width: 24px; height: 19px; flex: none; }
+  .tt-card { padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 14px; }
+  .tt-card .name { font-weight: 650; font-size: 1rem; letter-spacing: -0.015em; }
+  .tt-card .row { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 7px; }
+  .tt-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+  .tt-btn { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 42px; padding: 8px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--card-2); font-size: .8rem; font-weight: 600; white-space: nowrap; }
+  .tt-btn svg { width: 15px; height: 15px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+  .tt-btn.go { position: relative; grid-column: 1 / -1; background: var(--accent-fill); color: var(--on-accent); border-color: transparent; font-weight: 700; transition: transform .14s var(--ease); }
+  .tt-btn.go::after { content: ''; position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 30%, transparent); opacity: 0; transform: scale(.3); pointer-events: none; }
+  .wa.armed.tap .tt-btn.go { transform: scale(.96); }
+  .wa.armed.tap .tt-btn.go::after { animation: tapRing .5s cubic-bezier(.16,1,.3,1) both; }
+  .wa.armed.launched .tt { animation: ttOut .42s cubic-bezier(.5,0,.75,0) both; }
+  .wa.armed.launched .wa-head, .wa.armed.launched .wa-chat, .wa.armed.launched .wa-bar { animation: waOpen .5s cubic-bezier(.16,1,.3,1) .12s both; }
+  @keyframes tapRing { 0% { opacity: .9; transform: scale(.3); } 100% { opacity: 0; transform: scale(1.5); } }
+  @keyframes ttOut { to { opacity: 0; transform: scale(1.05); visibility: hidden; } }
+  @keyframes waOpen { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+
   .wa.armed .bub.out, .wa.armed .bub.in { display: none; }
   .wa.armed.drafting .wa-input .hint { display: none; }
   .wa.armed.drafting .wa-input .draft { display: block; animation: draftIn .5s var(--ease) both; }
@@ -396,6 +420,19 @@
       </div>
       <div class="step rv">
         <div class="art"><div class="wa" id="wa" role="img" aria-label="A WhatsApp chat with Karen, Joe's mum. The tutor sends: Hi Karen! Just a note that we have 3 outstanding sessions totalling £180. Please could you settle this when you get the chance? Thanks! It shows as read, and Karen replies: So sorry, slipped my mind. Just sent it now.">
+          <div class="tt" aria-hidden="true">
+            <div class="tt-top"><svg viewBox="0 0 900 700"><path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)" stroke-width="94" stroke-linecap="round"/><rect x="292" y="48" width="100" height="604" rx="14" fill="currentColor"/><rect x="512" y="48" width="100" height="604" rx="14" fill="currentColor"/></svg>Sam's TutorTally</div>
+            <div class="tt-card">
+              <div class="name">Joe Fletcher</div>
+              <div class="row"><span class="pill warn">Overdue £180</span><span class="meta">3 lessons unpaid</span></div>
+              <div class="tt-acts">
+                <span class="tt-btn go"><svg viewBox="0 0 24 24"><path d="M3 6h18v12H3z M3 10h18 M7 15h3"/></svg>Request payment</span>
+                <span class="tt-btn"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z"/></svg>WhatsApp</span>
+                <span class="tt-btn"><svg viewBox="0 0 24 24"><path d="M12 5v14 M5 12h14"/></svg>Log payment</span>
+              </div>
+            </div>
+            <div class="tt-card"><div class="name">Tom Bennett</div><div class="row"><span class="pill neutral">Owes £90</span><span class="meta">2 lessons unpaid</span></div></div>
+          </div>
           <div class="wa-head"><span class="wa-av">K</span><div><b>Karen (Joe's mum)</b><span id="waStatus">online</span></div></div>
           <div class="wa-chat">
             <div class="bub out">Hi Karen! Just a note that we have 3 outstanding sessions totalling £180. Please could you settle this when you get the chance? Thanks!
@@ -409,7 +446,7 @@
           </div>
         </div></div>
         <div class="txt"><span class="n">3</span><h3>Chase payments in seconds.</h3>
-          <p class="body">One tap opens WhatsApp with the message already written: the right parent, the right amount, the number of lessons. You just press send.</p>
+          <p class="body">Tap Request payment and WhatsApp opens with the message already written: the right parent, the right amount, the number of lessons. You just press send.</p>
           <button type="button" class="replay" id="waReplay">Play it again</button></div>
       </div>
     </div>
@@ -639,8 +676,9 @@ if ('IntersectionObserver' in window) {
   items.forEach(el => el.classList.add('in'));
 }
 
-// The chase, played once as it comes into view: the message arrives already
-// written, is sent, delivered, read, and answered, and Joe's row in the panel
+// The chase, played once as it comes into view: Joe's card in TutorTally, a
+// tap on Request payment, WhatsApp opening with the message already written,
+// then sent, delivered, read, and answered, and Joe's row in the panel
 // beside it is logged as paid. The markup already shows the finished chat, so
 // with reduced motion, or with no script at all, nothing is missing.
 const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -649,7 +687,7 @@ const waStatus = document.getElementById('waStatus');
 const joePill = document.getElementById('joePill');
 const joeToast = document.getElementById('joeToast');
 const waReplay = document.getElementById('waReplay');
-const STAGES = ['drafting', 'press', 'sent', 'delivered', 'read', 'reply'];
+const STAGES = ['tap', 'launched', 'drafting', 'press', 'sent', 'delivered', 'read', 'reply'];
 let waTimers = [];
 
 function joePaid(paid) {
@@ -667,13 +705,16 @@ function playChase() {
   waReplay.classList.remove('show');
   joePaid(false);
   const at = (ms, fn) => waTimers.push(setTimeout(fn, ms));
-  at(500,  () => wa.classList.add('drafting'));
-  at(2100, () => wa.classList.add('press'));
-  at(2260, () => { wa.classList.remove('press'); wa.classList.add('sent'); });
-  at(3000, () => wa.classList.add('delivered'));
-  at(4000, () => { wa.classList.add('read'); waStatus.textContent = 'typing…'; });
-  at(5700, () => { wa.classList.add('reply'); waStatus.textContent = 'online'; });
-  at(7000, () => { joePaid(true); waReplay.classList.add('show'); });
+  // Joe's card first, long enough to read. Then the tap, and WhatsApp opens
+  // with the message already in the box, which is exactly what the app does.
+  at(1300, () => wa.classList.add('tap'));
+  at(1750, () => { wa.classList.remove('tap'); wa.classList.add('launched', 'drafting'); });
+  at(3700, () => wa.classList.add('press'));
+  at(3860, () => { wa.classList.remove('press'); wa.classList.add('sent'); });
+  at(4600, () => wa.classList.add('delivered'));
+  at(5600, () => { wa.classList.add('read'); waStatus.textContent = 'typing…'; });
+  at(7300, () => { wa.classList.add('reply'); waStatus.textContent = 'online'; });
+  at(8600, () => { joePaid(true); waReplay.classList.add('show'); });
 }
 
 if (!calm && 'IntersectionObserver' in window) {
