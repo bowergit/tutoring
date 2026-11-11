@@ -1042,7 +1042,7 @@
 </head>
 <body>
 <div id="root"></div>
-<script src="weekly-billing.js?v=6.44.2"></script>
+<script src="weekly-billing.js?v=6.45.0"></script>
 <script src="hourly-billing.js"></script>
 <script type="text/babel">
 const { useState, useEffect } = React;
@@ -1202,7 +1202,7 @@ function makeDemoData() {
       school_year: s.year,
       school_year_as_of_date: todayStr,
       exam_board: s.board,
-      exam_tier: s.tier,
+      exam_tier: s.tier ? s.tier.toLowerCase() : null,
       has_extra_time: false,
       pays_in_cash: s.cash,
       is_zoom: s.zoom,
@@ -1319,6 +1319,7 @@ function makeDemoClient() {
         case 'gt':  return v != null && v >  f.val;
         case 'gte': return v != null && v >= f.val;
         case 'in':  return Array.isArray(f.val) && f.val.includes(v);
+        case 'notnull': return v !== null && v !== undefined;
         default:    return true;
       }
     });
@@ -1458,6 +1459,10 @@ function makeDemoClient() {
       gt(c, v)  { st.filters.push({ op: 'gt',  col: c, val: v }); return api; },
       gte(c, v) { st.filters.push({ op: 'gte', col: c, val: v }); return api; },
       in(c, v)  { st.filters.push({ op: 'in',  col: c, val: v }); return api; },
+      // Only "not ... is null" is ever asked for (the deleted payments list).
+      // Without this the demo threw and that screen sat on "Loading" for ever.
+      not(c, op, v) { if (op === 'is' && v === null) st.filters.push({ op: 'notnull', col: c }); return api; },
+      range() { return api; },
       order(col, opts) { st.orders.push({ col, asc: !(opts && opts.ascending === false) }); return api; },
       limit() { return api; },
       single() { st.single = true; return api; },
@@ -1655,7 +1660,42 @@ const ADDONS = [
   },
 ];
 
-function todayISO() { return new Date().toISOString().slice(0, 10); }
+// The date in the UK, not in UTC: between midnight and 1am in summer the two
+// disagree, and "today" was yesterday for every rate, balance and overdue check.
+function todayISO() { return TTWeekly.today(); }
+function londonHHMM() { return new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date()); }
+// Reads a whole table, however long, a page at a time. Ordered by id so the
+// pages cannot overlap or skip a row between requests.
+const PAGE_ROWS = 1000;
+async function readEveryRow(query) {
+  const all = [];
+  for (let from = 0; from < 50 * PAGE_ROWS; from += PAGE_ROWS) {
+    const { data, error } = await query().order('id').range(from, from + PAGE_ROWS - 1);
+    if (error) return { data: null, error };
+    all.push(...(data || []));
+    if (!data || data.length < PAGE_ROWS) break;
+  }
+  return { data: all, error: null };
+}
+
+// A save that failed has to say so. Several of them used to close their sheet
+// as if they had worked, which is how a payment ends up "logged" and missing.
+function sayError(text) {
+  window.dispatchEvent(new CustomEvent('tt-error', { detail: String(text || 'That did not save. Check your connection and try again.') }));
+}
+// Runs the writes in order and stops at the first one refused. A refusal for
+// the student limit has already put its own prompt up, so it stays quiet.
+async function saved(...writes) {
+  for (const w of writes) {
+    const { error } = await w();
+    if (error) {
+      if (!/TutorTally (Lite|Pro)/.test(error.message || '')) sayError(`That did not save: ${error.message || 'no connection'}. Nothing was changed.`);
+      return false;
+    }
+  }
+  return true;
+}
+
 function tutorCopyName(name) {
   const clean = String(name || '').trim();
   return clean ? `${clean}'s TutorTally` : 'TutorTally';
@@ -2265,7 +2305,7 @@ function getRateOnDate(studentId, rateHistory, dateStr, fallback = 90) {
 }
 
 function getCurrentRate(studentId, rateHistory, fallback = 90) {
-  return getRateOnDate(studentId, rateHistory, new Date().toISOString().slice(0, 10), fallback);
+  return getRateOnDate(studentId, rateHistory, todayISO(), fallback);
 }
 
 // What a lesson is worth. An explicit rate_charged is a manual override and
@@ -2285,7 +2325,7 @@ function rateForLesson(lesson, rateHistory, fallback = 90) {
 // payment still covers exactly the number of lessons it really covered.
 function moneyScaleFor(studentId, rateHistory) {
   if (PRIVACY_MONEY_MODE !== 'dummy') return 1;
-  const real = getRateOnDateReal(studentId, rateHistory, new Date().toISOString().slice(0, 10));
+  const real = getRateOnDateReal(studentId, rateHistory, todayISO());
   if (!real) return 1;
   return dummyRateFor(studentId) / real;
 }
@@ -2509,7 +2549,7 @@ function WeekStrip({ students, lessons, onJump }) {
   const today = TTWeekly.today();
   const end = new Date(Date.parse(today + 'T12:00:00Z') + 6 * 86400000).toISOString().slice(0, 10);
   const byId = new Map(students.filter(s => s.active).map(s => [s.id, s]));
-  const nowHHMM = new Date().toTimeString().slice(0, 5);
+  const nowHHMM = londonHHMM();
   const upcoming = lessons
     .filter(l => byId.has(l.student_id) && l.status !== 'cancelled' && l.lesson_date >= today && l.lesson_date <= end)
     .filter(l => l.lesson_date > today || l.status === 'scheduled' || l.status === 'completed')
@@ -2559,6 +2599,9 @@ function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
   };
   const [fullTarget, setFullTarget] = useState(readSavedTarget);
   const [targetSaving, setTargetSaving] = useState('idle');
+  // What is being typed, kept apart from the saved number. Clamping on every
+  // keystroke turned an emptied box into "1", so typing 20 gave 120.
+  const [targetText, setTargetText] = useState(null);
 
   // What the lessons are worth, not what is left after tax. The old figure
   // quietly took 40% off anyone not paying cash, which made this account's
@@ -2595,7 +2638,7 @@ function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
   }, []);
 
   async function saveFullTarget(raw) {
-    const next = Math.max(1, Math.min(999, parseInt(raw, 10) || 15));
+    const next = Math.max(1, Math.min(999, parseInt(raw, 10) || fullTarget));
     setFullTarget(next);
     localStorage.setItem('tutortally_full_target', String(next));
     if (DEMO_MODE) return;
@@ -2650,9 +2693,9 @@ function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
               type="number"
               min="1"
               max="999"
-              value={fullTarget}
-              onChange={e => setFullTarget(Math.max(1, Math.min(999, parseInt(e.target.value, 10) || 1)))}
-              onBlur={e => saveFullTarget(e.target.value)}
+              value={targetText ?? fullTarget}
+              onChange={e => setTargetText(e.target.value)}
+              onBlur={e => { setTargetText(null); if (parseInt(e.target.value, 10) !== fullTarget) saveFullTarget(e.target.value); }}
               onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
               style={{width:54,padding:'3px 6px',border:'1px solid var(--line)',borderRadius:6,background:'var(--card)',color:'var(--ink)',font:'inherit',fontSize:'0.82rem'}}
             />
@@ -2769,8 +2812,13 @@ function moneyText(n) {
 }
 
 function normaliseUKPhone(raw) {
-  const digits = (raw || '').replace(/\D/g, '');
+  const text = String(raw || '').trim();
+  const digits = text.replace(/\D/g, '');
   if (!digits) return '';
+  // A number typed with its country code is already complete. Putting 44 in
+  // front of "+1 415..." or "00 33..." sent the message to nobody.
+  if (text.startsWith('+')) return digits;
+  if (digits.startsWith('00')) return digits.slice(2);
   if (digits.startsWith('44')) return digits;
   if (digits.startsWith('0')) return '44' + digits.slice(1);
   return '44' + digits;
@@ -2793,12 +2841,12 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
   const setEC = setExtraCash || (() => {});
 
   const currGrossW = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
-  const currNetW   = active.reduce((sum, s) => {
-    const r = getCurrentRate(s.id, rateHistory);
-    return sum + r;
-  }, 0);
+  // Take-home sets 40% aside for tax on anything not paid in cash, the same
+  // assumption "what it buys you" below has always used.
+  const KEEP = 0.6;
+  const currNetW   = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory) * (s.pays_in_cash ? 1 : KEEP), 0);
   const addGrossW = e * er;
-  const addNetW   = e * er;
+  const addNetW   = e * er * (ec ? 1 : KEEP);
 
   const fmt = n => n >= 1000000 ? `£${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
   const M = useMoney();
@@ -2806,9 +2854,9 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
   const rows = [
     { label: 'Students',  curr: active.length,    add: e,      isCount: true },
     { label: 'Gross/wk', curr: currGrossW,        add: addGrossW  },
-    { label: 'Per wk',   curr: currNetW,          add: addNetW    },
+    { label: 'Kept/wk',  curr: currNetW,          add: addNetW    },
     { label: 'Gross/yr', curr: currGrossW * 40,   add: addGrossW * 40 },
-    { label: 'Per yr',   curr: currNetW * 40,     add: addNetW * 40   },
+    { label: 'Kept/yr',  curr: currNetW * 40,     add: addNetW * 40   },
   ];
 
   return (
@@ -2825,6 +2873,9 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
       </div>
       <div style={{marginBottom:14}}>
         <Toggle checked={ec} onChange={setEC} label="Pay in cash" />
+        <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:6, lineHeight:1.45}}>
+          "Kept" sets 40% aside for tax on anything not paid in cash. Years are 40 teaching weeks.
+        </div>
       </div>
       <div className="calc-grid">
         <div className="calc-grid-head"></div>
@@ -2846,7 +2897,7 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
 
 // ---------- Perspective Calculator ----------
 function PerspectiveCalculator({ addNetW }) {
-  const addNetY = addNetW * 52;
+  const addNetY = addNetW * 40;
 
   const items = [
     { emoji: '🍫', name: 'Kitkats', price: 0.25 },
@@ -4116,6 +4167,368 @@ function SetupChecklist({ session, students, onOpenTool, onAddStudent }) {
   );
 }
 
+// ---------- Insights ----------
+// Answers a tutor would otherwise work out by hand from the cards: what has
+// come in this tax year, who is slow to pay, how old the money owed is, and
+// which students the income rests on. Read-only, built from what is loaded.
+function isoDaysAgo(n) {
+  return new Date(Date.parse(todayISO() + 'T12:00:00Z') - n * 86400000).toISOString().slice(0, 10);
+}
+function daysApart(from, to) {
+  return Math.round((Date.parse(to + 'T12:00:00Z') - Date.parse(from + 'T12:00:00Z')) / 86400000);
+}
+// UK tax years run 6 April to 5 April.
+function taxYear(startYear) {
+  return { start: `${startYear}-04-06`, end: `${startYear + 1}-04-05`, label: `${startYear}/${String(startYear + 1).slice(2)}` };
+}
+function taxYearOf(dateStr) {
+  const y = Number(dateStr.slice(0, 4));
+  return taxYear(dateStr >= `${y}-04-06` ? y : y - 1);
+}
+
+function InsightBar({ label, value, share, note }) {
+  return (
+    <div className="rev-row">
+      <span style={{flex:'0 0 34%', minWidth:0, fontSize:'0.8rem', color:'var(--ink)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>{label}</span>
+      <span className="rev-track"><span className="rev-fill" style={share > 0 ? {width:`${Math.max(2, Math.min(100, share * 100))}%`} : {width:0, minWidth:0}} /></span>
+      <span className="rev-val" style={{width:'auto', minWidth:64}}>
+        {value}
+        {note && <span style={{display:'block', fontSize:'0.62rem', color:'var(--muted)', fontWeight:500}}>{note}</span>}
+      </span>
+    </div>
+  );
+}
+
+function InsightStat({ value, label, warn }) {
+  return (
+    <div style={{flex:'1 1 96px', minWidth:0}}>
+      <div style={{fontSize:'1.15rem', fontWeight:750, letterSpacing:'-0.02em', color: warn ? 'var(--warn)' : 'var(--ink)'}}>{value}</div>
+      <div style={{fontSize:'0.66rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.07em', marginTop:2, lineHeight:1.35}}>{label}</div>
+    </div>
+  );
+}
+
+function InsightSection({ title, sub, children }) {
+  return (
+    <section style={{paddingTop:16, marginTop:16, borderTop:'1px solid var(--line)'}}>
+      <h3 style={{margin:'0 0 3px', fontSize:'0.95rem', fontWeight:700, color:'var(--ink)'}}>{title}</h3>
+      {sub && <div style={{fontSize:'0.78rem', color:'var(--muted)', lineHeight:1.45, marginBottom:10}}>{sub}</div>}
+      {children}
+    </section>
+  );
+}
+
+function Insights({ students, lessons, payments, allocations, rateHistory }) {
+  const M = useMoney();
+  const N = useNameDisplay();
+  const today = todayISO();
+  const yearAgo = isoDaysAgo(365);
+  const sum = list => list.reduce((t, x) => t + x, 0);
+  const byId = new Map(students.map(s => [s.id, s]));
+  const scale = {};
+  students.forEach(s => { scale[s.id] = moneyScaleFor(s.id, rateHistory); });
+  const amt = p => parseFloat(p.amount) * (scale[p.student_id] ?? 1);
+  const quiet = { fontSize:'0.84rem', color:'var(--muted)', lineHeight:1.5 };
+
+  if (!lessons.length && !payments.length) {
+    return <div style={quiet}>Nothing to read yet. Once there are lessons and payments, this page shows your tax-year total, how quickly families pay and where your income comes from.</div>;
+  }
+
+  // ----- Tax year
+  const ty = taxYearOf(today);
+  const lastTy = taxYear(Number(ty.start.slice(0, 4)) - 1);
+  const within = (p, r) => { const d = String(p.date_paid || ''); return d >= r.start && d <= r.end; };
+  const tyPayments = payments.filter(p => within(p, ty));
+  const tyTotal = sum(tyPayments.map(amt));
+  const tyCash = sum(tyPayments.filter(p => p.method === 'cash').map(amt));
+  const lastTyTotal = sum(payments.filter(p => within(p, lastTy)).map(amt));
+  const longDate = d => new Date(d + 'T12:00:00Z').toLocaleDateString('en-GB', { day:'numeric', month:'long', year:'numeric', timeZone:'UTC' });
+
+  // ----- How quickly lessons get paid for. A lesson settled by two payments
+  // counts from the later one, which is when it was actually paid off.
+  const lessonById = new Map(lessons.map(l => [l.id, l]));
+  const paymentById = new Map(payments.map(p => [p.id, p]));
+  const waitByLesson = new Map();
+  const coveredByLesson = new Map();
+  allocations.forEach(a => {
+    const l = lessonById.get(a.lesson_id), p = paymentById.get(a.payment_id);
+    if (!l || !p) return;
+    coveredByLesson.set(l.id, (coveredByLesson.get(l.id) || 0) + parseFloat(a.amount) * (scale[l.student_id] ?? 1));
+    if (l.status !== 'completed' || l.lesson_date < yearAgo) return;
+    const wait = Math.max(0, daysApart(l.lesson_date, p.date_paid));
+    waitByLesson.set(l.id, Math.max(waitByLesson.get(l.id) ?? 0, wait));
+  });
+  const waits = [...waitByLesson.values()];
+  const avgWait = waits.length ? sum(waits) / waits.length : null;
+  const withinWeek = waits.length ? waits.filter(w => w <= 7).length / waits.length : null;
+  const waitsByStudent = new Map();
+  waitByLesson.forEach((w, lessonId) => {
+    const sid = lessonById.get(lessonId).student_id;
+    if (!waitsByStudent.has(sid)) waitsByStudent.set(sid, []);
+    waitsByStudent.get(sid).push(w);
+  });
+  const slowest = [...waitsByStudent]
+    .map(([sid, list]) => ({ s: byId.get(sid), avg: sum(list) / list.length, n: list.length }))
+    // Only families who stand out. When everyone pays at about the same speed
+    // there is no "slowest", and listing them all would accuse the lot.
+    .filter(x => x.s && x.s.active && x.n >= 2 && x.avg >= 7 && x.avg > avgWait * 1.15)
+    .sort((a, b) => b.avg - a.avg)
+    .slice(0, 5);
+  const slowestPeak = Math.max(...slowest.map(x => x.avg), 1);
+  const dayWord = n => `${Math.round(n)} day${Math.round(n) === 1 ? '' : 's'}`;
+
+  // ----- What is owed, by how long it has been owed
+  const aged = [0, 0, 0];
+  students.filter(s => s.active).forEach(s => {
+    if (studentBalance(s, lessons, payments, rateHistory) <= 0.005) return;
+    const weekly = TTWeekly.plans(s.id).some(p => p.acceptance && p.status !== 'proposed');
+    const open = weekly
+      ? TTWeekly.ledger(lessons, payments, s.id, row => rateForLesson(row, rateHistory))
+          .filter(r => r.due && r.left > 0.005).map(r => ({ date: r.lesson_date, left: r.left }))
+      : lessons
+          .filter(l => l.student_id === s.id && l.status === 'completed' && !l.is_complimentary && !l.pre_settled)
+          .map(l => ({ date: l.lesson_date, left: rateForLesson(l, rateHistory) - (coveredByLesson.get(l.id) || 0) }))
+          .filter(x => x.left > 0.005);
+    open.forEach(o => {
+      const d = daysApart(o.date, today);
+      aged[d <= 7 ? 0 : d <= 30 ? 1 : 2] += o.left;
+    });
+  });
+  const agedTotal = sum(aged);
+  const agedPeak = Math.max(...aged, 1);
+
+  // ----- Where the income comes from, last 12 months
+  const earnedBy = new Map();
+  TTWeekly.financialLessons(lessons)
+    .filter(l => l.status === 'completed' && !l.is_complimentary && l.lesson_date >= yearAgo && l.lesson_date <= today)
+    .forEach(l => earnedBy.set(l.student_id, (earnedBy.get(l.student_id) || 0) + rateForLesson(l, rateHistory)));
+  const earners = [...earnedBy]
+    .map(([sid, total]) => ({ s: byId.get(sid), total }))
+    .filter(x => x.s && x.total > 0)
+    .sort((a, b) => b.total - a.total);
+  const earnedTotal = sum(earners.map(x => x.total));
+  const topShare = earners.length >= 5 ? sum(earners.slice(0, 3).map(x => x.total)) / earnedTotal : null;
+
+  // ----- The teaching week, from the last 12 weeks actually taught
+  const since = isoDaysAgo(83);
+  const taught = lessons.filter(l => l.status === 'completed' && l.lesson_date >= since && l.lesson_date <= today);
+  const firstTaught = taught.reduce((min, l) => (l.lesson_date < min ? l.lesson_date : min), today);
+  const weeks = Math.max(1, Math.min(12, Math.ceil((daysApart(firstTaught, today) + 1) / 7)));
+  const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const perDay = DAYS.map(() => 0);
+  taught.forEach(l => { perDay[(new Date(l.lesson_date + 'T12:00:00Z').getUTCDay() + 6) % 7] += 1; });
+  const dayPeak = Math.max(...perDay, 1);
+  const busiest = perDay.indexOf(Math.max(...perDay));
+  const LONG_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const free = lessons.filter(l => l.is_complimentary && l.status === 'completed' && l.lesson_date >= yearAgo && l.lesson_date <= today);
+  const freeValue = sum(free.map(l => getRateOnDate(l.student_id, rateHistory, l.lesson_date)));
+  const perWeek = taught.length / weeks;
+
+  return (
+    <div>
+      <div style={{...quiet, fontSize:'0.8rem'}}>Worked out from your lessons and payments as they stand right now.</div>
+
+      <InsightSection title={`Tax year ${ty.label}`}
+        sub={`Money received from ${longDate(ty.start)} to today, counted on the day it was paid. Ask your accountant whether your return uses money received or money earned.`}>
+        <div style={{display:'flex', gap:14, flexWrap:'wrap'}}>
+          <InsightStat value={M(tyTotal)} label="received so far" />
+          <InsightStat value={M(tyCash)} label="of that in cash" />
+          <InsightStat value={lastTyTotal > 0 ? M(lastTyTotal) : '-'} label={`all of ${lastTy.label}`} />
+        </div>
+      </InsightSection>
+
+      <InsightSection title="How quickly you get paid"
+        sub="Days between a lesson and the payment that settled it, over the last 12 months. Paid in advance counts as 0.">
+        {avgWait === null ? (
+          <div style={quiet}>Shows once some lessons have been paid for.</div>
+        ) : (
+          <>
+            <div style={{display:'flex', gap:14, flexWrap:'wrap', marginBottom: slowest.length ? 12 : 0}}>
+              <InsightStat value={dayWord(avgWait)} label="average wait" warn={avgWait > 14} />
+              <InsightStat value={`${Math.round(withinWeek * 100)}%`} label="paid within a week" />
+              <InsightStat value={waits.length} label="lessons counted" />
+            </div>
+            {slowest.length > 0 && (
+              <>
+                <div style={{fontSize:'0.72rem', color:'var(--muted)', textTransform:'uppercase', letterSpacing:'0.07em', fontWeight:700, marginBottom:4}}>Slowest to pay</div>
+                {slowest.map(x => (
+                  <InsightBar key={x.s.id} label={N(x.s.name, x.s.id)} share={x.avg / slowestPeak}
+                    value={dayWord(x.avg)} note={`${x.n} lessons`} />
+                ))}
+              </>
+            )}
+          </>
+        )}
+      </InsightSection>
+
+      <InsightSection title="Still owed, by age"
+        sub="How long each unpaid lesson has been waiting. The oldest money is the hardest to collect.">
+        {agedTotal <= 0.005 ? (
+          <div style={quiet}>Nothing is outstanding.</div>
+        ) : (
+          <>
+            <InsightBar label="Up to a week" share={aged[0] / agedPeak} value={aged[0] > 0.005 ? M(aged[0]) : '-'} />
+            <InsightBar label="8 to 30 days" share={aged[1] / agedPeak} value={aged[1] > 0.005 ? M(aged[1]) : '-'} />
+            <InsightBar label="Over 30 days" share={aged[2] / agedPeak} value={aged[2] > 0.005 ? M(aged[2]) : '-'} />
+          </>
+        )}
+      </InsightSection>
+
+      <InsightSection title="Where your income comes from"
+        sub="Lessons taught in the last 12 months, by student. Free lessons are left out.">
+        {earners.length === 0 ? (
+          <div style={quiet}>Shows once some lessons have been taught.</div>
+        ) : (
+          <>
+            {earners.slice(0, 6).map(x => (
+              <InsightBar key={x.s.id} label={N(x.s.name, x.s.id) + (x.s.active ? '' : ' (archived)')}
+                share={x.total / earners[0].total} value={M(x.total)} note={`${Math.round((x.total / earnedTotal) * 100)}%`} />
+            ))}
+            <div style={{...quiet, fontSize:'0.78rem', marginTop:8}}>
+              {M(earnedTotal)} earned from {earners.length} student{earners.length === 1 ? '' : 's'}.
+              {topShare !== null && ` Your top three bring in ${Math.round(topShare * 100)}% of it${topShare >= 0.5 ? ', so losing one of them would be felt' : ''}.`}
+            </div>
+          </>
+        )}
+      </InsightSection>
+
+      <InsightSection title="Your teaching week"
+        sub={`Lessons taught over the last ${weeks === 1 ? 'week' : `${weeks} weeks`}, by day.`}>
+        {taught.length === 0 ? (
+          <div style={quiet}>No lessons taught in the last 12 weeks.</div>
+        ) : (
+          <>
+            <div style={{display:'flex', gap:14, flexWrap:'wrap', marginBottom:12}}>
+              <InsightStat value={perWeek >= 10 ? Math.round(perWeek) : perWeek.toFixed(1).replace(/\.0$/, '')} label="lessons a week" />
+              <InsightStat value={LONG_DAYS[busiest]} label="busiest day" />
+              <InsightStat value={free.length} label="free lessons this year" />
+            </div>
+            {DAYS.map((d, i) => (
+              <InsightBar key={d} label={d} share={perDay[i] / dayPeak} value={perDay[i] || '-'} />
+            ))}
+            {free.length > 0 && freeValue > 0 && (
+              <div style={{...quiet, fontSize:'0.78rem', marginTop:8}}>
+                The {free.length} free lesson{free.length === 1 ? '' : 's'} you gave in the last 12 months would have come to {M(freeValue)}.
+              </div>
+            )}
+          </>
+        )}
+      </InsightSection>
+    </div>
+  );
+}
+
+// ---------- Export ----------
+// The marketing page and the billing screen both promise that records can be
+// exported. Until now there was nothing to export them with.
+function csvCell(v) {
+  if (typeof v === 'number') return String(v);
+  let t = v == null ? '' : String(v);
+  // A cell that starts like a formula would be run by Excel or Sheets.
+  if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+  return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+}
+function downloadCSV(filename, header, rows) {
+  // The BOM is what makes Excel read the £ and accented names correctly.
+  const text = '﻿' + [header, ...rows].map(r => r.map(csvCell).join(',')).join('\r\n');
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function ExportRecords({ students, lessons, payments, allocations, rateHistory }) {
+  const { moneyMode, nameMode } = usePrivacy();
+  const masked = moneyMode !== 'normal' || nameMode !== 'normal';
+  const today = todayISO();
+  const ty = taxYearOf(today);
+  const lastTy = taxYear(Number(ty.start.slice(0, 4)) - 1);
+  const RANGES = {
+    ty:   { label: `Tax year ${ty.label}`, start: ty.start, end: ty.end, file: `tax-year-${ty.label.replace('/', '-')}` },
+    last: { label: `Tax year ${lastTy.label}`, start: lastTy.start, end: lastTy.end, file: `tax-year-${lastTy.label.replace('/', '-')}` },
+    all:  { label: 'Everything', start: '0000-00-00', end: '9999-99-99', file: 'all' },
+  };
+  const [rangeKey, setRangeKey] = useState('ty');
+  const [done, setDone] = useState('');
+  const range = RANGES[rangeKey];
+  const inRange = d => { const x = String(d || ''); return x >= range.start && x <= range.end; };
+  const nameOf = id => students.find(s => s.id === id)?.name || 'Deleted student';
+  const round2 = n => Math.round(n * 100) / 100;
+  const METHODS = { cash: 'Cash', bank_transfer: 'Bank transfer', monzo_auto: 'Bank transfer (Monzo)', other: 'Other' };
+
+  const paidByLesson = new Map(), countByPayment = new Map();
+  allocations.forEach(a => {
+    paidByLesson.set(a.lesson_id, (paidByLesson.get(a.lesson_id) || 0) + parseFloat(a.amount));
+    countByPayment.set(a.payment_id, (countByPayment.get(a.payment_id) || 0) + 1);
+  });
+
+  // Lessons up to today only: a statement of what was taught, not the diary.
+  const lessonRows = TTWeekly.financialLessons(lessons)
+    .concat(lessons.filter(l => TTWeekly.covers(l)))
+    .filter(l => inRange(l.lesson_date) && l.lesson_date <= today && l.status !== 'scheduled')
+    .sort((a, b) => (a.lesson_date + (a.start_time || '')).localeCompare(b.lesson_date + (b.start_time || '')));
+  const chargeOf = l => (l.is_complimentary || l.status === 'cancelled' || TTWeekly.covers(l)) ? 0 : round2(rateForLesson(l, rateHistory));
+  const paymentRows = payments.filter(p => inRange(p.date_paid))
+    .sort((a, b) => String(a.date_paid).localeCompare(String(b.date_paid)));
+  const charged = lessonRows.reduce((t, l) => t + chargeOf(l), 0);
+  const received = paymentRows.reduce((t, p) => t + parseFloat(p.amount), 0);
+
+  function exportLessons() {
+    downloadCSV(`tutortally-lessons-${range.file}.csv`,
+      ['Date', 'Time', 'Student', 'Type', 'Status', 'Charge (£)', 'Paid (£)', 'Notes'],
+      lessonRows.map(l => [
+        l.lesson_date, l.start_time || '', nameOf(l.student_id),
+        l.is_weekly_charge ? 'Weekly fee' : TTWeekly.covers(l) ? 'Lesson (in weekly fee)' : l.is_complimentary ? 'Free lesson' : 'Lesson',
+        l.is_weekly_charge ? 'Charged' : lessonStatusLabel(l.status),
+        chargeOf(l),
+        l.is_weekly_charge || TTWeekly.covers(l) ? '' : l.pre_settled ? 'settled' : round2(paidByLesson.get(l.id) || 0),
+        l.tutor_notes || '',
+      ]));
+    setDone(`Saved ${lessonRows.length} lesson${lessonRows.length === 1 ? '' : 's'} to your downloads.`);
+  }
+  function exportPayments() {
+    downloadCSV(`tutortally-payments-${range.file}.csv`,
+      ['Date paid', 'Student', 'Parent', 'Amount (£)', 'Method', 'Lessons covered'],
+      paymentRows.map(p => [
+        p.date_paid, nameOf(p.student_id), students.find(s => s.id === p.student_id)?.parent_name || '',
+        round2(parseFloat(p.amount)), METHODS[p.method] || p.method || '', countByPayment.get(p.id) || 0,
+      ]));
+    setDone(`Saved ${paymentRows.length} payment${paymentRows.length === 1 ? '' : 's'} to your downloads.`);
+  }
+
+  if (masked) {
+    return (
+      <div style={{fontSize:'0.86rem', color:'var(--ink-dim)', lineHeight:1.55}}>
+        Privacy mode is on. An export always holds your real names and amounts, so turn privacy mode off in Settings before exporting.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{fontSize:'0.82rem', color:'var(--muted)', lineHeight:1.5, marginBottom:14}}>
+        Two spreadsheet files that open in Excel, Numbers or Google Sheets. They hold real names and amounts, so treat them like any other record of your students.
+      </div>
+      <div className="seg" style={{marginBottom:16, flexWrap:'wrap'}}>
+        {Object.entries(RANGES).map(([k, r]) => (
+          <button key={k} className={k === rangeKey ? 'sel' : ''} onClick={() => { setRangeKey(k); setDone(''); }}>{r.label}</button>
+        ))}
+      </div>
+      <div className="tools-group">
+        <ToolsRow title="Export lessons"
+          subtitle={lessonRows.length ? `${lessonRows.length} taught, ${moneyText(round2(charged))} charged` : 'No lessons in this period'}
+          onClick={lessonRows.length ? exportLessons : undefined} end="↓" />
+        <ToolsRow title="Export payments"
+          subtitle={paymentRows.length ? `${paymentRows.length} received, ${moneyText(round2(received))} in total` : 'No payments in this period'}
+          onClick={paymentRows.length ? exportPayments : undefined} end="↓" />
+      </div>
+      {done && <div role="status" style={{fontSize:'0.82rem', color:'var(--good)', marginTop:12, fontWeight:600}}>{done}</div>}
+    </div>
+  );
+}
+
 function RevenueTrend({ payments, lessons, students, rateHistory }) {
   const M = useMoney();
   const [basis, setBasis] = React.useState('earned');
@@ -4907,9 +5320,10 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
   // Remembered per device. Storage can be blocked, so it is always guarded.
   const [collapsed, setCollapsed] = useState(() => { try { return localStorage.getItem('tt_attn_collapsed') === '1'; } catch (e) { return false; } });
   const toggleCollapsed = () => setCollapsed(c => { const n = !c; try { localStorage.setItem('tt_attn_collapsed', n ? '1' : '0'); } catch (e) {} return n; });
+  const [showAll, setShowAll] = useState(false);
   const M = useMoney();
   const N = useNameDisplay();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   const items = [];
   students.filter(s => s.active).forEach(s => {
@@ -4969,7 +5383,7 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
         <span className={`chevron ${collapsed ? '' : 'open'}`} aria-hidden="true">›</span>
       </button>
       <div className="attn-body"><div className="attn-body-inner">
-        {items.slice(0, 6).map(it => (
+        {(showAll ? items : items.slice(0, 6)).map(it => (
           <div className="attn-item" key={it.id} onClick={() => onJump(it.studentId)}>
             <span>{N(it.name, it.studentId)}</span>
             <span className="attn-right">
@@ -4980,6 +5394,13 @@ function NeedsAttention({ students, lessons, payments, allocations, rateHistory,
             </span>
           </div>
         ))}
+        {items.length > 6 && (
+          <button type="button" onClick={() => setShowAll(v => !v)} style={{
+            display:'block', width:'100%', textAlign:'center', padding:'10px 0 4px', minHeight:40,
+            background:'none', border:'none', color:'var(--muted)', fontSize:'0.82rem',
+            fontFamily:'inherit', cursor:'pointer',
+          }}>{showAll ? 'Show fewer' : `Show ${items.length - 6} more`}</button>
+        )}
       </div></div>
     </div>
   );
@@ -5127,7 +5548,7 @@ function ToolsRow({ title, subtitle, onClick, tone = '', end = '›' }) {
     : /calendar/.test(key) ? 'calendar' : /privacy/.test(key) ? 'shield'
     : /revenue|growth/.test(key) ? 'chart' : /payment|billing|monzo/.test(key) ? 'payment'
     : /account|admin/.test(key) ? 'user' : /sign out/.test(key) ? 'logout'
-    : /copy|copied|open/.test(key) ? 'link' : /walkthrough|about/.test(key) ? 'info' : 'notes';
+    : /export/.test(key) ? 'notes' : /copy|copied|open/.test(key) ? 'link' : /walkthrough|about/.test(key) ? 'info' : 'notes';
   return (
     <button className={`tools-row ${tone}`} onClick={onClick}>
       <span className="tools-icon"><AppIcon name={icon} /></span>
@@ -5141,7 +5562,7 @@ function ToolsRow({ title, subtitle, onClick, tone = '', end = '›' }) {
 }
 
 // ---------- Global Tools Sheet ----------
-function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], userEmail, session, entitlement, initialTool = null, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onReplayWalkthrough, onDataChanged, onAddStudent }) {
+function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], allocations = [], userEmail, session, entitlement, initialTool = null, moneyMode, setMoneyMode, nameMode, setNameMode, onClose, onReplayWalkthrough, onDataChanged, onAddStudent }) {
   const N = useNameDisplay();
   const [cls, close] = useAnimatedClose(onClose);
   // Opens straight onto a panel when the walkthrough sent them here, so the
@@ -5186,7 +5607,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   const addNetW = extra * extraRate * (extraCash ? 1 : 0.6);
 
   async function unarchive(id) {
-    await supabase.from('tutoring_students').update({ active: true }).eq('id', id);
+    if (!await saved(() => supabase.from('tutoring_students').update({ active: true }).eq('id', id))) return;
     onDataChanged();
   }
 
@@ -5199,8 +5620,9 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   async function deleteStudent(id) {
     await supabase.from('tutoring_monzo_transactions')
       .update({ matched_student_id: null }).eq('matched_student_id', id);
-    await supabase.from('tutoring_students').delete().eq('id', id);
+    const gone = await saved(() => supabase.from('tutoring_students').delete().eq('id', id));
     setDeletingId(null);
+    if (!gone) return;
     onDataChanged();
   }
 
@@ -5213,7 +5635,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   // three, and the pair you actually wanted is one tap away instead of a
   // return trip through the menu.
   const GROUPS = {
-    money:   { title: 'Money',        tabs: danielOnly ? [['revenue', 'Revenue trend'], ['growth', 'Growth calculator']] : [['revenue', 'Revenue trend']] },
+    money:   { title: 'Money',        tabs: danielOnly ? [['revenue', 'Revenue'], ['insights', 'Insights'], ['growth', 'Growth']] : [['revenue', 'Revenue trend'], ['insights', 'Insights']] },
     archive: { title: 'Archive',      tabs: [['archived', 'Students'], ['deletedpay', 'Payments']] },
     account: { title: 'Your account', tabs: [['yourname', 'Your details'], ['password', 'Reset password'], ['deleteaccount', 'Delete account']] },
   };
@@ -5276,8 +5698,8 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
                   onClick={() => setTool('billing')}
                 />
                 <ToolsRow
-                  title={danielOnly ? 'Revenue and growth' : 'Revenue trend'}
-                  subtitle={danielOnly ? 'Track income and model extra students' : 'See what has been paid over time'}
+                  title="Revenue and insights"
+                  subtitle="Income by month, your tax-year total and who pays late"
                   onClick={() => setTool('revenue')}
                 />
               </ToolsSection>
@@ -5287,6 +5709,11 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
                   title="Archive"
                   subtitle={`Archived students and deleted payments${archived.length > 0 ? ` (${archived.length} archived)` : ''}`}
                   onClick={() => setTool('archived')}
+                />
+                <ToolsRow
+                  title="Export your records"
+                  subtitle="Lessons and payments as spreadsheets, for you or your accountant"
+                  onClick={() => setTool('export')}
                 />
                 <ToolsRow
                   title="Privacy mode"
@@ -5409,6 +5836,21 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
           <>
             {groupHeader('revenue')}
             <RevenueTrend payments={payments} lessons={lessons} students={students} rateHistory={rateHistory} />
+          </>
+        )}
+        {tool === 'insights' && (
+          <>
+            {groupHeader('insights')}
+            <Insights students={students} lessons={lessons} payments={payments} allocations={allocations} rateHistory={rateHistory} />
+          </>
+        )}
+        {tool === 'export' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:14}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Export your records</h2>
+            </div>
+            <ExportRecords students={students} lessons={lessons} payments={payments} allocations={allocations} rateHistory={rateHistory} />
           </>
         )}
         {tool === 'growth' && danielOnly && (
@@ -5600,7 +6042,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
     referred_by_student_id: student?.referred_by_student_id || '',
     active: student?.active !== undefined ? student.active : true,
   });
-  const todayStr = new Date().toISOString().slice(0, 10);
+  const todayStr = todayISO();
   // A new student starts on the tutor's usual fee (set during setup) so the
   // common case needs no typing; an existing one keeps whatever they're on,
   // which is loaded from rate history below.
@@ -5631,7 +6073,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
   useEffect(() => {
     if (!isEdit || !student?.id) return;
     async function fetchRate() {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = todayISO();
       const { data } = await supabase
         .from('tutoring_rate_history')
         .select('rate')
@@ -5655,16 +6097,16 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
       ? form.exam_board_custom
       : form.exam_board_preset;
     const payload = {
-      name: form.name,
-      parent_name: form.parent_name,
-      parent_phone: form.parent_phone,
+      name: form.name.trim(),
+      parent_name: form.parent_name.trim(),
+      parent_phone: form.parent_phone.trim(),
       address: form.address,
       school: form.school,
       school_year: form.school_year ? parseInt(form.school_year) : null,
       school_year_as_of_date: form.school_year
         ? (parseInt(form.school_year) !== student?.school_year
-            ? new Date().toISOString().slice(0, 10)
-            : (student?.school_year_as_of_date || new Date().toISOString().slice(0, 10)))
+            ? todayISO()
+            : (student?.school_year_as_of_date || todayISO()))
         : null,
       exam_board: exam_board || null,
       exam_tier: form.exam_tier || null,
@@ -5690,13 +6132,21 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
     // from the default wouldn't match their own auth.uid()).
     const ownerId = (await supabase.auth.getUser()).data.user?.id;
 
+    // If the student does not save, the form stays open with everything still
+    // typed in. It used to close regardless, and a dropped connection threw
+    // the whole form away without a word.
     let studentId = student?.id;
     if (isEdit) {
-      await supabase.from('tutoring_students').update(payload).eq('id', student.id);
+      if (!await saved(() => supabase.from('tutoring_students').update(payload).eq('id', student.id))) { setSaving(false); return; }
     } else {
-      const { data: newStudent } = await supabase.from('tutoring_students')
-        .insert({ ...payload, owner_id: ownerId }).select().single();
-      studentId = newStudent?.id;
+      let newStudent = null;
+      const ok = await saved(async () => {
+        const res = await supabase.from('tutoring_students').insert({ ...payload, owner_id: ownerId }).select().single();
+        newStudent = res.data;
+        return res;
+      });
+      if (!ok || !newStudent?.id) { setSaving(false); return; }
+      studentId = newStudent.id;
     }
 
     const rateNum = parseFloat(ratePerSession);
@@ -5718,12 +6168,12 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
       }
       // Upsert, not insert: editing a rate twice in one day must replace that
       // day's figure rather than leave two rows competing for the same date.
-      await supabase.from('tutoring_rate_history').upsert({
+      await saved(() => supabase.from('tutoring_rate_history').upsert({
         student_id: studentId,
         rate: rateNum,
         effective_from_date: rateFrom,
         owner_id: ownerId,
-      }, { onConflict: 'student_id,effective_from_date' });
+      }, { onConflict: 'student_id,effective_from_date' }));
 
       // Changing a rate changes what each lesson costs, so money already
       // spread across lessons has to be spread again. Without this a lesson
@@ -5947,7 +6397,7 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
         <div className="btn-row">
           <button className="btn cancel" onClick={close}>{demo ? 'Close' : 'Cancel'}</button>
           {!demo && (
-            <button className="btn save" onClick={handleSave} disabled={saving || !form.name}>
+            <button className="btn save" onClick={handleSave} disabled={saving || !form.name.trim()}>
               {saving ? 'Saving…' : 'Save'}
             </button>
           )}
@@ -5963,13 +6413,13 @@ function StudentFormModal({ student, onClose, onSaved, allStudents = [], rateHis
 // once, and paying in advance are all the same action. The preview below
 // shows what it will settle before you commit.
 function PaymentModal({ student, payment, lessons, currentRate, rateHistory = [],
-                        allocations = [], onClose, onSaved }) {
+                        allocations = [], balance = 0, onClose, onSaved }) {
   const N = useNameDisplay();
   const M = useMoney();
   const { moneyMode, nameMode } = usePrivacy();
   const [cls, close] = useAnimatedClose(onClose);
   const editing = !!payment;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
 
   // Read-only while privacy is on, for the same reason as the student form: a
   // masked amount you can still submit is one tap away from being saved.
@@ -5979,7 +6429,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
     : '•••';
 
   const [datePaid, setDatePaid]   = useState(payment?.date_paid || today);
-  const payerPlan = TTHourly.planFor(student.id, new Date().toISOString().slice(0, 10)) || TTHourly.currentPlan(student.id);
+  const payerPlan = TTHourly.planFor(student.id, todayISO()) || TTHourly.currentPlan(student.id);
   const [payer, setPayer] = useState(payment?.payer || payerPlan?.payer || 'parent');
   const [method, setMethod]       = useState(payment?.method || (student.pays_in_cash ? 'cash' : 'bank_transfer'));
   const [amount, setAmount]       = useState(payment ? String(payment.amount) : '');
@@ -6018,9 +6468,17 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
 
   // Prefill a new payment with one session at the current rate, since that is
   // by far the most common case.
+  // An hourly student has no per-session rate, so "one session" there was the
+  // £90 fallback, a figure that belongs to nobody. They start on what is owed.
+  const owedNow = Math.round(Math.max(0, balance) * 100) / 100;
   useEffect(() => {
-    if (!editing) setAmount(String(rate));
+    if (!editing) setAmount(payerPlan ? (owedNow > 0 ? String(owedNow) : '') : String(rate));
   }, []);
+  // The two amounts that cover nearly every payment, one tap each.
+  const quickAmounts = [];
+  if (!payerPlan && rate > 0) quickAmounts.push([weeklyAccount ? 'One week' : 'One session', rate]);
+  if (owedNow > 0 && Math.abs(owedNow - rate) > 0.005) quickAmounts.push(['Everything owed', owedNow]);
+  const [formError, setFormError] = useState('');
 
   const pendingUndo = React.useRef(null);
   const offerUndo = () => {
@@ -6032,23 +6490,35 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
   const afterReceipt = fn => () => { offerUndo(); fn(); };
 
   async function handleSave() {
+    const amt = Math.round((parseFloat(amount) || 0) * 100) / 100;
+    // A blank or zero amount used to be saved as a £0 payment.
+    if (amt <= 0) { setFormError('Enter the amount that was paid.'); return; }
+    if (!datePaid) { setFormError('Choose the date it was paid.'); return; }
+    setFormError('');
     setSaving(true);
-    const amt = parseFloat(amount) || 0;
 
     // Allocation is handled by a database trigger, so it happens identically
     // however the payment arrives - here, from Monzo, or by hand.
+    // Nothing below closes the sheet unless the database took the payment.
     if (editing) {
-      await supabase.from('tutoring_payments')
+      const ok = await saved(() => supabase.from('tutoring_payments')
         .update({ amount: amt, date_paid: datePaid, method, ...(payerPlan ? { payer } : {}) })
-        .eq('id', payment.id);
+        .eq('id', payment.id));
+      if (!ok) { setSaving(false); setFormError('This change was not saved. Try again.'); return; }
     } else {
       // owner_id set explicitly: see the comment on the same pattern in
       // StudentFormModal - the column DEFAULT belongs to Daniel's account, so
       // a second tenant's insert would otherwise fail the RLS WITH CHECK.
       const ownerId = (await supabase.auth.getUser()).data.user?.id;
-      const { data: added } = await supabase.from('tutoring_payments').insert({
-        student_id: student.id, amount: amt, date_paid: datePaid, method, owner_id: ownerId, ...(payerPlan ? { payer } : {})
-      }).select('id').single();
+      let added = null;
+      const ok = await saved(async () => {
+        const res = await supabase.from('tutoring_payments').insert({
+          student_id: student.id, amount: amt, date_paid: datePaid, method, owner_id: ownerId, ...(payerPlan ? { payer } : {})
+        }).select('id').single();
+        added = res.data;
+        return res;
+      });
+      if (!ok) { setSaving(false); setFormError('This payment was not saved. Try again.'); return; }
       // Undo instead of an "are you sure": logging is the common case, a slip
       // is rare, and taking it back is the same soft delete the payment list uses.
       // When the cash receipt step follows, the offer waits until that step is
@@ -6151,10 +6621,24 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
           <label>Amount</label>
           <input type={demo ? 'text' : 'number'} min="0" step="0.01"
                  value={maskAmount(amount)} placeholder="0.00"
-                 onChange={e => setAmount(e.target.value)} />
-          <div style={{fontSize:'0.78rem', color:'var(--muted)', marginTop:4}}>
+                 onChange={e => { setAmount(e.target.value); setFormError(''); }} />
+          {!editing && !demo && quickAmounts.length > 0 && (
+            <div style={{display:'flex', gap:8, flexWrap:'wrap', marginTop:8}}>
+              {quickAmounts.map(([label, value]) => {
+                const on = Math.abs((parseFloat(amount) || 0) - value) < 0.005;
+                return (
+                  <button type="button" key={label} aria-pressed={on} onClick={() => { setAmount(String(value)); setFormError(''); }} style={{
+                    padding:'8px 12px', minHeight:40, borderRadius:999, cursor:'pointer', fontFamily:'inherit', fontSize:'0.8rem', fontWeight:600,
+                    border:`1px solid ${on ? 'var(--accent)' : 'var(--line)'}`,
+                    background: on ? 'var(--accent-light, var(--card-2))' : 'var(--card-2)', color:'var(--ink)',
+                  }}>{label} · {moneyText(value)}</button>
+                );
+              })}
+            </div>
+          )}
+          {!payerPlan && <div style={{fontSize:'0.78rem', color:'var(--muted)', marginTop:6}}>
             {weeklyAccount ? <>Reserved weekly fee {M(rate)}, including holidays.</> : <>Current rate {M(rate)} per session.</>}
-          </div>
+          </div>}
         </div>
 
         <div className="field">
@@ -6194,6 +6678,7 @@ function PaymentModal({ student, payment, lessons, currentRate, rateHistory = []
         </div>
         </div>
 
+        {formError && <p className="wk-error" role="alert">{formError}</p>}
         <div className="btn-row">
           <button className="btn cancel" onClick={close}>{demo ? 'Close' : 'Cancel'}</button>
           {!demo && (
@@ -6230,8 +6715,8 @@ function PaymentDetailSheet({ payment, lessons, allocations = [], onClose, onEdi
     // Archived, not destroyed. A hard delete took the date, method and Monzo
     // link with it, so undoing meant retyping the payment from memory -
     // which is exactly how a correct set of payments ends up wrong.
-    await supabase.from('tutoring_payments')
-      .update({ deleted_at: new Date().toISOString() }).eq('id', payment.id);
+    if (!await saved(() => supabase.from('tutoring_payments')
+      .update({ deleted_at: new Date().toISOString() }).eq('id', payment.id))) { setBusy(false); return; }
     // Rebuilding drops this payment's allocations along with it and spreads
     // whatever is left over the lessons again, oldest first.
     await supabase.rpc('reallocate_student_payments', { p_student_id: payment.student_id });
@@ -6326,7 +6811,7 @@ function DeletedPayments({ students, onDataChanged }) {
 
   async function restore(p) {
     setBusyId(p.id);
-    await supabase.from('tutoring_payments').update({ deleted_at: null }).eq('id', p.id);
+    if (!await saved(() => supabase.from('tutoring_payments').update({ deleted_at: null }).eq('id', p.id))) { setBusyId(null); return; }
     // Put the money back where it belongs rather than on the end: rebuilding
     // settles the oldest unpaid lesson first, exactly as if it had never gone.
     await supabase.rpc('reallocate_student_payments', { p_student_id: p.student_id });
@@ -6704,6 +7189,73 @@ function groupByMonth(lessons) {
   return Object.values(groups).sort((a, b) => b.key.localeCompare(a.key));
 }
 
+// ---------- Add a lesson by hand ----------
+// For a tutor with no calendar connected, and for the one-off lesson that
+// never made it into the diary. A lesson added here has no calendar event
+// behind it, so the sync leaves it alone.
+function AddLessonSheet({ student, lessons, session, onClose, onSaved }) {
+  const N = useNameDisplay();
+  const { moneyMode, nameMode } = usePrivacy();
+  const [cls, close] = useAnimatedClose(onClose);
+  const today = todayISO();
+  const [date, setDate] = useState(today);
+  const [time, setTime] = useState('');
+  const [free, setFree] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const masked = moneyMode !== 'normal' || nameMode !== 'normal';
+  const clash = lessons.find(l => l.lesson_date === date && l.status !== 'cancelled'
+    && (!time || !l.start_time || l.start_time.slice(0, 5) === time));
+  const past = date < today || (date === today && (!time || time < londonHHMM()));
+
+  async function save() {
+    if (!date) { setError('Choose the date of the lesson.'); return; }
+    setSaving(true); setError('');
+    const ownerId = (await supabase.auth.getUser()).data.user?.id || session?.user?.id;
+    const ok = await saved(() => supabase.from('tutoring_lessons').insert({
+      student_id: student.id, owner_id: ownerId, lesson_date: date,
+      start_time: time || null, status: past ? 'completed' : 'scheduled', is_complimentary: free,
+    }));
+    if (!ok) { setSaving(false); setError('This lesson was not added.'); return; }
+    // Credit already in hand should settle the new lesson straight away.
+    await supabase.rpc('reallocate_student_payments', { p_student_id: student.id });
+    setSaving(false);
+    onSaved();
+  }
+
+  return (
+    <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
+        <h2>Add a lesson - {N(student.name, student.id)}</h2>
+        <div className="field">
+          <label htmlFor="add-lesson-date">Date</label>
+          <input id="add-lesson-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+        </div>
+        <div className="field">
+          <label htmlFor="add-lesson-time">Start time (optional)</label>
+          <input id="add-lesson-time" type="time" value={time} onChange={e => setTime(e.target.value)} />
+        </div>
+        <label className="checkbox-row" style={{fontSize:'.86rem', marginBottom:12}}>
+          <input type="checkbox" checked={free} onChange={e => setFree(e.target.checked)} />Free lesson (no charge)
+        </label>
+        <div style={{fontSize:'0.8rem', color:'var(--muted)', lineHeight:1.5, marginBottom:6}}>
+          {past
+            ? (free ? 'Goes into their history as a free lesson.' : 'Goes into their history as taught, and counts towards what they owe.')
+            : 'Shows as upcoming, and becomes owed once it has happened.'}
+          {' '}Lessons in your connected calendar arrive on their own, so only add what is not in there.
+        </div>
+        {clash && <p className="wk-error" role="alert" style={{marginTop:6}}>There is already a lesson on this day{clash.start_time ? ` at ${clash.start_time}` : ''}. Adding this one makes two lessons that day.</p>}
+        {error && <p className="wk-error" role="alert">{error}</p>}
+        <div className="btn-row" style={{marginTop:16}}>
+          <button className="btn cancel" onClick={close}>Cancel</button>
+          {!masked && <button className="btn save" onClick={save} disabled={saving || !date}>{saving ? 'Adding…' : clash ? 'Add anyway' : 'Add lesson'}</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree, onDelete, toggling, hourly, onSaved }) {
   const M = useMoney();
   const { nameMode } = usePrivacy();
@@ -6727,6 +7279,15 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
   const hourlyPlan = hourly ? TTHourly.planFor(lesson.student_id, lesson.lesson_date) : null;
   const previewMins = Number(len) || lesson.calendar_minutes || lesson.billed_minutes || hourlyPlan?.default_minutes || 60;
   const previewPrice = hourlyPlan ? TTHourly.price(hourlyPlan.hourly_rate, previewMins) : null;
+  // Notes were only editable on hourly lessons, though the parent page shows
+  // them for every lesson. Everyone else had a notes feature with no way in.
+  async function saveNotes() {
+    setSaving(true); setSaveError('');
+    const { error } = await supabase.from('tutoring_lessons').update({ tutor_notes: notes.trim() || null }).eq('id', lesson.id);
+    setSaving(false);
+    if (error) setSaveError(error.message || 'Could not save these notes.'); else onSaved?.();
+  }
+  const notesChanged = notes.trim() !== (lesson.tutor_notes || '').trim();
   async function saveHourly() {
     setSaving(true); setSaveError('');
     const change = { duration_minutes: len === '' ? null : Number(len), charge_overridden: ownPrice, is_complimentary: free, tutor_notes: notes.trim() || null };
@@ -6803,6 +7364,13 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
             <textarea maxLength={4000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="What you covered and how it went. Shown on the parent's page and used in termly summaries." /></div>
           {saveError && <p className="wk-error" role="alert">{saveError}</p>}
           <button type="button" className="btn save" style={{width:'100%'}} disabled={saving} onClick={saveHourly}>{saving ? 'Saving…' : 'Save lesson'}</button>
+        </div>}
+        {!hourly && nameMode === 'normal' && <div className="field" style={{marginBottom:16}}>
+          <label>Lesson notes · the parent can see these</label>
+          <textarea maxLength={4000} value={notes} onChange={e => setNotes(e.target.value)}
+            placeholder="What you covered and how it went. Shown when the parent taps this lesson on their page." />
+          {saveError && <p className="wk-error" role="alert">{saveError}</p>}
+          {notesChanged && <button type="button" className="btn save" style={{width:'100%', marginTop:8}} disabled={saving} onClick={saveNotes}>{saving ? 'Saving…' : 'Save notes'}</button>}
         </div>}
         {/* Lesson notes come straight from the calendar event title, which
             usually contains the student's name - hidden whenever names are. */}
@@ -7458,6 +8026,8 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const [showCashModal, setShowCashModal] = useState(false);
   const [openMonths, setOpenMonths] = useState({});
   const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+  const [historyShown, setHistoryShown] = useState(10);
+  const [showAddLesson, setShowAddLesson] = useState(false);
   const [detailLesson, setDetailLesson] = useState(null);
   const [detailPayment, setDetailPayment] = useState(null);
   const [editPayment, setEditPayment] = useState(null);
@@ -7536,7 +8106,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
 
   async function toggleComplimentary(lesson) {
     setToggling(true);
-    await supabase.from('tutoring_lessons').update({ is_complimentary: !lesson.is_complimentary }).eq('id', lesson.id);
+    if (!await saved(() => supabase.from('tutoring_lessons').update({ is_complimentary: !lesson.is_complimentary }).eq('id', lesson.id))) { setToggling(false); return; }
     // Same reason as a rate change: this moves what's owed, so anything
     // already allocated to this lesson has to be redistributed - otherwise
     // making a lesson free strands its payment there instead of letting it
@@ -7553,7 +8123,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   // in the history that never happened and quietly distorts the record.
   async function deleteLesson(lesson) {
     setToggling(true);
-    await supabase.from('tutoring_lessons').delete().eq('id', lesson.id);
+    if (!await saved(() => supabase.from('tutoring_lessons').delete().eq('id', lesson.id))) { setToggling(false); return; }
     // Its allocations cascade away with it, so rebuilding moves that money
     // onto the next unpaid lesson instead of leaving the student looking
     // behind on payments they've actually made.
@@ -7564,7 +8134,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   }
 
   async function archiveStudent() {
-    await supabase.from('tutoring_students').update({ active: false }).eq('id', student.id);
+    if (!await saved(() => supabase.from('tutoring_students').update({ active: false }).eq('id', student.id))) return;
     setShowMoreTools(false);
     onDataChanged();
   }
@@ -7572,7 +8142,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   async function deleteStudent() {
     await supabase.from('tutoring_monzo_transactions')
       .update({ matched_student_id: null }).eq('matched_student_id', student.id);
-    await supabase.from('tutoring_students').delete().eq('id', student.id);
+    if (!await saved(() => supabase.from('tutoring_students').delete().eq('id', student.id))) return;
     setShowMoreTools(false);
     onDataChanged();
   }
@@ -7589,9 +8159,8 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
   const sixMonthsOutStr = sixMonthsOut.toISOString().slice(0, 10);
   const upcomingNext6 = upcomingLessons.filter(l => l.lesson_date <= sixMonthsOutStr);
-  const pastLessons = studentLessons
-    .filter(l => l.status !== 'scheduled')
-    .slice(0, Math.max(10, unpaidCount));
+  const allPastLessons = studentLessons.filter(l => l.status !== 'scheduled');
+  const pastLessons = allPastLessons.slice(0, Math.max(historyShown, unpaidCount));
 
   const groupedLessons = groupByMonth(pastLessons);
   const isMonthOpen = key => key in openMonths ? openMonths[key] : (groupedLessons.length > 0 && groupedLessons[0].key === key);
@@ -7647,7 +8216,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
             )}
             {balance >= -0.005 && balance <= 0.005 && <span className="pill ok">Paid up</span>}
             {nextLesson && (
-              <span className="meta">Next {new Date(nextLesson.lesson_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
+              <span className="meta">Next {new Date(nextLesson.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
             )}
             {displayYear && <span className="meta">Y{displayYear}</span>}
             {hourlyPlanNow
@@ -7740,7 +8309,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
 
           <div className="section-label">History</div>
           {groupedLessons.length === 0 && (
-            <div style={{fontSize:'0.85rem',color:'var(--muted)',padding:'6px 0'}}>No lessons logged yet.</div>
+            <div style={{fontSize:'0.85rem',color:'var(--muted)',padding:'6px 0',lineHeight:1.5}}>No lessons yet. They arrive from your calendar, or you can add one by hand below.</div>
           )}
           {groupedLessons.map(group => (
             <React.Fragment key={group.key}>
@@ -7756,6 +8325,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                   <span className="lesson-date">
                     {new Date(l.lesson_date + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' })}
                     {l.start_time && <span style={{color:'var(--muted)'}}> · {l.start_time}</span>}
+                    {l.tutor_notes && <span style={{color:'var(--muted)', fontSize:'0.7rem'}}> · note</span>}
                   </span>
                   <span style={{display:'flex',alignItems:'center'}}>
                     {(() => {
@@ -7788,6 +8358,19 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
               ))}
             </React.Fragment>
           ))}
+
+          {allPastLessons.length > pastLessons.length && (
+            <button onClick={() => setHistoryShown(c => Math.max(c, unpaidCount) + 20)} style={{
+              display:'block', width:'100%', textAlign:'center', padding:'10px 0', marginTop:2, minHeight:40,
+              background:'none', border:'none', color:'var(--muted)', fontSize:'0.82rem',
+              fontFamily:'inherit', cursor:'pointer',
+            }}>Show older lessons ({allPastLessons.length - pastLessons.length} more)</button>
+          )}
+          <button
+            className="btn"
+            style={{width:'100%',marginTop:10,background:'var(--card-2)',color:'var(--ink)',border:'1px solid var(--line)'}}
+            onClick={() => setShowAddLesson(true)}
+          >+ Add a lesson by hand</button>
 
           <div className="month-hdr" onClick={() => setPaymentsOpen(!paymentsOpen)} style={{marginTop:14}}>
             <span className="section-label" style={{margin:0}}>Payments</span>
@@ -7867,7 +8450,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           student={student}
           onClose={() => setShowMoreTools(false)}
           onTrackCash={() => { setShowMoreTools(false); setEditPayment(null); setShowCashModal(true); }}
-          onStatement={() => { setShowMoreTools(false); setShowStatement(true); }}
+          onStatement={() => { setShowMoreTools(false); if (weeklyActive) setShowWeekly(true); else setShowStatement(true); }}
           onArchive={archiveStudent}
           onDelete={deleteStudent}
           onWeekly={danielOnly && student.owner_id === 'babb06b5-b5e0-4436-8b72-bc5556814956' ? () => { setShowMoreTools(false); setShowWeekly(true); } : null}
@@ -7893,6 +8476,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           currentRate={currentRate}
           rateHistory={rateHistory}
           allocations={studentAllocations}
+          balance={balance}
           onClose={() => { setShowCashModal(false); setEditPayment(null); }}
           onSaved={() => { setShowCashModal(false); setEditPayment(null); onDataChanged(); }}
         />, document.body
@@ -7909,7 +8493,6 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
         />, document.body
       )}
 
-      {showStatement && weeklyActive && ReactDOM.createPortal(<div className="overlay" onClick={() => setShowStatement(false)}><div className="sheet"><h2>Weekly tuition statement</h2><p>Use the Weekly statement button in the weekly tuition panel to see charges, waivers and payments together.</p><button className="btn" onClick={() => setShowStatement(false)}>Close</button></div></div>, document.body)}
       {showStatement && !weeklyActive && ReactDOM.createPortal(
         <StatementSheet
           student={student}
@@ -7919,6 +8502,16 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           payState={lessonPayState}
           scale={moneyScale}
           onClose={() => setShowStatement(false)}
+        />, document.body
+      )}
+
+      {showAddLesson && ReactDOM.createPortal(
+        <AddLessonSheet
+          student={student}
+          lessons={studentLessons}
+          session={session}
+          onClose={() => setShowAddLesson(false)}
+          onSaved={() => { setShowAddLesson(false); onDataChanged(); }}
         />, document.body
       )}
 
@@ -8444,6 +9037,16 @@ function App() {
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, []);
+  useEffect(() => {
+    let timer;
+    const onError = e => {
+      clearTimeout(timer);
+      setRefreshNote({ bad: true, text: e.detail });
+      timer = setTimeout(() => setRefreshNote(null), 8000);
+    };
+    window.addEventListener('tt-error', onError);
+    return () => { window.removeEventListener('tt-error', onError); clearTimeout(timer); };
+  }, []);
   const [students, setStudents] = useState([]);
   const [lessons, setLessons] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -8621,21 +9224,25 @@ function App() {
       // Auto-complete lessons that have already happened. Two passes, because a
       // lesson earlier TODAY has passed too - checking the date alone left this
       // morning's lesson showing as upcoming until tomorrow.
-      const today = new Date().toISOString().slice(0, 10);
-      const nowHHMM = new Date().toTimeString().slice(0, 5);
+      const today = todayISO();
+      const nowHHMM = londonHHMM();
       await supabase.from('tutoring_lessons').update({ status: 'completed' })
         .eq('status', 'scheduled').lt('lesson_date', today);
       await supabase.from('tutoring_lessons').update({ status: 'completed' })
         .eq('status', 'scheduled').eq('lesson_date', today).lt('start_time', nowHHMM);
+      // The database hands back at most 1,000 rows per request and says nothing
+      // about the rest. A busy tutor passes that in lessons within a couple of
+      // years, and from then on balances would be worked out from whichever
+      // thousand happened to come back. These three are read page by page.
       const [s, l, p, b, r, a] = await Promise.all([
         supabase.from('tutoring_students').select('*').order('active', { ascending: false }).order('name'),
-        supabase.from('tutoring_lessons').select('*'),
+        readEveryRow(() => supabase.from('tutoring_lessons').select('*')),
         // Archived payments are excluded everywhere money is counted; they
         // only surface in Tools → Deleted payments, where they can be restored.
-        supabase.from('tutoring_payments').select('*').is('deleted_at', null),
+        readEveryRow(() => supabase.from('tutoring_payments').select('*').is('deleted_at', null)),
         supabase.from('tutoring_bundles').select('*'),
         supabase.from('tutoring_rate_history').select('*'),
-        supabase.from('tutoring_payment_allocations').select('*')
+        readEveryRow(() => supabase.from('tutoring_payment_allocations').select('*'))
       ]);
 
       const failed = [s, l, p, b, r, a].find(res => res.error);
@@ -8771,6 +9378,7 @@ function App() {
   const matchingStudents = q
     ? activeStudents.filter(s =>
         (s.name || '').toLowerCase().includes(q) ||
+        (s.parent_name || '').toLowerCase().includes(q) ||
         (s.school || '').toLowerCase().includes(q))
     : activeStudents;
   const shownStudents = sortStudents(matchingStudents, sortBy, rateHistory);
@@ -8840,7 +9448,7 @@ function App() {
       )}
       {refreshNote && (
         <div role="status" className="toast-in" style={{
-          position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:200,
+          position:'fixed', top:12, left:0, right:0, marginInline:'auto', width:'fit-content', zIndex:5000,
           padding:'10px 18px', borderRadius:10, fontSize:'0.85rem', fontWeight:600, maxWidth:'92vw',
           background: refreshNote.bad ? 'var(--danger-fill)' : 'var(--good-fill)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
@@ -8993,9 +9601,9 @@ function App() {
           <div className="list-tools">
             <div className="search-wrap">
               <span className="s-icon"><AppIcon name="search" /></span>
-              <input type="search" value={query} aria-label="Search students or schools"
+              <input type="search" value={query} aria-label="Search students, parents or schools"
                 onChange={e => { captureListPositions(); setQuery(e.target.value); }}
-                placeholder="Find a student or school…" />
+                placeholder="Find a student, parent or school…" />
               {query && <button className="s-clear" aria-label="Clear search"
                 onMouseDown={e => e.preventDefault()}
                 onClick={() => { captureListPositions(); setQuery(''); }}><AppIcon name="close" /></button>}
@@ -9016,7 +9624,7 @@ function App() {
         )}
 
         {!loading && activeStudents.length > 0 && shownStudents.length === 0 && (
-          <div className="empty"><AppIcon name="search" /><strong>No students found</strong>Try a different name or school.</div>
+          <div className="empty"><AppIcon name="search" /><strong>No students found</strong>Try a different student, parent or school.</div>
         )}
 
         <div ref={studentListRef} className="student-grid">
@@ -9030,7 +9638,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.44.2</div>}
+        {!loading && <div className="version-tag">v6.45.0</div>}
       </div>
 
       {showAddModal && (
@@ -9057,6 +9665,7 @@ function App() {
           rateHistory={rateHistory}
           payments={payments}
           lessons={lessons}
+          allocations={allocations}
           entitlement={entitlement}
           userEmail={session?.user?.email}
           session={session}
