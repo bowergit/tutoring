@@ -142,7 +142,7 @@
   /* How it works: three real artefacts on one baseline. */
   .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
   .step { display: flex; flex-direction: column; gap: 22px; }
-  .step .art { min-height: 230px; display: flex; align-items: flex-end; }
+  .step .art { min-height: 330px; display: flex; align-items: flex-end; }
   .step .txt { display: flex; flex-direction: column; gap: 8px; padding-top: 20px; border-top: 1px solid var(--ink); }
   .step .n { font-size: .875rem; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
   @media (max-width: 900px) { .steps { grid-template-columns: 1fr; gap: 64px; } .step .art { min-height: 0; } }
@@ -154,13 +154,82 @@
   .ev span { font-size: .75rem; color: #3c5a9a; }
   .mini { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--line-soft); font-size: .9rem; }
   .mini b { font-weight: 600; }
-  .wa { width: 100%; padding: 18px; border-radius: 16px; background: #efeae2; color: #111b21; display: flex; flex-direction: column; gap: 10px; }
-  .wa-name { font-size: .82rem; font-weight: 600; }
-  .bub { align-self: flex-end; max-width: 94%; padding: 10px 12px; border-radius: 10px 2px 10px 10px; background: #d9fdd3; font-size: .875rem; line-height: 1.45; min-height: 64px; }
-  .bub .tick { display: block; text-align: right; font-size: .7rem; color: #54656f; padding-top: 4px; }
-  .caret { display: inline-block; width: 2px; height: 1em; background: #111b21; vertical-align: -2px; margin-left: 1px; animation: blink 1s steps(1) infinite; }
-  .bub.done .caret { display: none; }
-  @keyframes blink { 50% { opacity: 0; } }
+  /* The chase, start to finish, in a WhatsApp chat drawn small. Without
+     script (or with reduced motion) it simply shows how the story ends: sent,
+     read, answered. With it, the same story plays once when it comes into view. */
+  .wa { width: 100%; height: 330px; border-radius: 16px; background: #efeae2; color: #111b21; display: flex; flex-direction: column; overflow: hidden; }
+  .wa-head { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #f0f2f5; border-bottom: 1px solid #d9dcdf; }
+  .wa-av { width: 30px; height: 30px; border-radius: 50%; background: #c8d3da; color: #44545d; display: grid; place-items: center; font-size: .8rem; font-weight: 700; flex: none; }
+  .wa-head b { display: block; font-size: .84rem; font-weight: 600; line-height: 1.2; }
+  .wa-head div span { display: block; font-size: .7rem; color: #54656f; line-height: 1.3; }
+  .wa-chat { flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; gap: 7px; padding: 12px 12px 10px; }
+  .bub { max-width: 90%; padding: 7px 9px 5px 10px; font-size: .84rem; line-height: 1.42; box-shadow: 0 1px .5px rgba(11,20,26,.13); transform-origin: 100% 100%; }
+  .bub.out { align-self: flex-end; background: #d9fdd3; border-radius: 9px 2px 9px 9px; }
+  .bub.in { align-self: flex-start; background: #fff; border-radius: 2px 9px 9px 9px; transform-origin: 0 100%; }
+  .bub .when { display: flex; justify-content: flex-end; align-items: center; gap: 4px; font-size: .7rem; color: #54656f; padding-top: 1px; font-variant-numeric: tabular-nums; }
+  /* Two real ticks, drawn, not two tick characters sat side by side. */
+  .ticks { width: 17px; height: 11px; flex: none; fill: none; stroke: #53bdeb; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke .25s var(--ease); }
+  .ticks .t2 { transition: opacity .2s var(--ease); }
+  .wa-bar { display: flex; align-items: flex-end; gap: 8px; padding: 8px 10px 10px; }
+  .wa-input { flex: 1; min-height: 38px; padding: 9px 13px; border-radius: 19px; background: #fff; font-size: .84rem; line-height: 1.42; color: #667781; }
+  .wa-input .draft { display: none; color: #111b21; }
+  .wa-send { width: 38px; height: 38px; border-radius: 50%; background: #00a884; display: grid; place-items: center; flex: none; transition: transform .14s var(--ease); }
+  .wa-send svg { width: 18px; height: 18px; fill: #fff; }
+  .wa-by { display: none; align-self: flex-end; margin: 0 2px -1px 0; padding: 3px 9px; border-radius: 20px; background: #111b21; color: #fff; font-size: .68rem; font-weight: 600; }
+
+  /* While it plays. Each stage adds a class; nothing here runs unless the
+     script armed it, so a failed script can never leave the chat empty. */
+  .wa.armed .bub.out, .wa.armed .bub.in { display: none; }
+  .wa.armed.drafting .wa-input .hint { display: none; }
+  .wa.armed.drafting .wa-input .draft { display: block; animation: draftIn .5s var(--ease) both; }
+  .wa.armed.drafting .wa-by { display: block; animation: draftIn .4s var(--ease) both; }
+  .wa.armed.press .wa-send { transform: scale(.86); }
+  .wa.armed.sent .wa-by { display: none; }
+  .wa.armed.sent .wa-input .draft { display: none; }
+  .wa.armed.sent .wa-input .hint { display: inline; }
+  .wa.armed.sent .bub.out { display: block; animation: sendUp .46s cubic-bezier(.16,1,.3,1) both; }
+  .wa.armed.sent .ticks { stroke: #8696a0; }
+  .wa.armed.sent .ticks .t2 { opacity: 0; }
+  .wa.armed.delivered .ticks .t2 { opacity: 1; }
+  .wa.armed.read .ticks { stroke: #53bdeb; }
+  .wa.armed.reply .bub.in { display: block; animation: popIn .4s cubic-bezier(.16,1,.3,1) both; }
+  @keyframes draftIn { from { opacity: 0; clip-path: inset(0 0 100% 0); } to { opacity: 1; clip-path: inset(0); } }
+  @keyframes sendUp { from { opacity: .4; transform: translateY(46px) scale(.94); } to { opacity: 1; transform: none; } }
+  @keyframes popIn { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
+  .mini .pill { transition: background .3s var(--ease), color .3s var(--ease); }
+  .mini-toast { visibility: hidden; margin-top: 10px; padding: 8px 12px; border-radius: 10px; background: var(--ink); color: var(--bg); font-size: .8rem; font-weight: 600; }
+  .mini-toast.show { visibility: visible; animation: popIn .4s cubic-bezier(.16,1,.3,1) both; }
+  .replay { display: none; align-self: flex-start; margin-top: 2px; padding: 8px 0; min-height: 40px; background: none; border: 0; color: var(--accent); font: 600 .9rem var(--font); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+  .replay.show { display: inline-block; }
+
+  /* The dashboard sample is usable: open a family that owes and log it. */
+  .scard-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .scard-acts .btn { min-height: 44px; padding: 10px 16px; font-size: .9rem; }
+  .dash-over b { transition: color .3s var(--ease); }
+  .dash-cap b { color: var(--ink); font-weight: 600; }
+
+  /* Features, as the ledger the rest of the page is: a name, then what it does. */
+  .feat { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 72px; align-items: start; }
+  @media (max-width: 900px) { .feat { grid-template-columns: 1fr; gap: 48px; } }
+  .ledger { margin: 0; border-top: 1px solid var(--ink); }
+  .ledger > div { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 6px 28px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+  .ledger dt { font-weight: 650; font-size: 1.02rem; letter-spacing: -0.01em; }
+  .ledger dd { margin: 0; color: var(--ink-dim); line-height: 1.55; }
+  @media (max-width: 560px) { .ledger > div { grid-template-columns: 1fr; } }
+  .ins { position: sticky; top: 100px; }
+  @media (max-width: 900px) { .ins { position: static; } }
+  .ins-stats { display: flex; gap: 20px; flex-wrap: wrap; margin: 14px 0 18px; padding-bottom: 16px; border-bottom: 1px solid var(--line-soft); }
+  .ins-stats b { display: block; font-size: 1.5rem; line-height: 1.1; font-weight: 700; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .ins-stats span { display: block; font-size: .78rem; color: var(--ink-dim); margin-top: 3px; }
+  .ins-h { font-size: .84rem; font-weight: 650; margin-bottom: 6px; }
+  .bar { display: grid; grid-template-columns: 96px minmax(0, 1fr) 44px; gap: 10px; align-items: center; padding: 5px 0; font-size: .8rem; color: var(--ink-dim); }
+  .bar i { display: block; height: 18px; border-radius: 5px; background: var(--card-2); overflow: hidden; }
+  .bar i u { display: block; height: 100%; border-radius: 5px; background: var(--accent-fill); transform-origin: 0 50%; }
+  .bar b { text-align: right; color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
+  .js .rv .bar i u { transform: scaleX(0); transition: transform .8s cubic-bezier(.16,1,.3,1) .25s; }
+  .js .rv.in .bar i u { transform: none; }
+  .js .rv.in .bar:nth-child(odd) i u { transition-delay: .35s; }
+  ::selection { background: var(--accent-light); color: var(--ink); }
 
   /* The problem, as a list of things that actually happen. */
   .leaks { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 80px; align-items: start; }
@@ -233,7 +302,11 @@
   /* Reveal on scroll, from an already-visible default when JS is off. */
   .js .rv { opacity: 0; transform: translateY(14px); transition: opacity .6s var(--ease), transform .6s var(--ease); }
   .js .rv.in { opacity: 1; transform: none; }
-  @media (prefers-reduced-motion: reduce) { .js .rv { opacity: 1; transform: none; transition: none; } .caret { animation: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .js .rv { opacity: 1; transform: none; transition: none; }
+    .js .rv .bar i u { transform: none; transition: none; }
+    .mini-toast.show { animation: none; }
+  }
 </style>
 <link rel="stylesheet" href="ux.css?v=6.44.1">
 </head>
@@ -243,6 +316,7 @@
   <div class="wrap nav-in">
     <a class="wm" href="/app" aria-label="TutorTally"><svg class="mark" viewBox="0 0 900 700" aria-hidden="true"><path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)" stroke-width="94" stroke-linecap="round"/><rect x="292" y="48" width="100" height="604" rx="14" fill="currentColor"/><rect x="512" y="48" width="100" height="604" rx="14" fill="currentColor"/></svg><span class="name">Tutor<span>Tally</span></span></a>
     <a class="nav-link opt" href="#how">How it works</a>
+    <a class="nav-link opt" href="#features">Features</a>
     <a class="nav-link opt" href="#price">Pricing</a>
     <a class="nav-link" href="/">Sign in</a>
     <a class="btn btn-primary" href="/?signup=1">Start free</a>
@@ -259,15 +333,15 @@
         <a href="/?signup=1" class="btn btn-primary btn-lg">Start free</a>
         <a href="/?demo=1" class="btn btn-ghost btn-lg">Try the demo</a>
       </div>
-      <p class="small">Free for up to 3 students. No card required. Built by a tutor who got fed up of doing this by hand.</p>
+      <p class="small">The demo opens straight away, with no sign-up. Free for up to 3 students, no card required. Built by a tutor who got fed up of doing this by hand.</p>
     </div>
 
     <div>
       <div class="dash" aria-label="Example of the TutorTally dashboard">
         <div class="dash-top"><svg viewBox="0 0 900 700" aria-hidden="true"><path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)" stroke-width="94" stroke-linecap="round"/><rect x="292" y="48" width="100" height="604" rx="14" fill="currentColor"/><rect x="512" y="48" width="100" height="604" rx="14" fill="currentColor"/></svg><div><b>Sam's TutorTally</b><span>7 active · synced 2 min ago</span></div></div>
         <div class="dash-over">
-          <div><b class="owed">£270</b><span>Still to collect</span></div>
-          <div><b>£640</b><span>Collected this month</span></div>
+          <div><b class="owed" id="dOwed">£270</b><span>Still to collect</span></div>
+          <div><b id="dPaid">£640</b><span>Collected this month</span></div>
           <div><b>7</b><span>Active students</span></div>
         </div>
         <div class="scard" role="button" tabindex="0" data-student="joe" aria-expanded="false">
@@ -287,7 +361,7 @@
             <div class="row"><span class="pill ok">Paid up</span><span class="meta" data-next="4">Next 6 Nov</span><span class="meta">Y13</span><span class="meta">£55</span></div></div><span class="chev" aria-hidden="true">›</span></div>
         </div>
       </div>
-      <p class="small dash-cap">See exactly who's paid, who owes you and who's up next. Tap a student to explore.</p>
+      <p class="small dash-cap" id="dashCap"><b>Try it here.</b> Tap Joe and log his payment.</p>
     </div>
   </div>
 </header>
@@ -312,20 +386,31 @@
       <div class="step rv">
         <div class="art"><div class="panel">
           <div class="panel-t" style="margin-bottom:10px">TutorTally</div>
-          <div class="mini"><b>Joe Fletcher</b><span class="pill warn">Overdue £180</span></div>
+          <div class="mini"><b>Joe Fletcher</b><span class="pill warn" id="joePill">Overdue £180</span></div>
           <div class="mini"><b>Amira Khan</b><span class="pill ok">Paid up</span></div>
           <div class="mini" style="border-bottom:0"><b>Priya Shah</b><span class="pill ok">Paid up</span></div>
+          <div class="mini-toast" id="joeToast" role="status">£180 logged for Joe</div>
         </div></div>
         <div class="txt"><span class="n">2</span><h3>See what you're owed.</h3>
           <p class="body">Track payments and outstanding balances without cross checking spreadsheets.</p></div>
       </div>
       <div class="step rv">
-        <div class="art"><div class="wa">
-          <div class="wa-name">Karen (Joe's mum)</div>
-          <div class="bub" id="bub"><span id="waText"></span><span class="caret"></span><span class="tick">17:42 ✓✓</span></div>
+        <div class="art"><div class="wa" id="wa" role="img" aria-label="A WhatsApp chat with Karen, Joe's mum. The tutor sends: Hi Karen! Just a note that we have 3 outstanding sessions totalling £180. Please could you settle this when you get the chance? Thanks! It shows as read, and Karen replies: So sorry, slipped my mind. Just sent it now.">
+          <div class="wa-head"><span class="wa-av">K</span><div><b>Karen (Joe's mum)</b><span id="waStatus">online</span></div></div>
+          <div class="wa-chat">
+            <div class="bub out">Hi Karen! Just a note that we have 3 outstanding sessions totalling £180. Please could you settle this when you get the chance? Thanks!
+              <span class="when">17:42<svg class="ticks" viewBox="0 0 18 11" aria-hidden="true"><path class="t1" d="M1 6l3.5 3.6 7.1-8.4"/><path class="t2" d="M7.4 8.5l1.2 1.1 8.3-8.4"/></svg></span></div>
+            <div class="bub in">So sorry, slipped my mind. Just sent it now.<span class="when">17:44</span></div>
+          </div>
+          <span class="wa-by">Written by TutorTally</span>
+          <div class="wa-bar">
+            <div class="wa-input"><span class="hint">Message</span><span class="draft">Hi Karen! Just a note that we have 3 outstanding sessions totalling £180. Please could you settle this when you get the chance? Thanks!</span></div>
+            <span class="wa-send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10.1 15 12 3.4 13.9z"/></svg></span>
+          </div>
         </div></div>
         <div class="txt"><span class="n">3</span><h3>Chase payments in seconds.</h3>
-          <p class="body">Get a ready to send WhatsApp message showing exactly what needs paying.</p></div>
+          <p class="body">One tap opens WhatsApp with the message already written: the right parent, the right amount, the number of lessons. You just press send.</p>
+          <button type="button" class="replay" id="waReplay">Play it again</button></div>
       </div>
     </div>
   </div>
@@ -382,6 +467,41 @@
   </div>
 </section>
 
+<section id="features" class="ruled">
+  <div class="wrap">
+    <div class="sec-head rv">
+      <h2>Everything your tutoring books need.</h2>
+      <p class="body" style="font-size:1.12rem">Not a CRM, not an accounts package. Just the part between a lesson being taught and the money arriving, kept right.</p>
+    </div>
+    <div class="feat">
+      <dl class="ledger rv">
+        <div><dt>Lessons</dt><dd>Read from your Google, Apple or Outlook calendar and kept in step when a lesson moves. One that never made the diary can be added by hand.</dd></div>
+        <div><dt>Who owes what</dt><dd>A balance for every family, the same sum the parent sees. The ones who have owed for a week or more are listed first, so you never have to go looking.</dd></div>
+        <div><dt>Logging a payment</dt><dd>Two taps, cash or transfer. It settles the oldest unpaid lesson first and shows you which ones before you save. Change your mind and there is an undo.</dd></div>
+        <div><dt>Chasers and receipts</dt><dd>WhatsApp messages written for you, with the amount and the number of lessons. Take cash and a receipt is ready to send.</dd></div>
+        <div><dt>Parent and pupil pages</dt><dd>A private link per family with lessons, payments and your notes on each lesson. Pupils get their own page with no money on it.</dd></div>
+        <div><dt>Cancelled and free lessons</dt><dd>Mark a lesson cancelled or free and it stays on the record without ever being charged.</dd></div>
+        <div><dt>Insights</dt><dd>What has come in this tax year, how quickly each family pays, how long money has been owed and which students your income rests on.</dd></div>
+        <div><dt>Export</dt><dd>Lessons and payments as spreadsheets, by tax year, for you or your accountant.</dd></div>
+      </dl>
+      <div class="rv ins">
+        <div class="panel" aria-label="Example of the Insights screen">
+          <div class="panel-t">Insights</div>
+          <div class="ins-stats">
+            <div><b>6 days</b><span>average wait to be paid</span></div>
+            <div><b>81%</b><span>paid within a week</span></div>
+          </div>
+          <div class="ins-h">Still owed, by age</div>
+          <div class="bar"><span>Up to a week</span><i><u style="width:34%"></u></i><b>£90</b></div>
+          <div class="bar"><span>8 to 30 days</span><i><u style="width:68%"></u></i><b>£180</b></div>
+          <div class="bar"><span>Over 30 days</span><i></i><b>£0</b></div>
+        </div>
+        <p class="small" style="margin-top:14px">Worked out from your own lessons and payments. Sample figures shown.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="price" class="ruled">
   <div class="wrap">
     <div class="sec-head rv">
@@ -399,6 +519,7 @@
           <li>WhatsApp chasers<span>1 tap</span></li>
           <li>Parent and pupil pages<span>included</span></li>
           <li>Payment history and cash receipts<span>included</span></li>
+          <li>Insights and export<span>included</span></li>
         </ul>
         <a href="/?signup=1" class="btn btn-primary btn-lg">Create my free account</a>
       </div>
@@ -518,51 +639,135 @@ if ('IntersectionObserver' in window) {
   items.forEach(el => el.classList.add('in'));
 }
 
-// The real message the app generates, typed out once it scrolls into view.
-// Word by word rather than character by character so it reads like a message
-// arriving instead of a gimmick.
-const MSG = "Hi Karen! Just a note that we have 3 outstanding sessions totalling £180. Please could you settle this when you get the chance? Thanks!";
-const target = document.getElementById('waText');
-const bub = document.getElementById('bub');
-let typed = false;
-function typeIt() {
-  if (typed) return; typed = true;
-  const words = MSG.split(' ');
-  let i = 0;
-  (function next() {
-    if (i >= words.length) { bub.classList.add('done'); return; }
-    target.textContent += (i ? ' ' : '') + words[i++];
-    setTimeout(next, 55 + Math.random() * 45);
-  })();
-}
-if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) {
-  target.textContent = MSG; bub.classList.add('done');
-} else {
-  const io2 = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) typeIt(); }), { threshold: 0.4 });
-  io2.observe(bub);
+// The chase, played once as it comes into view: the message arrives already
+// written, is sent, delivered, read, and answered, and Joe's row in the panel
+// beside it is logged as paid. The markup already shows the finished chat, so
+// with reduced motion, or with no script at all, nothing is missing.
+const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const wa = document.getElementById('wa');
+const waStatus = document.getElementById('waStatus');
+const joePill = document.getElementById('joePill');
+const joeToast = document.getElementById('joeToast');
+const waReplay = document.getElementById('waReplay');
+const STAGES = ['drafting', 'press', 'sent', 'delivered', 'read', 'reply'];
+let waTimers = [];
+
+function joePaid(paid) {
+  joePill.textContent = paid ? 'Paid up' : 'Overdue £180';
+  joePill.className = 'pill ' + (paid ? 'ok' : 'warn');
+  joeToast.classList.toggle('show', paid);
 }
 
-// Tapping a student opens their card, the way it does in the app.
-const notes = {
-  amira: 'Paid up for every lesson so far. Next lesson Tuesday at 16:00.',
-  joe: 'His last 3 lessons are unpaid, £180, the oldest from 3 weeks ago. One tap writes the message to Karen.',
-  priya: 'Paid up. Online lesson Thursday at 18:00.',
-  tom: '2 lessons unpaid, £90. Next lesson Monday at 17:00.',
+function playChase() {
+  waTimers.forEach(clearTimeout);
+  waTimers = [];
+  wa.classList.remove(...STAGES);
+  wa.classList.add('armed');
+  waStatus.textContent = 'online';
+  waReplay.classList.remove('show');
+  joePaid(false);
+  const at = (ms, fn) => waTimers.push(setTimeout(fn, ms));
+  at(500,  () => wa.classList.add('drafting'));
+  at(2100, () => wa.classList.add('press'));
+  at(2260, () => { wa.classList.remove('press'); wa.classList.add('sent'); });
+  at(3000, () => wa.classList.add('delivered'));
+  at(4000, () => { wa.classList.add('read'); waStatus.textContent = 'typing…'; });
+  at(5700, () => { wa.classList.add('reply'); waStatus.textContent = 'online'; });
+  at(7000, () => { joePaid(true); waReplay.classList.add('show'); });
+}
+
+if (!calm && 'IntersectionObserver' in window) {
+  wa.classList.add('armed');
+  const io2 = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return;
+    io2.disconnect();
+    playChase();
+  }), { threshold: 0.55 });
+  io2.observe(wa);
+  waReplay.addEventListener('click', playChase);
+  // Nothing keeps ticking in a tab nobody is looking at.
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden || !waTimers.length) return;
+    waTimers.forEach(clearTimeout); waTimers = [];
+    wa.classList.remove('armed', ...STAGES);
+    waStatus.textContent = 'online';
+    joePaid(true);
+    waReplay.classList.add('show');
+  });
+} else {
+  joePaid(true);
+}
+
+// The dashboard sample works. Open a family that owes, log the payment, and
+// the totals move the way they do in the app. Nothing is sent anywhere.
+const book = {
+  joe:   { owes: 180, first: 'Joe',   open: 'His last 3 lessons are unpaid, the oldest from 3 weeks ago.', done: 'Logged. It settled his 3 oldest lessons, and Karen\'s page now says paid.' },
+  tom:   { owes: 90,  first: 'Tom',   open: '2 lessons unpaid. Next lesson Monday at 17:00.', done: 'Logged. Both lessons are settled.' },
+  amira: { owes: 0,   first: 'Amira', open: 'Paid up for every lesson so far. Next lesson Tuesday at 16:00.' },
+  priya: { owes: 0,   first: 'Priya', open: 'Paid up. Online lesson Thursday at 18:00.' },
 };
+const totals = { owed: 270, paid: 640 };
+const dOwed = document.getElementById('dOwed');
+const dPaid = document.getElementById('dPaid');
+const dashCap = document.getElementById('dashCap');
+
+function countTo(el, from, to) {
+  if (calm) { el.textContent = '£' + to; return; }
+  const t0 = performance.now();
+  (function step(now) {
+    const k = Math.min(1, (now - t0) / 650);
+    el.textContent = '£' + Math.round(from + (to - from) * (1 - Math.pow(1 - k, 4)));
+    if (k < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
 const cards = document.querySelectorAll('.scard');
+function noteFor(card) {
+  const who = book[card.dataset.student];
+  const note = document.createElement('div');
+  note.className = 'scard-note';
+  const demo = '<a href="/?demo=1">Do it for real in the demo →</a>';
+  if (who.owes > 0) {
+    note.innerHTML = who.open + '<div class="scard-acts"><button type="button" class="btn btn-primary" data-log>Log £' + who.owes + ' payment</button></div>';
+  } else {
+    note.innerHTML = (who.logged ? who.done : who.open) + ' ' + demo;
+  }
+  return note;
+}
 function toggleCard(card) {
   const open = card.getAttribute('aria-expanded') === 'true';
   cards.forEach(c => { c.setAttribute('aria-expanded', 'false'); c.querySelector('.scard-note')?.remove(); });
   if (open) return;
   card.setAttribute('aria-expanded', 'true');
-  const note = document.createElement('div');
-  note.className = 'scard-note';
-  note.innerHTML = notes[card.dataset.student] + ' <a href="/?demo=1">See it in the demo →</a>';
-  card.append(note);
+  card.append(noteFor(card));
+}
+function logPayment(card) {
+  const who = book[card.dataset.student];
+  const amount = who.owes;
+  who.owes = 0;
+  who.logged = true;
+  const pill = card.querySelector('.pill');
+  pill.textContent = 'Paid up';
+  pill.className = 'pill ok';
+  countTo(dOwed, totals.owed, totals.owed - amount);
+  countTo(dPaid, totals.paid, totals.paid + amount);
+  totals.owed -= amount;
+  totals.paid += amount;
+  if (totals.owed === 0) dOwed.classList.remove('owed');
+  card.querySelector('.scard-note').replaceWith(noteFor(card));
+  dashCap.innerHTML = totals.owed
+    ? '<b>That is the whole job.</b> ' + (book.joe.owes ? 'Joe' : 'Tom') + ' still owes £' + totals.owed + '.'
+    : '<b>Everyone is paid up.</b> <a href="/?demo=1" style="color:var(--accent);font-weight:600;text-underline-offset:3px">Now try it with a full week of lessons →</a>';
 }
 cards.forEach(card => {
-  card.addEventListener('click', e => { if (!e.target.closest('a')) toggleCard(card); });
-  card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCard(card); } });
+  card.addEventListener('click', e => {
+    if (e.target.closest('[data-log]')) return logPayment(card);
+    if (!e.target.closest('a')) toggleCard(card);
+  });
+  card.addEventListener('keydown', e => {
+    if (e.target !== card) return;
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCard(card); }
+  });
 });
 </script>
 </body>
