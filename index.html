@@ -4218,7 +4218,7 @@ function InsightSection({ title, sub, children }) {
   );
 }
 
-function Insights({ students, lessons, payments, allocations, rateHistory }) {
+function Insights({ students, lessons, payments, allocations, rateHistory, showCash = false }) {
   const M = useMoney();
   const N = useNameDisplay();
   const today = todayISO();
@@ -4323,16 +4323,18 @@ function Insights({ students, lessons, payments, allocations, rateHistory }) {
   const free = lessons.filter(l => l.is_complimentary && l.status === 'completed' && l.lesson_date >= yearAgo && l.lesson_date <= today);
   const freeValue = sum(free.map(l => getRateOnDate(l.student_id, rateHistory, l.lesson_date)));
   const perWeek = taught.length / weeks;
+  const cancelledCount = lessons.filter(l => l.status === 'cancelled' && l.lesson_date >= yearAgo && l.lesson_date <= today).length;
+  const yearTaught = lessons.filter(l => l.status === 'completed' && l.lesson_date >= yearAgo && l.lesson_date <= today).length;
 
   return (
     <div>
       <div style={{...quiet, fontSize:'0.8rem'}}>Worked out from your lessons and payments as they stand right now.</div>
 
       <InsightSection title={`Tax year ${ty.label}`}
-        sub={`Money received from ${longDate(ty.start)} to today, counted on the day it was paid. Ask your accountant whether your return uses money received or money earned.`}>
+        sub={`Money received from ${longDate(ty.start)} to today, counted on the day it was paid.`}>
         <div style={{display:'flex', gap:14, flexWrap:'wrap'}}>
           <InsightStat value={M(tyTotal)} label="received so far" />
-          <InsightStat value={M(tyCash)} label="of that in cash" />
+          {showCash && <InsightStat value={M(tyCash)} label="of that in cash" />}
           <InsightStat value={lastTyTotal > 0 ? M(lastTyTotal) : '-'} label={`all of ${lastTy.label}`} />
         </div>
       </InsightSection>
@@ -4406,6 +4408,11 @@ function Insights({ students, lessons, payments, allocations, rateHistory }) {
             {DAYS.map((d, i) => (
               <InsightBar key={d} label={d} share={perDay[i] / dayPeak} value={perDay[i] || '-'} />
             ))}
+            {cancelledCount > 0 && (
+              <div style={{...quiet, fontSize:'0.78rem', marginTop:8}}>
+                {cancelledCount} lesson{cancelledCount === 1 ? ' was' : 's were'} cancelled in the last 12 months, {Math.round((cancelledCount / (cancelledCount + yearTaught)) * 100)}% of those booked.
+              </div>
+            )}
             {free.length > 0 && freeValue > 0 && (
               <div style={{...quiet, fontSize:'0.78rem', marginTop:8}}>
                 The {free.length} free lesson{free.length === 1 ? '' : 's'} you gave in the last 12 months would have come to {M(freeValue)}.
@@ -5841,7 +5848,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
         {tool === 'insights' && (
           <>
             {groupHeader('insights')}
-            <Insights students={students} lessons={lessons} payments={payments} allocations={allocations} rateHistory={rateHistory} />
+            <Insights students={students} lessons={lessons} payments={payments} allocations={allocations} rateHistory={rateHistory} showCash={danielOnly} />
           </>
         )}
         {tool === 'export' && (
@@ -7256,15 +7263,16 @@ function AddLessonSheet({ student, lessons, session, onClose, onSaved }) {
   );
 }
 
-function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree, onDelete, toggling, hourly, onSaved }) {
+function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree, onDelete, onCancelLesson, onRestoreLesson, toggling, hourly, onSaved }) {
+  const cancelled = lesson.status === 'cancelled';
   const M = useMoney();
   const { nameMode } = usePrivacy();
   const [cls, close] = useAnimatedClose(onClose);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const d = new Date(lesson.lesson_date + 'T12:00:00');
   const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  const statusClass = lesson.is_complimentary ? 'ok' : lesson.status === 'completed' ? 'ok' : lesson.status === 'missed' ? 'warn' : 'neutral';
-  const statusLabel = lesson.is_complimentary ? 'Free lesson' : lessonStatusLabel(lesson.status);
+  const statusClass = cancelled ? 'neutral' : lesson.is_complimentary ? 'ok' : lesson.status === 'completed' ? 'ok' : lesson.status === 'missed' ? 'warn' : 'neutral';
+  const statusLabel = cancelled ? 'Cancelled · not charged' : lesson.is_complimentary ? 'Free lesson' : lessonStatusLabel(lesson.status);
   const METHODS = { cash:'cash', bank_transfer:'bank transfer', monzo_auto:'bank transfer', other:'payment' };
   const st = payState || { rate: lessonRate, paid: 0, payments: [], settled: false, partial: false };
   const moneySeed = lesson.id + ':rate';
@@ -7307,10 +7315,10 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
         </div>
         <div style={{display:'flex',gap:6,marginBottom:16,flexWrap:'wrap'}}>
           <span className={`pill ${statusClass}`}>{statusLabel}</span>
-          {!lesson.is_complimentary && lessonRate != null && (
+          {!cancelled && !lesson.is_complimentary && lessonRate != null && (
             <span className="pill neutral">{M(lessonRate, moneySeed)}</span>
           )}
-          {lesson.is_complimentary ? null
+          {cancelled || lesson.is_complimentary ? null
             : lesson.pre_settled ? <span className="pill ok">settled before 27 Jul</span>
             : st.settled ? <span className="pill ok">paid</span>
             : st.partial ? <span className="pill warn">part paid · {M(st.paid, moneySeed + ':paid')} of {M(st.rate, moneySeed)}</span>
@@ -7343,7 +7351,7 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
             )}
           </div>
         )}
-        {hourly && <div className="wk-sum" style={{marginBottom:16}}>
+        {hourly && !cancelled && <div className="wk-sum" style={{marginBottom:16}}>
           <div className="wk-row">
             <div className="field" style={{marginBottom:10}}><label>Length</label>
               <select value={len} onChange={e => setLen(e.target.value)}>
@@ -7365,10 +7373,11 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
           {saveError && <p className="wk-error" role="alert">{saveError}</p>}
           <button type="button" className="btn save" style={{width:'100%'}} disabled={saving} onClick={saveHourly}>{saving ? 'Saving…' : 'Save lesson'}</button>
         </div>}
-        {!hourly && nameMode === 'normal' && <div className="field" style={{marginBottom:16}}>
-          <label>Lesson notes · the parent can see these</label>
+        {(!hourly || cancelled) && nameMode === 'normal' && <div className="field" style={{marginBottom:16}}>
+          {/* A cancelled lesson is left off the parent page altogether. */}
+          <label>{cancelled ? 'Notes · only you see these' : 'Lesson notes · the parent can see these'}</label>
           <textarea maxLength={4000} value={notes} onChange={e => setNotes(e.target.value)}
-            placeholder="What you covered and how it went. Shown when the parent taps this lesson on their page." />
+            placeholder={cancelled ? 'Why it was cancelled, if worth remembering.' : 'What you covered and how it went. Shown when the parent taps this lesson on their page.'} />
           {saveError && <p className="wk-error" role="alert">{saveError}</p>}
           {notesChanged && <button type="button" className="btn save" style={{width:'100%', marginTop:8}} disabled={saving} onClick={saveNotes}>{saving ? 'Saving…' : 'Save notes'}</button>}
         </div>}
@@ -7381,24 +7390,42 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
         )}
         {confirmingDelete ? (
           <>
+            {/* Two different things used to share one Delete button: a lesson
+                that did not happen, and a record that should not exist. */}
+            {!cancelled && onCancelLesson && (
+              <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:10, lineHeight:1.45}}>
+                <b style={{color:'var(--ink)'}}>Cancel</b> keeps it on the record as cancelled and never charges for it.
+                {lesson.google_event_id ? ' It stays cancelled when your calendar syncs.' : ''}
+                {' '}You can restore it later.
+              </div>
+            )}
             <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:10, lineHeight:1.45}}>
+              <b style={{color:'var(--ink)'}}>Delete</b> removes it completely.{' '}
               {lesson.google_event_id
-                ? 'This one came from your calendar, so remove it there too - otherwise the next sync puts it straight back.'
-                : 'This was added by hand, so it won’t come back.'}
-              {' '}Any money covering it moves to the next unpaid lesson.
+                ? 'It came from your calendar, so remove it there too, or the next sync puts it straight back.'
+                : 'It was added by hand, so it will not come back.'}
+              {' '}Either way, any money covering it moves to the next unpaid lesson.
             </div>
             <div className="btn-row">
               <button className="btn cancel" onClick={() => setConfirmingDelete(false)}>Keep</button>
-              <button className="btn save" style={{background:'var(--warn)'}} onClick={onDelete} disabled={toggling}>
-                {toggling ? '…' : 'Delete lesson'}
+              <button className="btn" style={{background:'var(--danger-fill)', color:'#fff'}} onClick={onDelete} disabled={toggling}>
+                {toggling ? '…' : 'Delete'}
               </button>
+              {!cancelled && onCancelLesson && (
+                <button className="btn save" onClick={onCancelLesson} disabled={toggling}>
+                  {toggling ? '…' : 'Cancel lesson'}
+                </button>
+              )}
             </div>
           </>
         ) : (
           <div className="btn-row">
             <button className="btn cancel" onClick={close}>Close</button>
             <button className="btn" style={{background:'var(--danger-fill)', color:'#fff', flex:'0 0 auto', minWidth:'auto', padding:'11px 14px'}}
-              onClick={() => setConfirmingDelete(true)}>Delete</button>
+              onClick={() => setConfirmingDelete(true)}>{cancelled || !onCancelLesson ? 'Delete' : 'Cancel or delete'}</button>
+            {cancelled && onRestoreLesson && (
+              <button className="btn save" onClick={onRestoreLesson} disabled={toggling}>{toggling ? '…' : 'Restore lesson'}</button>
+            )}
             {lesson.status === 'completed' && (
               <button
                 className="btn save"
@@ -8133,6 +8160,23 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
     onDataChanged();
   }
 
+  // A cancelled lesson stays on the record, is never charged, and is locked so
+  // the calendar sync cannot quietly turn it back into a lesson that happened.
+  // Restoring hands it back to the sync with whichever status the clock says.
+  async function setCancelled(lesson, cancel) {
+    setToggling(true);
+    const happened = lesson.lesson_date < todayISO()
+      || (lesson.lesson_date === todayISO() && lesson.start_time && lesson.start_time.slice(0, 5) < londonHHMM());
+    const change = cancel
+      ? { status: 'cancelled', status_locked: true }
+      : { status: happened ? 'completed' : 'scheduled', status_locked: false };
+    if (!await saved(() => supabase.from('tutoring_lessons').update(change).eq('id', lesson.id))) { setToggling(false); return; }
+    await supabase.rpc('reallocate_student_payments', { p_student_id: student.id });
+    setToggling(false);
+    setDetailLesson(null);
+    onDataChanged();
+  }
+
   async function archiveStudent() {
     if (!await saved(() => supabase.from('tutoring_students').update({ active: false }).eq('id', student.id))) return;
     setShowMoreTools(false);
@@ -8158,8 +8202,12 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
   const sixMonthsOut = new Date();
   sixMonthsOut.setMonth(sixMonthsOut.getMonth() + 6);
   const sixMonthsOutStr = sixMonthsOut.toISOString().slice(0, 10);
-  const upcomingNext6 = upcomingLessons.filter(l => l.lesson_date <= sixMonthsOutStr);
-  const allPastLessons = studentLessons.filter(l => l.status !== 'scheduled');
+  const cardToday = todayISO();
+  const cancelledAhead = l => l.status === 'cancelled' && l.lesson_date >= cardToday;
+  const upcomingNext6 = studentLessons
+    .filter(l => (l.status === 'scheduled' || cancelledAhead(l)) && l.lesson_date <= sixMonthsOutStr)
+    .sort((a, b) => (a.lesson_date + (a.start_time || '')).localeCompare(b.lesson_date + (b.start_time || '')));
+  const allPastLessons = studentLessons.filter(l => l.status !== 'scheduled' && !cancelledAhead(l));
   const pastLessons = allPastLessons.slice(0, Math.max(historyShown, unpaidCount));
 
   const groupedLessons = groupByMonth(pastLessons);
@@ -8287,8 +8335,8 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                     {l.start_time && <span style={{color:'var(--muted)'}}> · {l.start_time}</span>}
                   </span>
                   <span style={{display:'flex',alignItems:'center'}}>
-                    <span className="lesson-status scheduled" style={paidAhead ? {color:'var(--accent)'} : {}}>
-                      {inWeekly ? 'Weekly plan' : paidAhead ? (l.is_complimentary ? 'Free' : 'Paid already') : 'Upcoming'}
+                    <span className="lesson-status scheduled" style={l.status === 'cancelled' ? {color:'var(--muted)'} : paidAhead ? {color:'var(--accent)'} : {}}>
+                      {l.status === 'cancelled' ? 'Cancelled' : inWeekly ? 'Weekly plan' : paidAhead ? (l.is_complimentary ? 'Free' : 'Paid already') : 'Upcoming'}
                     </span>
                     <span className="chev">›</span>
                   </span>
@@ -8329,6 +8377,7 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                   </span>
                   <span style={{display:'flex',alignItems:'center'}}>
                     {(() => {
+                      if (l.status === 'cancelled') return <span className="lesson-status" style={{color:'var(--muted)'}}>Cancelled</span>;
                       const st = l.is_complimentary ? null : lessonPayState(l);
                       const settled = l.is_complimentary || l.pre_settled || (st && st.settled);
                       return (
@@ -8523,6 +8572,10 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
           onClose={() => setDetailLesson(null)}
           onToggleFree={() => toggleComplimentary(detailLesson)}
           onDelete={() => deleteLesson(detailLesson)}
+          // Cancelling needs the status lock in the database (lesson_status_lock.sql).
+          // Until that column exists the option is not offered, rather than offered and refused.
+          onCancelLesson={(DEMO_MODE || 'status_locked' in detailLesson) ? () => setCancelled(detailLesson, true) : null}
+          onRestoreLesson={(DEMO_MODE || 'status_locked' in detailLesson) ? () => setCancelled(detailLesson, false) : null}
           toggling={toggling}
           hourly={!!(detailLesson.hourly_plan_id || TTHourly.planFor(student.id, detailLesson.lesson_date))}
           onSaved={() => { setDetailLesson(null); onDataChanged(); }}
@@ -9638,7 +9691,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.45.0</div>}
+        {!loading && <div className="version-tag">v6.46.0</div>}
       </div>
 
       {showAddModal && (
