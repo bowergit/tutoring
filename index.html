@@ -425,6 +425,17 @@
   .note-editor[data-empty="true"]::before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
   .note-editor ul { margin: 2px 0; padding-left: 22px; }
   .note-editor b, .note-editor strong { font-weight: 700; }
+  .note-editor-wrap { width: 100%; }
+  .note-toolbar { display: flex; gap: 6px; margin-bottom: 6px; }
+  .note-tool {
+    min-width: 40px; height: 36px; padding: 0 10px; border-radius: var(--r-md);
+    border: 1px solid var(--line); background: var(--card-2); color: var(--ink-dim);
+    font: inherit; font-size: 0.95rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s var(--ease), color .15s var(--ease), border-color .15s var(--ease);
+  }
+  .note-tool:hover { color: var(--ink); border-color: var(--ink-dim); }
+  .note-tool.on { background: var(--accent-fill); color: var(--on-accent); border-color: var(--accent-fill); }
+  .note-tool:focus-visible { outline: none; box-shadow: var(--ring); }
   .empty   { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 0.9rem; }
   .loading { text-align: center; color: var(--muted); padding: 48px 20px; font-size: 0.88rem; letter-spacing: 0.04em; }
 
@@ -4491,7 +4502,8 @@ function ExportRecords({ students, lessons, payments, allocations, rateHistory }
         l.is_weekly_charge ? 'Charged' : lessonStatusLabel(l.status),
         chargeOf(l),
         l.is_weekly_charge || TTWeekly.covers(l) ? '' : l.pre_settled ? 'settled' : round2(paidByLesson.get(l.id) || 0),
-        l.tutor_notes || '',
+        // Formatting markers mean nothing in a spreadsheet; bullets keep their dot.
+        String(l.tutor_notes || '').replace(/\*\*|__/g, '').replace(/^\s*[-*•]\s+/gm, '• '),
       ]));
     setDone(`Saved ${lessonRows.length} lesson${lessonRows.length === 1 ? '' : 's'} to your downloads.`);
   }
@@ -5070,7 +5082,53 @@ function RichNoteEditor({ value, onChange, disabled = false, placeholder = '' })
     emit();
   }
 
+  // Buttons for the three things a note can hold. Keyboard shortcuts and the
+  // iPhone Format menu were the only way in before, and nobody found them.
+  // onMouseDown is stopped so the box keeps its selection while you tap.
+  const [active, setActive] = useState({ b: false, u: false, list: false });
+  function readActive() {
+    const el = ref.current, sel = window.getSelection();
+    if (!el || !sel.rangeCount || !el.contains(sel.anchorNode)) return;
+    try {
+      setActive({
+        b: document.queryCommandState('bold'),
+        u: document.queryCommandState('underline'),
+        list: !!(sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement)?.closest('li'),
+      });
+    } catch {}
+  }
+  useEffect(() => {
+    document.addEventListener('selectionchange', readActive);
+    return () => document.removeEventListener('selectionchange', readActive);
+  }, []);
+  function apply(cmd) {
+    const el = ref.current;
+    if (!el || disabled) return;
+    if (!el.contains(document.activeElement)) el.focus();
+    try { document.execCommand('styleWithCSS', false, false); } catch {}
+    document.execCommand(cmd, false, null);
+    noteNormalise(el);
+    emit();
+    readActive();
+  }
+  const toolBtn = (cmd, on, label, face) => (
+    <button type="button" className={`note-tool${on ? ' on' : ''}`} aria-label={label} title={label} aria-pressed={on}
+      disabled={disabled} onMouseDown={e => e.preventDefault()} onClick={() => apply(cmd)}>{face}</button>
+  );
+
   return (
+    <div className="note-editor-wrap">
+    {!disabled && (
+      <div className="note-toolbar" role="toolbar" aria-label="Formatting">
+        {toolBtn('bold', active.b, 'Bold', <b>B</b>)}
+        {toolBtn('underline', active.u, 'Underline', <u>U</u>)}
+        {toolBtn('insertUnorderedList', active.list, 'Bullet list',
+          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+            <circle cx="3.5" cy="4.5" r="1" fill="currentColor" /><circle cx="3.5" cy="9" r="1" fill="currentColor" /><circle cx="3.5" cy="13.5" r="1" fill="currentColor" />
+            <path d="M7.5 4.5h8M7.5 9h8M7.5 13.5h8" />
+          </svg>)}
+      </div>
+    )}
     <div
       ref={ref}
       className="note-editor"
@@ -5084,6 +5142,7 @@ function RichNoteEditor({ value, onChange, disabled = false, placeholder = '' })
       onInput={() => { noteNormalise(ref.current); noteAutoList(ref.current); emit(); }}
       onPaste={onPaste}
     />
+    </div>
   );
 }
 
@@ -7385,14 +7444,14 @@ function LessonDetailSheet({ lesson, payState, lessonRate, onClose, onToggleFree
           <label className="checkbox-row" style={{fontSize:'.84rem', marginBottom:6}}><input type="checkbox" checked={ownPrice} onChange={e => { setOwnPrice(e.target.checked); if (e.target.checked && !price) setPrice(String(previewPrice ?? '')); }} />Set the price by hand</label>
           <label className="checkbox-row" style={{fontSize:'.84rem', marginBottom:10}}><input type="checkbox" checked={free} onChange={e => setFree(e.target.checked)} />Complimentary (no charge)</label>
           <div className="field" style={{marginBottom:10}}><label>Lesson notes · the parent can see these</label>
-            <textarea maxLength={4000} value={notes} onChange={e => setNotes(e.target.value)} placeholder="What you covered and how it went. Shown on the parent's page and used in termly summaries." /></div>
+            <RichNoteEditor value={notes} onChange={v => setNotes(v.slice(0, 4000))} placeholder="What you covered and how it went. Shown on the parent's page and used in termly summaries." /></div>
           {saveError && <p className="wk-error" role="alert">{saveError}</p>}
           <button type="button" className="btn save" style={{width:'100%'}} disabled={saving} onClick={saveHourly}>{saving ? 'Saving…' : 'Save lesson'}</button>
         </div>}
         {(!hourly || cancelled) && nameMode === 'normal' && <div className="field" style={{marginBottom:16}}>
           {/* A cancelled lesson is left off the parent page altogether. */}
           <label>{cancelled ? 'Notes · only you see these' : 'Lesson notes · the parent can see these'}</label>
-          <textarea maxLength={4000} value={notes} onChange={e => setNotes(e.target.value)}
+          <RichNoteEditor value={notes} onChange={v => setNotes(v.slice(0, 4000))}
             placeholder={cancelled ? 'Why it was cancelled, if worth remembering.' : 'What you covered and how it went. Shown when the parent taps this lesson on their page.'} />
           {saveError && <p className="wk-error" role="alert">{saveError}</p>}
           {notesChanged && <button type="button" className="btn save" style={{width:'100%', marginTop:8}} disabled={saving} onClick={saveNotes}>{saving ? 'Saving…' : 'Save notes'}</button>}
@@ -7558,6 +7617,19 @@ function HomeScreenSteps() {
   );
   return (
     <>
+      {/* A real recording of it being done, which beats any description of
+          where Apple has put the Share button this year. Silent and short,
+          so it loops on its own; the steps underneath are for anyone who
+          wants to read along. */}
+      <div style={{display:'flex', justifyContent:'center', margin:'4px 0 16px'}}>
+        <video
+          src="brand/add-to-home-screen.mp4"
+          poster="brand/add-to-home-screen.jpg"
+          autoPlay muted loop playsInline controls preload="metadata"
+          aria-label="Screen recording: adding TutorTally to the iPhone Home Screen"
+          style={{display:'block', maxHeight:'50vh', maxWidth:'100%', aspectRatio:'360 / 780', borderRadius:16, border:'1px solid var(--line, rgba(127,127,127,.25))', background:'#000'}}
+        />
+      </div>
       <ol style={{listStyle:'none', padding:0, margin:'4px 0 6px'}}>
         {step(1, <>Tap the Share button <ShareGlyph />. In Safari on newer iPhones it sits inside the <b>•••</b> button at the bottom. In Chrome it is at the top right.</>)}
         {step(2, <>Scroll down the list and tap <b>Add to Home Screen</b>.</>)}
@@ -9820,7 +9892,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.47.0</div>}
+        {!loading && <div className="version-tag">v6.47.1</div>}
       </div>
 
       {showAddModal && (
