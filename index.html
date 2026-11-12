@@ -5762,6 +5762,13 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
                   subtitle="Your details, password and account deletion"
                   onClick={() => setTool('yourname')}
                 />
+                {homeScreenTipRelevant() && (
+                  <ToolsRow
+                    title="Add to your Home Screen"
+                    subtitle="Open TutorTally from its own icon, like an app"
+                    onClick={() => setTool('homescreen')}
+                  />
+                )}
                 <ToolsRow
                   title="Replay walkthrough"
                   subtitle="Show the guided setup again"
@@ -5788,6 +5795,15 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               activeStudents={students.filter(s => s.active).length}
               ownerName={session?.user?.user_metadata?.display_name}
             />
+          </>
+        )}
+        {tool === 'homescreen' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:12}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Add to your Home Screen</h2>
+            </div>
+            <HomeScreenSteps />
           </>
         )}
         {tool === 'privacy' && (
@@ -7479,6 +7495,102 @@ function AppIcon({ name }) {
 }
 
 
+// ---------- Home Screen tip (iPhone / iPad) ----------
+// On an iPhone the app is far nicer from its own icon: full screen, no Safari
+// bars, opens where you left it. Apple gives no install prompt, so the tutor
+// has to be shown the Share > Add to Home Screen route. It is a tip, not a
+// setup step, so it waits until they have settled in (used on a few separate
+// days) and is offered as a popup once. After that it lives in Settings, and
+// disappears from there too once they are opening it from the icon.
+const A2HS_DAYS_KEY = 'tt_days_used';
+const A2HS_OFFERED_KEY = 'tt_a2hs_offered';
+const A2HS_MIN_DAYS = 3;
+
+function isAppleMobile() {
+  const ua = navigator.userAgent || '';
+  // iPadOS reports itself as a Mac, so a Mac with a touch screen is an iPad.
+  return /iPhone|iPod|iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+}
+function isRunningAsWebApp() {
+  return window.navigator.standalone === true
+    || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+}
+function homeScreenTipRelevant() {
+  return isAppleMobile() && !isRunningAsWebApp();
+}
+// Counts distinct days the app was opened, so "used for a while" means a few
+// separate days rather than lots of taps in the first sitting.
+function noteDayUsed() {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const days = JSON.parse(localStorage.getItem(A2HS_DAYS_KEY) || '[]');
+    if (!days.includes(today)) {
+      days.push(today);
+      localStorage.setItem(A2HS_DAYS_KEY, JSON.stringify(days.slice(-10)));
+    }
+    return days.length;
+  } catch (e) { return 0; }
+}
+function homeScreenTipDue() {
+  if (!homeScreenTipRelevant()) return false;
+  try {
+    if (localStorage.getItem(A2HS_OFFERED_KEY)) return false;
+    return JSON.parse(localStorage.getItem(A2HS_DAYS_KEY) || '[]').length >= A2HS_MIN_DAYS;
+  } catch (e) { return false; }
+}
+function markHomeScreenTipOffered() {
+  try { localStorage.setItem(A2HS_OFFERED_KEY, new Date().toISOString()); } catch (e) {}
+}
+
+function ShareGlyph() {
+  return <svg width="15" height="17" viewBox="0 0 15 19" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-label="Share" style={{verticalAlign:'-3px', margin:'0 2px'}}>
+    <path d="M7.5 1.5v10M4 5l3.5-3.5L11 5" />
+    <path d="M5 8H2.5v9h10V8H10" />
+  </svg>;
+}
+
+function HomeScreenSteps() {
+  const step = (n, body) => (
+    <li style={{display:'flex', gap:12, alignItems:'flex-start', marginBottom:12}}>
+      <span style={{flex:'0 0 24px', height:24, borderRadius:12, background:'var(--accent-fill)', color:'var(--on-accent)', fontSize:'0.78rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center'}}>{n}</span>
+      <span style={{lineHeight:1.45, paddingTop:2}}>{body}</span>
+    </li>
+  );
+  return (
+    <>
+      <ol style={{listStyle:'none', padding:0, margin:'4px 0 6px'}}>
+        {step(1, <>Tap the Share button <ShareGlyph />. In Safari on newer iPhones it sits inside the <b>•••</b> button at the bottom. In Chrome it is at the top right.</>)}
+        {step(2, <>Scroll down the list and tap <b>Add to Home Screen</b>.</>)}
+        {step(3, <>Leave <b>Open as Web App</b> switched on if you see it, then tap <b>Add</b>.</>)}
+        {step(4, <>Open TutorTally from the new icon. You will need to sign in once more there, as it keeps its own login.</>)}
+      </ol>
+      <div style={{fontSize:'0.8rem', color:'var(--muted)', lineHeight:1.5}}>
+        It then opens full screen like any other app, without the browser bars, and stays signed in.
+      </div>
+    </>
+  );
+}
+
+function HomeScreenTipModal({ onClose }) {
+  const [cls, close] = useAnimatedClose(onClose);
+  return (
+    <div className={`overlay${cls}`} onClick={e => e.target === e.currentTarget && close()}>
+      <div className={`sheet${cls}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
+        <h2 style={{marginTop:0}}>Quick tip: put TutorTally on your Home Screen</h2>
+        <p style={{marginTop:0, color:'var(--muted)', lineHeight:1.5}}>
+          Nothing you need to do, but it makes TutorTally feel like a proper app on your phone. Takes about ten seconds.
+        </p>
+        <HomeScreenSteps />
+        <button className="btn save" style={{width:'100%', marginTop:16}} onClick={close}>Got it</button>
+        <div style={{fontSize:'0.76rem', color:'var(--muted)', textAlign:'center', marginTop:10}}>
+          You can find this again in Settings.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DialogClose({ onClose }) {
   const ref = React.useRef(null);
   const titleId = React.useId();
@@ -9137,6 +9249,23 @@ function App() {
   const [entitlement, setEntitlement] = useState(undefined);
   const [blockedOnce, setBlockedOnce] = useState(false);
   const [limitPrompt, setLimitPrompt] = useState(false);
+
+  // The Home Screen tip. Each signed-in open counts the day; once they have
+  // used it on a few separate days, and only on an iPhone/iPad browser tab,
+  // it is offered once, a little after load and only if nothing else is open.
+  const [homeTipOpen, setHomeTipOpen] = useState(false);
+  const signedInId = session?.user?.id;
+  useEffect(() => { if (signedInId) noteDayUsed(); }, [signedInId]);
+  useEffect(() => {
+    if (!signedInId || loading || walkthroughOpen || !students.some(s => s.active)) return;
+    if (!homeScreenTipDue()) return;
+    const t = setTimeout(() => {
+      if (document.querySelector('.overlay') || !homeScreenTipDue()) return;
+      markHomeScreenTipOffered();
+      setHomeTipOpen(true);
+    }, 6000);
+    return () => clearTimeout(t);
+  }, [signedInId, loading, walkthroughOpen, students.length]);
   const [billingNotice, setBillingNotice] = useState(null);
   const [billingCheckExpired, setBillingCheckExpired] = useState(false);
   const [billingTick, setBillingTick] = useState(0);
@@ -9691,7 +9820,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.46.0</div>}
+        {!loading && <div className="version-tag">v6.47.0</div>}
       </div>
 
       {showAddModal && (
@@ -9742,6 +9871,8 @@ function App() {
           onDone={() => { setWalkthroughOpen(false); setWalkthroughPaused(false); }}
         />
       )}
+
+      {homeTipOpen && <HomeScreenTipModal onClose={() => setHomeTipOpen(false)} />}
 
       {limitPrompt && (
         <StudentLimitModal
