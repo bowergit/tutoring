@@ -714,6 +714,10 @@
   .tri[data-v="dummy"]  .tri-knob { left:4px; }
   .tri[data-v="normal"] .tri-knob { left:45px; }
   .tri[data-v="hidden"] .tri-knob { left:86px; }
+  /* Two positions only: real or hidden. Same look as the three-way switch. */
+  .tri.two { width:88px; padding:0; font:inherit; display:block; }
+  .tri.two .tri-knob { left:4px; }
+  .tri.two[data-v="hidden"] .tri-knob { left:44px; }
   .tri-state { font-size:0.72rem; font-weight:600; margin-top:5px; text-align:right; }
   .tri-state.dummy  { color:var(--gold); }
   .tri-state.normal { color:var(--accent); }
@@ -2496,6 +2500,29 @@ function PrivacyToggle3({ title, sub, value, onChange }) {
           <div className="tri-zone r" onClick={() => onChange('hidden')} />
         </div>
         <div className={`tri-state ${value}`}>{TRI_WORD[value]}</div>
+      </div>
+    </div>
+  );
+}
+
+// Names can only be shown or hidden. Fake names were dropped: a made-up name
+// next to a real lesson was more confusing than useful.
+function PrivacySwitch2({ title, sub, value, onChange }) {
+  const on = value === 'hidden';
+  return (
+    <div className="tri-row">
+      <div className="tri-meta">
+        <div className="tri-title">{title}</div>
+        <div className="tri-sub">{sub}</div>
+      </div>
+      <div>
+        <button type="button" className="tri two" data-v={on ? 'hidden' : 'normal'}
+          role="switch" aria-checked={on} aria-label={`Hide ${title.replace(/^\W+\s*/, '').toLowerCase()}`}
+          onClick={() => onChange(on ? 'normal' : 'hidden')}>
+          <span className="tri-edge r">✕</span>
+          <span className="tri-knob">{on ? '✕' : '✓'}</span>
+        </button>
+        <div className={`tri-state ${on ? 'hidden' : 'normal'}`}>{on ? 'Hidden' : 'Showing real names'}</div>
       </div>
     </div>
   );
@@ -5893,8 +5920,8 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
             </div>
             <div style={{fontSize:'0.8rem', color:'var(--muted)', marginBottom:6, lineHeight:1.45}}>
               For showing the app to someone without handing over your rates or
-              your students' names. Slide left for believable fake data, right to
-              blank it out entirely.
+              your students' names. Amounts can be swapped for believable fake
+              figures or blanked out; names can be hidden.
             </div>
             <PrivacyToggle3
               title="💰 Amounts"
@@ -5902,18 +5929,12 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               value={moneyMode}
               onChange={setMoneyMode}
             />
-            <PrivacyToggle3
+            <PrivacySwitch2
               title="🧑 Names"
               sub="Students, parents and payer names."
               value={nameMode}
               onChange={setNameMode}
             />
-            <div style={{fontSize:'0.76rem', color:'var(--gold)', marginTop:14, lineHeight:1.5}}>
-              While either switch is off centre, the add/edit forms show masked
-              values and go read-only - a field displaying a fake number that you
-              could still save would put fake data in your real records. The text
-              the payment record copies for a parent stays real either way.
-            </div>
           </>
         )}
         {tool === 'yourname' && (
@@ -9365,7 +9386,8 @@ function App() {
     try {
       const p = JSON.parse(localStorage.getItem(PRIVACY_KEY) || 'null');
       const ok = v => v === 'dummy' || v === 'hidden' ? v : 'normal';
-      return p ? { money: ok(p.money), name: ok(p.name) } : { money: 'normal', name: 'normal' };
+      // Fake names no longer exist; someone who had them on gets names hidden.
+      return p ? { money: ok(p.money), name: ok(p.name) === 'normal' ? 'normal' : 'hidden' } : { money: 'normal', name: 'normal' };
     } catch (e) { return { money: 'normal', name: 'normal' }; }
   }, []);
   const [moneyMode, setMoneyMode] = useState(savedPrivacy.money);
@@ -10002,7 +10024,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.51.2</div>}
+        {!loading && <div className="version-tag">v6.52.0</div>}
       </div>
 
       {showAddModal && (
