@@ -7663,6 +7663,33 @@ function HomeScreenTipModal({ onClose }) {
   );
 }
 
+// ---------- Privacy mode carried over from last time ----------
+const PRIVACY_KEY = 'tt_privacy_modes';
+
+// Asked once on load when privacy mode was left on. It is already back on by
+// the time this shows, so closing it any other way (the X, tapping outside)
+// keeps things hidden; only the explicit button reveals anything.
+function PrivacyStillOnModal({ moneyMode, nameMode, onKeep, onTurnOff }) {
+  const [cls, close] = useAnimatedClose(onKeep);
+  const [offCls, setOffCls] = useState('');
+  const hidden = [nameMode !== 'normal' && 'names', moneyMode !== 'normal' && 'amounts'].filter(Boolean).join(' and ');
+  function turnOff() { setOffCls(' closing'); setTimeout(onTurnOff, 200); }
+  const c = offCls || cls;
+  return (
+    <div className={`overlay${c}`} onClick={e => e.target === e.currentTarget && close()}>
+      <div className={`sheet${c}`} role="dialog" aria-modal="true">
+        <DialogClose onClose={close} />
+        <h2 style={{marginTop:0}}>Privacy mode is still on</h2>
+        <p style={{marginTop:0, color:'var(--muted)', lineHeight:1.5}}>
+          You had it on last time, so {hidden || 'your details'} {hidden.includes(' and ') ? 'are' : 'is'} still hidden. Do you want to keep it on?
+        </p>
+        <button className="btn save" style={{width:'100%'}} onClick={turnOff}>Turn it off</button>
+        <button className="btn cancel" style={{width:'100%', marginTop:10}} onClick={close}>Keep it on</button>
+      </div>
+    </div>
+  );
+}
+
 function DialogClose({ onClose }) {
   const ref = React.useRef(null);
   const titleId = React.useId();
@@ -9310,8 +9337,26 @@ function App() {
   const [walkthroughPaused, setWalkthroughPaused] = useState(false);
   const [monzoStatus, setMonzoStatus] = useState(null);
   const [googleStatus, setGoogleStatus] = useState(null);
-  const [moneyMode, setMoneyMode] = useState('normal');
-  const [nameMode, setNameMode] = useState('normal');
+  // Privacy mode used to reset to off on every load. Someone who switched it
+  // on to show the app around, then closed it, came back to real names and
+  // amounts on screen before they could do anything. It is now remembered on
+  // this device and comes back on, with a question asking whether to keep it.
+  const savedPrivacy = React.useMemo(() => {
+    try {
+      const p = JSON.parse(localStorage.getItem(PRIVACY_KEY) || 'null');
+      const ok = v => v === 'dummy' || v === 'hidden' ? v : 'normal';
+      return p ? { money: ok(p.money), name: ok(p.name) } : { money: 'normal', name: 'normal' };
+    } catch (e) { return { money: 'normal', name: 'normal' }; }
+  }, []);
+  const [moneyMode, setMoneyMode] = useState(savedPrivacy.money);
+  const [nameMode, setNameMode] = useState(savedPrivacy.name);
+  useEffect(() => {
+    try {
+      if (moneyMode === 'normal' && nameMode === 'normal') localStorage.removeItem(PRIVACY_KEY);
+      else localStorage.setItem(PRIVACY_KEY, JSON.stringify({ money: moneyMode, name: nameMode }));
+    } catch (e) {}
+  }, [moneyMode, nameMode]);
+  const [privacyAsk, setPrivacyAsk] = useState(savedPrivacy.money !== 'normal' || savedPrivacy.name !== 'normal');
   const [query, setQuery] = useState('');
   const [focusStudentId, setFocusStudentId] = useState(null);
   // undefined = still checking; null = signed out; object = signed in.
@@ -9892,7 +9937,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.48.0</div>}
+        {!loading && <div className="version-tag">v6.49.0</div>}
       </div>
 
       {showAddModal && (
@@ -9945,6 +9990,15 @@ function App() {
       )}
 
       {homeTipOpen && <HomeScreenTipModal onClose={() => setHomeTipOpen(false)} />}
+
+      {privacyAsk && session && !loading && (
+        <PrivacyStillOnModal
+          moneyMode={moneyMode}
+          nameMode={nameMode}
+          onKeep={() => setPrivacyAsk(false)}
+          onTurnOff={() => { setMoneyMode('normal'); setNameMode('normal'); setPrivacyAsk(false); }}
+        />
+      )}
 
       {limitPrompt && (
         <StudentLimitModal
