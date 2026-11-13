@@ -444,39 +444,17 @@
   @keyframes overlayOut { from { background: rgba(0,0,0,0.5); } to { background: rgba(0,0,0,0); } }
   @keyframes sheetUp    { from { transform: translateY(48px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
   @keyframes sheetDown  { from { transform: translateY(0); opacity: 1; } to { transform: translateY(52px); opacity: 0; } }
-  /* Privacy mode switching. The page blurs out, a band of light sweeps across,
-     the values swap while nobody can read them, and it sharpens again. Only
-     the page itself blurs: overlays are left alone (and a filter on their
-     parent would also break their fixed positioning). */
-  .pv-flip > :not(.overlay):not(.pv-sweep) { transition: filter .22s ease, opacity .22s ease, transform .22s ease; }
-  .pv-out > :not(.overlay):not(.pv-sweep) { filter: blur(7px) saturate(.6); opacity: .55; transform: scale(.992); }
-  .pv-sweep {
-    position: fixed; inset: 0; z-index: 99; pointer-events: none; overflow: hidden;
+  /* Privacy mode switching. Only the bits of text that actually changed
+     (an amount, a name) animate: the new value wipes in from the left out of
+     a slight blur, so you see each £600 turn into £••• rather than the
+     whole page lurching. The App marks them with .pv-swap. */
+  .pv-swap { animation: pvSwap .5s cubic-bezier(.3,.7,.3,1) both; }
+  @keyframes pvSwap {
+    0%   { clip-path: inset(-4px 100% -4px -4px); filter: blur(3px); }
+    70%  { filter: blur(.6px); }
+    100% { clip-path: inset(-4px -4px -4px -4px); filter: none; }
   }
-  .pv-sweep::before {
-    content: ''; position: absolute; top: -20%; bottom: -20%; width: 55%;
-    background: linear-gradient(100deg, transparent 0%, color-mix(in srgb, var(--accent-fill) 22%, transparent) 40%,
-      rgba(255,255,255,.28) 50%, color-mix(in srgb, var(--accent-fill) 22%, transparent) 60%, transparent 100%);
-    transform: skewX(-12deg); animation: pvSweepR .62s cubic-bezier(.5,0,.3,1) forwards;
-  }
-  .pv-sweep.show::before { animation-name: pvSweepL; }
-  .pv-sweep .pv-badge {
-    position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%);
-    font-size: 2.6rem; animation: pvBadge .62s ease forwards; opacity: 0;
-    filter: drop-shadow(0 4px 14px rgba(0,0,0,.35));
-  }
-  @keyframes pvSweepR { from { left: -60%; } to { left: 110%; } }
-  @keyframes pvSweepL { from { left: 110%; } to { left: -60%; } }
-  @keyframes pvBadge {
-    0% { opacity: 0; transform: translate(-50%, -50%) scale(.6); }
-    35%, 60% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(1.15); }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .pv-flip > :not(.overlay):not(.pv-sweep) { transition: none; }
-    .pv-out > :not(.overlay):not(.pv-sweep) { filter: none; opacity: 1; transform: none; }
-    .pv-sweep { display: none; }
-  }
+  @media (prefers-reduced-motion: reduce) { .pv-swap { animation: none; } }
 
   .overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -9392,24 +9370,42 @@ function App() {
   }, [moneyMode, nameMode]);
   const [privacyAsk, setPrivacyAsk] = useState(savedPrivacy.money !== 'normal' || savedPrivacy.name !== 'normal');
 
-  // Every privacy switch goes through here so it animates: blur out, swap the
-  // values at the blurriest point, sharpen. pvFlip is null when idle, else
-  // { phase: 'out' | 'in', hiding, key }.
-  const [pvFlip, setPvFlip] = useState(null);
-  const pvTimers = React.useRef([]);
-  useEffect(() => () => pvTimers.current.forEach(clearTimeout), []);
+  // Every privacy switch goes through here so each value that changes gets a
+  // small animation of its own. The masked figures are plain strings built in
+  // dozens of places, so rather than touch every one, the page is watched for
+  // a moment after the switch and whatever text actually changed is marked.
+  const pageRef = React.useRef(null);
+  const pvWatch = React.useRef(null);
+  useEffect(() => () => pvWatch.current?.(), []);
   function flipPrivacy(nextMoney, nextName) {
     if (nextMoney === moneyMode && nextName === nameMode) return;
-    const apply = () => { setMoneyMode(nextMoney); setNameMode(nextName); };
-    if (prefersLessMotion()) { apply(); return; }
-    pvTimers.current.forEach(clearTimeout);
-    const hiding = (nextMoney !== 'normal' || nextName !== 'normal');
-    const key = Date.now();
-    setPvFlip({ phase: 'out', hiding, key });
-    pvTimers.current = [
-      setTimeout(() => { apply(); setPvFlip({ phase: 'in', hiding, key }); }, 240),
-      setTimeout(() => setPvFlip(null), 680),
-    ];
+    pvWatch.current?.();
+    const root = pageRef.current;
+    if (root && !prefersLessMotion() && window.MutationObserver) {
+      const seen = new Set();
+      const mark = el => {
+        if (!el || el.nodeType !== 1 || seen.has(el) || el.closest('.overlay')) return;
+        // Only small bits of data: an amount or a name, not a whole card that
+        // happened to re-render around them.
+        if ((el.textContent || '').length > 48 || el.childElementCount > 2) return;
+        seen.add(el);
+        el.classList.remove('pv-swap');
+        void el.offsetWidth;
+        el.classList.add('pv-swap');
+        el.addEventListener('animationend', () => el.classList.remove('pv-swap'), { once: true });
+      };
+      const obs = new MutationObserver(list => {
+        for (const m of list) {
+          if (m.type === 'characterData') mark(m.target.parentElement);
+          else m.addedNodes.forEach(n => mark(n.nodeType === 1 ? n : n.parentElement));
+        }
+      });
+      obs.observe(root, { subtree: true, characterData: true, childList: true });
+      const t = setTimeout(() => obs.disconnect(), 600);
+      pvWatch.current = () => { clearTimeout(t); obs.disconnect(); };
+    }
+    setMoneyMode(nextMoney);
+    setNameMode(nextName);
   }
   const setMoneyModeAnimated = v => flipPrivacy(v, nameMode);
   const setNameModeAnimated = v => flipPrivacy(moneyMode, v);
@@ -9784,12 +9780,7 @@ function App() {
 
   return (
     <PrivacyContext.Provider value={{ moneyMode, nameMode }}>
-    <div className={pvFlip ? `pv-flip${pvFlip.phase === 'out' ? ' pv-out' : ''}` : undefined}>
-      {pvFlip && (
-        <div key={pvFlip.key} className={`pv-sweep${pvFlip.hiding ? '' : ' show'}`} aria-hidden="true">
-          <span className="pv-badge">{pvFlip.hiding ? '🙈' : '👀'}</span>
-        </div>
-      )}
+    <div ref={pageRef}>
       <BillingBar
         entitlement={entitlement}
         activeStudents={activeStudents.length}
@@ -9998,7 +9989,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.51.0</div>}
+        {!loading && <div className="version-tag">v6.51.1</div>}
       </div>
 
       {showAddModal && (
