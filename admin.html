@@ -437,7 +437,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.50.0';
+const VERSION = 'v6.53.1';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -1520,6 +1520,9 @@ function drawPage() {
       </div>
       <div class="sub">Loaded ${esc(fmtDateTime(data.loadedAt))} · ${esc(data.me || '?')}</div>
       <button class="btn" data-act="refresh">Refresh</button>
+      <!-- Same tab, so on an iPhone it goes back into the installed app
+           rather than opening a browser tab where nobody is signed in. -->
+      <a class="btn" href="/" style="text-decoration:none">← TutorTally</a>
     </div>
     ${growthHTML(testers)}
     ${queueHTML(data.accounts)}
