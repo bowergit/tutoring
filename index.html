@@ -455,6 +455,14 @@
     100% { clip-path: inset(-4px -4px -4px -4px); filter: none; }
   }
   @media (prefers-reduced-motion: reduce) { .pv-swap { animation: none; } }
+  .pv-pill-wrap {
+    display: grid; grid-template-rows: 0fr; opacity: 0; pointer-events: none;
+    transition: grid-template-rows .32s cubic-bezier(.3,.7,.3,1), opacity .22s ease;
+  }
+  .pv-pill-wrap.open { grid-template-rows: 1fr; opacity: 1; pointer-events: auto; }
+  .pv-pill-inner { overflow: hidden; min-height: 0; }
+  .pv-pill-wrap:not(.open) .pv-pill-inner { visibility: hidden; transition: visibility 0s .32s; }
+  @media (prefers-reduced-motion: reduce) { .pv-pill-wrap { transition: none; } }
 
   .overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.5);
@@ -9877,9 +9885,13 @@ function App() {
         </div>
         {/* The controls live in Tools; this is only a reminder that they're on,
             so it can't be left masked by accident. */}
-        {privacyOn && (
+        {/* Always mounted and opened/closed by height, so switching privacy
+            eases the page down and back up instead of everything below
+            jumping by a line. */}
+        <div className={`pv-pill-wrap${privacyOn ? ' open' : ''}`} aria-hidden={!privacyOn}>
+          <div className="pv-pill-inner">
           <div
-            onClick={() => setShowGlobalTools(true)}
+            onClick={() => privacyOn && setShowGlobalTools(true)}
             style={{
               display:'inline-flex', alignItems:'center', gap:6, marginTop:10, cursor:'pointer',
               fontSize:'0.72rem', fontWeight:600, color:'var(--gold)',
@@ -9892,7 +9904,8 @@ function App() {
               {nameMode !== 'normal' ? (nameMode === 'dummy' ? 'fake names' : 'names hidden') : ''}
             </span>
           </div>
-        )}
+          </div>
+        </div>
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
@@ -9989,7 +10002,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.51.1</div>}
+        {!loading && <div className="version-tag">v6.51.2</div>}
       </div>
 
       {showAddModal && (
