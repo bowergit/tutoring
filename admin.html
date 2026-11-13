@@ -437,7 +437,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.46.1';
+const VERSION = 'v6.50.0';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -876,8 +876,7 @@ function stepsOf(a) {
     a.has_phone ? 'Filled in' : 'Not filled in yet',
     a.has_phone ? fmtPhone(a.phone) : 'No phone number yet. They add it in Settings → Your account.');
 
-  const calName = a.calendar === 'google' ? 'Google Calendar'
-    : a.calendar === 'link' ? 'Calendar link (Apple, Outlook or similar)' : null;
+  const calName = calendarName(a);
   const synced = a.calendar_synced_at ? ` Last sync ${agoLabel(a.calendar_synced_at)}.` : '';
   if (a.calendar && a.calendar_error) {
     add('calendar', 'Calendar', 'bad', 'Error',
@@ -1130,6 +1129,34 @@ function growthHTML(people) {
     <div class="chart-x" aria-hidden="true">${xLabels}</div>`;
 }
 
+// Which calendar app a tutor connected, so you can see how many are on
+// Outlook or Apple rather than just "connected". calendar_kind comes from the
+// server, which reads it off the link's address without sending the link.
+function calendarKind(a) {
+  if (!a.calendar) return null;
+  return a.calendar_kind || (a.calendar === 'google' ? 'Google' : 'Calendar link');
+}
+function calendarName(a) {
+  const k = calendarKind(a);
+  if (!k) return null;
+  if (k === 'Google') return 'Google Calendar (signed in with Google)';
+  if (k === 'Google (link)') return 'Google Calendar, by pasted link';
+  if (k.startsWith('Other: ')) return `Calendar link from ${k.slice(7)}`;
+  if (k === 'Other' || k === 'Calendar link') return 'Calendar link (type unknown)';
+  return `${k} Calendar, by pasted link`;
+}
+function calendarBreakdown(list) {
+  const counts = new Map();
+  for (const a of list) {
+    const k = calendarKind(a);
+    if (k) counts.set(k, (counts.get(k) || 0) + 1);
+  }
+  const none = list.filter(a => !a.calendar).length;
+  const lines = [...counts].sort((x, y) => y[1] - x[1]).map(([k, c]) => `${k}: ${c}`);
+  if (none) lines.push(`None yet: ${none}`);
+  return lines.join(' · ') || 'Nobody has connected a calendar yet.';
+}
+
 function funnelHTML(testers) {
   const n = testers.length;
   if (!n) return '';
@@ -1149,7 +1176,9 @@ function funnelHTML(testers) {
       return `
       <button class="f-row${isWorst ? ' worst' : ''}" data-missing="${r.key}"
         aria-label="${esc(`${r.done} of ${n} have done ${r.label}. Show the ${n - r.done} who have not.`)}">
-        <span class="f-label">${esc(r.label)}</span>
+        ${r.key === 'calendar'
+          ? `<span class="f-label" data-tip-title="Which calendar they use" data-tip="${esc(calendarBreakdown(testers))}" style="cursor:help;text-decoration:underline dotted;text-underline-offset:3px">${esc(r.label)}</span>`
+          : `<span class="f-label">${esc(r.label)}</span>`}
         <span class="f-track"><span class="f-fill" style="width:${Math.round((r.done / n) * 100)}%"></span></span>
         <span class="f-n">${r.done}</span>
         <span class="f-drop">${r.drop ? `−${r.drop}${isWorst ? ' · biggest drop' : ''}` : '—'}</span>
@@ -1330,7 +1359,7 @@ function metaHTML(a) {
   lines.push(`Joined ${esc(fmtDate(a.joined) || '?')} · last used <b>${esc(agoLabel(a.last_seen))}</b>${
     a.last_entry ? ' · last added something ' + esc(agoLabel(a.last_entry)) : ''}`);
 
-  const calName = a.calendar === 'google' ? 'Google Calendar' : a.calendar === 'link' ? 'Calendar link' : null;
+  const calName = calendarName(a);
   if (calName) {
     lines.push(`${calName}${a.calendar_synced_at ? ', last sync ' + esc(agoLabel(a.calendar_synced_at)) : ''}${
       a.calendar_error ? `<br><span class="bad">⚠ ${esc(a.calendar_error)}</span>` : ''}`);

@@ -253,6 +253,22 @@ function summariseLeads(rows: any[], accounts: any[]) {
   }).sort((a, b) => (a.last_seen < b.last_seen ? 1 : -1))
 }
 
+// Names the calendar app behind a pasted link from its address alone. Only
+// the label comes back, never any part of the link that grants access.
+function calendarFeedKind(url: string | null): string {
+  let host = ''
+  try { host = new URL(String(url ?? '').trim().replace(/^webcals?:\/\//i, 'https://')).hostname.toLowerCase() } catch { return 'Other' }
+  if (/(^|\.)icloud\.com$|(^|\.)me\.com$/.test(host)) return 'Apple'
+  if (/outlook\.|office365\.|office\.com$|live\.com$|hotmail\.|microsoft/.test(host)) return 'Outlook'
+  if (/(^|\.)google\.com$|googleusercontent\.com$/.test(host)) return 'Google (link)'
+  if (/yahoo\./.test(host)) return 'Yahoo'
+  if (/proton\./.test(host)) return 'Proton'
+  if (/fastmail\./.test(host)) return 'Fastmail'
+  // Anything else is named by its site, minus the www, which is enough to
+  // spot a booking tool (Calendly, TutorCruncher...) worth supporting.
+  return host ? 'Other: ' + host.replace(/^www\./, '') : 'Other'
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
 
@@ -283,7 +299,7 @@ Deno.serve(async (req) => {
     // version would have started under-reporting usage for everyone, silently,
     // as soon as there were a few thousand lessons across all tenants.
     const stripeP = fetchStripe()
-    const [{ data: rows, error: rowsErr }, { data: notes }, { data: leadRows }] = await Promise.all([
+    const [{ data: rows, error: rowsErr }, { data: notes }, { data: leadRows }, { data: feedRows }] = await Promise.all([
       supabase.rpc('tutoring_admin_accounts'),
       supabase.from('tutoring_account_notes')
         .select('owner_id,body,created_at,author_id')
@@ -295,8 +311,15 @@ Deno.serve(async (req) => {
         .select('phone,consent_text,created_at')
         .order('created_at', { ascending: false })
         .limit(LEAD_FETCH_LIMIT),
+      // Read only to say whose calendar it is (Apple, Outlook...). The link
+      // itself is a password to their whole calendar, so it never leaves here.
+      supabase.from('tutoring_calendar_feeds').select('owner_id,url'),
     ])
     if (rowsErr) return json({ ok: false, problem: 'list_failed', detail: rowsErr.message })
+
+    const feedKindOf = new Map<string, string>(
+      (feedRows ?? []).map((f: any) => [f.owner_id, calendarFeedKind(f.url)]),
+    )
 
     // Who wrote each note. Built from the accounts already loaded rather than a
     // second lookup, since every admin is also a user in that list. With two
@@ -388,6 +411,10 @@ Deno.serve(async (req) => {
         has_name: !!r.has_name,
         has_phone: !!r.has_phone,
         calendar: r.calendar,
+        // Which calendar app: 'Google' when connected through Google sign-in,
+        // otherwise read off the link's address. Null when nothing connected.
+        calendar_kind: r.calendar === 'google' ? 'Google'
+          : r.calendar === 'link' ? (feedKindOf.get(r.owner_id) ?? 'Calendar link') : null,
         calendar_synced_at: r.calendar_synced_at,
         // Surfaced because a broken calendar is silent: the tutor sees lessons
         // stop appearing and has no reason to connect that to anything.
