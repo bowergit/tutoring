@@ -21,7 +21,7 @@ get accounts, admin SQL), `GOOGLE_CALENDAR_SETUP.md`. `DJAVHAN_SETUP.md`,
 | `worker.js` | Cloudflare Worker in front of the parent/pupil pages only, to put the student's name in link previews. Everything else is static. |
 | `weekly-billing.js`, `hourly-billing.js` | Pure helpers shared by the app and the tests (`TTWeekly`, `TTHourly`). |
 | `tokens.css`, `ux.css` | Design tokens and shared component CSS. |
-| `supabase/functions/*` | Only `admin-portal` and `student-portal` are in the repo. |
+| `supabase/functions/*` | Every TutorTally edge function, copied from the live project on 13 Nov 2026. See below. |
 | `*.sql` | Hand-run migrations, kept for the record. Not applied automatically. |
 | `test-weekly.cjs`, `test-hourly.cjs` | `node test-weekly.cjs` / `node test-hourly.cjs`. Run them after touching billing code. |
 
@@ -39,10 +39,25 @@ then `function App()` near the end.
   assets, `wrangler.jsonc`). `.assetsignore` keeps `*.md`, `*.sql`, `*.gs`,
   `*.cjs`, `supabase/` and the worker itself from being served.
 - Edge functions are deployed separately to Supabase project
-  `uilytgubukiinyrqrltj`. Most of them (calendar, Monzo, Stripe, delete-account,
-  social...) exist only live, not in this repo. Before deploying one, fetch the
-  live version and check it matches what you are about to overwrite. Pull it
-  into `supabase/functions/` when you change it.
+  `uilytgubukiinyrqrltj` (no CLI login here; deploy through the Supabase MCP
+  tool with the same `verify_jwt` the function already has). The repo copy is
+  the source of truth: edit it, deploy it, commit it. Before deploying, fetch
+  the live version and check nobody changed it outside the repo.
+- The repo is PUBLIC on GitHub. Functions read every key from Supabase secrets
+  (`Deno.env.get`). Never write a key, token or password into a file here.
+- Edge functions by job:
+  - Calendar: `google-calendar-connect` / `-auth` (OAuth), `-list`, `-select`,
+    `-status`, `-disconnect`, `-sync` (+ `ics.ts` for pasted links).
+    `-diagnose` is retired (410).
+  - Money: `stripe-checkout`, `stripe-portal`, `stripe-webhook` (writes
+    `tutoring_subscriptions`), `stripe-refresh`. `stripe-price-diagnose` is disabled.
+  - Owner only: `monzo-connect` / `-auth` / `-status` / `-sync` / `-review`,
+    `platform-stats`.
+  - Pages: `student-portal` (parent and pupil data, weekly agreement signing),
+    `student-preview` (first name for link previews), `admin-portal`.
+  - Account: `delete-account`.
+- Also in the same Supabase project but NOT TutorTally, so not in this repo:
+  `social` (Post Desk) and `weight-sync`. Leave them alone.
 - Every user-visible change bumps the version: `<div className="version-tag">vX.Y.Z</div>`
   in `index.html`, and `const VERSION` in `admin.html` when admin changes.
   Minor for features, patch for fixes. Put the version first in the commit subject.
