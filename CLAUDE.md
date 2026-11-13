@@ -21,6 +21,7 @@ get accounts, admin SQL), `GOOGLE_CALENDAR_SETUP.md`. `DJAVHAN_SETUP.md`,
 | `worker.js` | Cloudflare Worker in front of the parent/pupil pages only, to put the student's name in link previews. Everything else is static. |
 | `weekly-billing.js`, `hourly-billing.js` | Pure helpers shared by the app and the tests (`TTWeekly`, `TTHourly`). |
 | `tokens.css`, `ux.css` | Design tokens and shared component CSS. |
+| `glide.js` | `TTGlide.toggle(el)` and auto-gliding `<details>` for the parent, pupil and /app pages. Anything that opens must glide, never flick: use this there, and the grid 0fr to 1fr pattern in `index.html`. Bump its `?v=` when changed. |
 | `supabase/functions/*` | Every TutorTally edge function, copied from the live project on 13 Nov 2026. See below. |
 | `*.sql` | Hand-run migrations, kept for the record. Not applied automatically. |
 | `test-weekly.cjs`, `test-hourly.cjs` | `node test-weekly.cjs` / `node test-hourly.cjs`. Run them after touching billing code. |

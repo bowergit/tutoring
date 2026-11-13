@@ -20,6 +20,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link href="https://api.fontshare.com/v2/css?f[]=general-sans@400,500,600,700&display=swap" rel="stylesheet">
 <script>document.documentElement.classList.add('js')</script>
+<script src="glide.js?v=1" defer></script>
 <link rel="stylesheet" href="tokens.css?v=6.44.1">
 <style>
   /* Designed in Paper first (file "TutorTally", page Landing). The page is a
@@ -186,8 +187,8 @@
     -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
     box-shadow: 0 8px 24px -6px rgba(0,0,0,.28), 0 0 0 1px rgba(0,0,0,.05); font-size: .8rem; line-height: 1.35;
   }
-  .wa-note-ic { width: 34px; height: 34px; flex: none; border-radius: 9px; background: #ff4f40; display: grid; place-items: center; }
-  .wa-note-ic svg { width: 19px; height: 19px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .wa-note-ic { width: 34px; height: 34px; flex: none; border-radius: 9px; overflow: hidden; }
+  .wa-note-ic img { display: block; width: 100%; height: 100%; }
   .wa-note-txt { flex: 1; min-width: 0; }
   .wa-note-top { display: flex; justify-content: space-between; gap: 8px; font-size: .72rem; color: #54656f; }
   .wa-note-top b { color: #111b21; font-weight: 600; }
@@ -229,6 +230,32 @@
   .wa.armed.delivered .ticks .t2 { opacity: 1; }
   .wa.armed.read .ticks { stroke: #53bdeb; }
   .wa.armed.reply .bub.in { display: block; animation: popIn .4s cubic-bezier(.16,1,.3,1) both; }
+  /* Cash and receipt clip: the TutorTally half, then the chase's WhatsApp half. */
+  .rc-block { margin-top: 28px; }
+  .rc-tap { position: relative; transition: transform .14s var(--ease); }
+  .rc-tap::after { content: ''; position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; margin: -23px 0 0 -23px; border-radius: 50%; background: color-mix(in srgb, var(--ink) 30%, transparent); opacity: 0; transform: scale(.3); pointer-events: none; }
+  .rc.tapLog .rc-log, .rc.tapSave .rc-save, .rc.tapSend .rc-send { transform: scale(.96); }
+  .rc.tapLog .rc-log::after, .rc.tapSave .rc-save::after, .rc.tapSend .rc-send::after { animation: tapRing .5s cubic-bezier(.16,1,.3,1) both; }
+  .rc-dim { display: none; position: absolute; inset: 0; background: rgba(0,0,0,.45); }
+  .rc-sheet { display: none; position: absolute; left: 0; right: 0; bottom: 0; padding: 16px 14px 14px; background: var(--card); border-top: 1px solid var(--line); border-radius: 18px 18px 0 0; box-shadow: var(--sh-3); }
+  .rc.sheet .rc-dim { display: block; animation: rcDim .25s ease both; }
+  .rc.sheet .rc-sheet { display: block; animation: rcSheetUp .28s cubic-bezier(.4,0,.2,1) both; }
+  @keyframes rcDim { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes rcSheetUp { from { transform: translateY(48px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .rc-sheet b { display: block; font-size: .95rem; letter-spacing: -0.015em; }
+  .rc-amt { margin: 8px 0 10px; padding: 9px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card-2); font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rc-chips { display: flex; gap: 6px; margin-bottom: 12px; }
+  .rc-chip { padding: 6px 11px; border-radius: 20px; border: 1px solid var(--line); font-size: .76rem; font-weight: 600; color: var(--ink-dim); }
+  .rc-chip.on { background: var(--accent-light); border-color: transparent; color: var(--accent); }
+  .rc-s2 { display: none; }
+  .rc-s2 p { margin: 6px 0 12px; font-size: .8rem; line-height: 1.45; color: var(--ink-dim); }
+  .rc-row { display: grid; grid-template-columns: 1fr 1.6fr; gap: 8px; }
+  .rc.logged .rc-s1 { display: none; }
+  .rc.logged .rc-s2 { display: block; animation: ttPop .2s ease both; }
+  .rc #rcPill.swapped { animation: ttPop .18s ease both; }
+  @media (prefers-reduced-motion: reduce) {
+    .rc.sheet .rc-dim, .rc.sheet .rc-sheet, .rc.logged .rc-s2 { animation: none; }
+  }
   @keyframes draftIn { from { opacity: 0; clip-path: inset(0 0 100% 0); } to { opacity: 1; clip-path: inset(0); } }
   @keyframes sendUp { from { opacity: .4; transform: translateY(46px) scale(.94); } to { opacity: 1; transform: none; } }
   @keyframes popIn { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
@@ -482,7 +509,7 @@
             <div class="tt-card"><div class="name">Tom Bennett</div><div class="row"><span class="pill neutral">Owes £90</span><span class="meta">2 lessons unpaid</span></div></div>
           </div>
           <div class="wa-note" aria-hidden="true">
-            <span class="wa-note-ic"><svg viewBox="0 0 24 24"><path d="M3 7h18v11H3z M3 11h18 M7 15h4"/></svg></span>
+            <span class="wa-note-ic"><img src="brand/monzo-icon.png" alt="" width="34" height="34"></span>
             <div class="wa-note-txt"><div class="wa-note-top"><b>Monzo</b><span>now</span></div>£180.00 received from Karen Fletcher</div>
           </div>
           <div class="wa-head"><span class="wa-av">K</span><div><b>Karen (Joe's mum)</b><span id="waStatus">online</span></div></div>
@@ -585,6 +612,45 @@
           <div class="bar"><span>Over 30 days</span><i></i><b>£0</b></div>
         </div>
         <p class="small" style="margin-top:14px">Worked out from your own lessons and payments. Sample figures shown.</p>
+        <div class="rc-block">
+          <div class="wa rc" id="rc" role="img" aria-label="Tom's mum pays £90 in cash. In TutorTally the tutor taps Log payment, picks Cash and saves. Tom's card turns to paid and TutorTally offers a WhatsApp receipt. One tap opens WhatsApp with the receipt written: Hi Sarah! Just confirming I've received £90 for Tom's lessons. Thanks a lot! It is sent and read.">
+            <div class="tt" aria-hidden="true">
+              <div class="tt-top"><svg viewBox="0 0 900 700"><path d="M86 440L812 220" fill="none" stroke="var(--accent-fill)" stroke-width="94" stroke-linecap="round"/><rect x="292" y="48" width="100" height="604" rx="14" fill="currentColor"/><rect x="512" y="48" width="100" height="604" rx="14" fill="currentColor"/></svg>Sam's TutorTally</div>
+              <div class="tt-card">
+                <div class="name">Tom Bennett</div>
+                <div class="row"><span class="pill neutral" id="rcPill">Owes £90</span><span class="meta">2 lessons unpaid</span></div>
+                <div class="tt-acts">
+                  <span class="tt-btn"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z"/></svg>WhatsApp</span>
+                  <span class="tt-btn rc-tap rc-log"><svg viewBox="0 0 24 24"><path d="M12 5v14 M5 12h14"/></svg>Log payment</span>
+                </div>
+              </div>
+              <div class="rc-dim"></div>
+              <div class="rc-sheet">
+                <div class="rc-s1">
+                  <b>Log a payment</b>
+                  <div class="rc-amt">£90</div>
+                  <div class="rc-chips"><span class="rc-chip on">Cash</span><span class="rc-chip">Bank transfer</span></div>
+                  <span class="tt-btn go rc-tap rc-save">Save payment</span>
+                </div>
+                <div class="rc-s2">
+                  <b>Payment logged</b>
+                  <p>£90 from Tom Bennett on <span class="rc-date">13 Nov</span>. Send a WhatsApp receipt to the parent?</p>
+                  <div class="rc-row"><span class="tt-btn">Skip</span><span class="tt-btn go rc-tap rc-send">💬 Send receipt</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="wa-head"><span class="wa-av">S</span><div><b>Sarah (Tom's mum)</b><span>online</span></div></div>
+            <div class="wa-chat">
+              <div class="bub out">Hi Sarah! Just confirming I've received £90 for Tom's lessons on <span class="rc-date">13 Nov</span>. Thanks a lot!
+                <span class="when">16:05<svg class="ticks" viewBox="0 0 18 11" aria-hidden="true"><path class="t1" d="M1 6l3.5 3.6 7.1-8.4"/><path class="t2" d="M7.4 8.5l1.2 1.1 8.3-8.4"/></svg></span></div>
+            </div>
+            <div class="wa-bar">
+              <div class="wa-input"><span class="hint">Message</span><span class="draft">Hi Sarah! Just confirming I've received £90 for Tom's lessons on <span class="rc-date">13 Nov</span>. Thanks a lot!</span></div>
+              <span class="wa-send"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.4 20.4 21 12 3.4 3.6 3.4 10.1 15 12 3.4 13.9z"/></svg></span>
+            </div>
+          </div>
+          <p class="small" style="margin-top:12px">Cash in, receipt out. <button type="button" class="replay" id="rcReplay">Play it again</button></p>
+        </div>
       </div>
     </div>
   </div>
@@ -791,6 +857,58 @@ if (!calm && 'IntersectionObserver' in window) {
 } else {
   joePaid(true);
 }
+
+// Cash in, receipt out: Tom's card, Log payment, Cash, Save, the receipt
+// offer, then WhatsApp with the receipt already written. The markup already
+// shows the sent receipt, so with reduced motion or no script nothing is lost.
+(function () {
+  const rc = document.getElementById('rc');
+  const rcPill = document.getElementById('rcPill');
+  const rcReplay = document.getElementById('rcReplay');
+  const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  rc.querySelectorAll('.rc-date').forEach(el => { el.textContent = today; });
+  const RC_STAGES = ['tapLog', 'sheet', 'tapSave', 'logged', 'tapSend', 'launched', 'drafting', 'press', 'sent', 'delivered', 'read'];
+  let rcTimers = [];
+  function rcPaid(paid) {
+    rcPill.textContent = paid ? 'Paid up' : 'Owes £90';
+    rcPill.className = 'pill ' + (paid ? 'ok' : 'neutral');
+    if (paid) { void rcPill.offsetWidth; rcPill.classList.add('swapped'); }
+  }
+  function playReceipt() {
+    rcTimers.forEach(clearTimeout);
+    rcTimers = [];
+    rc.classList.remove(...RC_STAGES);
+    rc.classList.add('armed');
+    rcReplay.classList.remove('show');
+    rcPaid(false);
+    const at = (ms, fn) => rcTimers.push(setTimeout(fn, ms));
+    at(1100, () => rc.classList.add('tapLog'));
+    at(1500, () => { rc.classList.remove('tapLog'); rc.classList.add('sheet'); });
+    at(2900, () => rc.classList.add('tapSave'));
+    at(3250, () => { rc.classList.remove('tapSave'); rc.classList.add('logged'); rcPaid(true); });
+    at(5000, () => rc.classList.add('tapSend'));
+    at(5400, () => { rc.classList.remove('tapSend'); rc.classList.add('launched', 'drafting'); });
+    at(7100, () => rc.classList.add('press'));
+    at(7260, () => { rc.classList.remove('press'); rc.classList.add('sent'); });
+    at(8000, () => rc.classList.add('delivered'));
+    at(9000, () => { rc.classList.add('read'); rcReplay.classList.add('show'); });
+  }
+  if (calm || !('IntersectionObserver' in window)) return;
+  rc.classList.add('armed');
+  const io3 = new IntersectionObserver(es => es.forEach(e => {
+    if (!e.isIntersecting) return;
+    io3.disconnect();
+    playReceipt();
+  }), { threshold: 0.55 });
+  io3.observe(rc);
+  rcReplay.addEventListener('click', playReceipt);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden || !rcTimers.length) return;
+    rcTimers.forEach(clearTimeout); rcTimers = [];
+    rc.classList.remove('armed', ...RC_STAGES);
+    rcReplay.classList.add('show');
+  });
+})();
 
 // The dashboard sample works. Open a family that owes, log the payment, and
 // the totals move the way they do in the app. Nothing is sent anywhere.
