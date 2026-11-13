@@ -49,6 +49,15 @@
   }
   .row .time { color: var(--muted); font-size: 0.82rem; }
   .detail { padding: 0 15px 13px; color: var(--muted); font-size: 0.82rem; }
+  /* Glides open to its real height rather than appearing: a grid row going
+     from 0fr to 1fr animates to whatever the content needs, the same way the
+     tutor app's student cards open. */
+  .detail-wrap { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .32s cubic-bezier(.4,0,.2,1); }
+  .detail-wrap.open { grid-template-rows: 1fr; }
+  .detail-clip { min-height: 0; overflow: hidden; }
+  .detail-wrap .detail { opacity: 0; transition: opacity .2s ease; }
+  .detail-wrap.open .detail { opacity: 1; transition: opacity .28s ease .04s; }
+  @media (prefers-reduced-motion: reduce) { .detail-wrap, .detail-wrap .detail { transition: none; } }
   .paid-line {
     display: flex; justify-content: space-between; align-items: baseline;
     gap: 12px; padding: 3px 0;
@@ -389,11 +398,11 @@
       const expandable = !window.__pupilView;
       return `
         <div class="lesson">
-          <div class="row"${expandable ? ` data-detail="${key}"` : ' style="cursor:default"'}>
+          <div class="row"${expandable ? ` data-detail="${key}" aria-expanded="false"` : ' style="cursor:default"'}>
             <span>${fmtDate(l.date)}${l.time ? `<span class="time"> · ${esc(l.time)}</span>` : ''}${l.minutes ? `<span class="time"> · ${esc(minLabel(l.minutes))}</span>` : ''}${l.notes && expandable ? '<span class="has-note" title="Has a lesson note">Note</span>' : ''}</span>
             ${pillHTML(l, scheduled)}
           </div>
-          ${expandable ? `<div class="detail" id="detail-${key}" hidden>${notesHTML(l)}${detailHTML(l, scheduled)}</div>` : ''}
+          ${expandable ? `<div class="detail-wrap" id="detail-${key}"><div class="detail-clip"><div class="detail">${notesHTML(l)}${detailHTML(l, scheduled)}</div></div></div>` : ''}
         </div>
       `;
     }).join('') + '</div>';
@@ -795,7 +804,10 @@
     const row = e.target.closest('[data-detail]');
     if (!row) return;
     const detail = document.getElementById('detail-' + row.dataset.detail);
-    if (detail) detail.hidden = !detail.hidden;
+    if (!detail) return;
+    const open = !detail.classList.contains('open');
+    detail.classList.toggle('open', open);
+    row.setAttribute('aria-expanded', String(open));
   });
 
 
