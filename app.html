@@ -750,6 +750,20 @@
   });
 })();
 document.getElementById('yr').textContent = new Date().getFullYear();
+// A referral link lands here as /app?ref=CODE. The code is kept on this device
+// and carried on every sign-up link, so it reaches the sign-up form whichever
+// way the visitor goes in. The app reads the same key.
+(function () {
+  try {
+    const ref = (new URLSearchParams(location.search).get('ref') || '').trim().toLowerCase();
+    if (/^[a-z0-9]{4,12}$/.test(ref)) localStorage.setItem('tt_ref', ref);
+    const kept = localStorage.getItem('tt_ref');
+    if (!kept) return;
+    document.querySelectorAll('a[href^="/?signup"]').forEach(a => {
+      a.href = a.getAttribute('href') + '&ref=' + encodeURIComponent(kept);
+    });
+  } catch (e) {}
+})();
 // The dashboard sample's next lessons are a few days from today, never in the past.
 document.querySelectorAll('[data-next]').forEach(function (el) {
   var d = new Date(); d.setDate(d.getDate() + Number(el.getAttribute('data-next')));

@@ -1109,6 +1109,22 @@ const realSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
 
 const DEMO_MODE = new URLSearchParams(window.location.search).has('demo');
 
+// Refer a tutor. A link is /app?ref=CODE; the code is remembered on this
+// device (the landing page and the app share an origin) until sign-up, which
+// puts it in the new account's metadata. The database records the referral
+// from there, so nothing here has to be trusted or kept in sync.
+const REF_KEY = 'tt_ref';
+const REF_RE = /^[a-z0-9]{4,12}$/;
+(function rememberReferral() {
+  try {
+    const ref = (new URLSearchParams(window.location.search).get('ref') || '').trim().toLowerCase();
+    if (REF_RE.test(ref)) localStorage.setItem(REF_KEY, ref);
+  } catch (e) {}
+})();
+function storedReferral() {
+  try { const r = localStorage.getItem(REF_KEY) || ''; return REF_RE.test(r) ? r : null; } catch (e) { return null; }
+}
+
 // Set true once a subscription has lapsed. Reads stay open deliberately. The
 // promise made on the marketing page is that nothing is deleted and records
 // stay readable and exportable, so lapsing blocks writing, not looking.
@@ -3753,7 +3769,7 @@ function LoginGate() {
       email: email.trim(),
       password,
       options: {
-        data: { display_name: name.trim() || null },
+        data: { display_name: name.trim() || null, ...(storedReferral() ? { referred_by: storedReferral() } : {}) },
         emailRedirectTo: window.location.origin + window.location.pathname,
       },
     });
@@ -5846,6 +5862,14 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
                 />
               </ToolsSection>
 
+              <ToolsSection title="Refer a tutor">
+                <ToolsRow
+                  title="Your referral link"
+                  subtitle="Send it to tutors you know and see who joins"
+                  onClick={() => setTool('referral')}
+                />
+              </ToolsSection>
+
               <ToolsSection title="Account">
                 <ToolsRow
                   title="Billing & subscription"
@@ -5910,6 +5934,15 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               activeStudents={students.filter(s => s.active).length}
               ownerName={session?.user?.user_metadata?.display_name}
             />
+          </>
+        )}
+        {tool === 'referral' && (
+          <>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:12}}>
+              {backBtn}
+              <h2 style={{margin:0}}>Refer a tutor</h2>
+            </div>
+            <ReferralPanel />
           </>
         )}
         {tool === 'homescreen' && (
@@ -7709,6 +7742,88 @@ function HomeScreenTipModal({ onClose }) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------- Refer a tutor ----------
+// The tutor's own link, how many joined through it and how many now pay, with
+// each one's first name. Everything comes from tutoring_my_referrals(), which
+// only ever answers about the caller. The reward is still being decided, and
+// the panel says so rather than promising something specific.
+function ReferralPanel() {
+  const [data, setData] = useState(null);
+  const [problem, setProblem] = useState(null);
+  useEffect(() => {
+    let gone = false;
+    if (DEMO_MODE) {
+      setData({ code: 'demo42', referrals: [
+        { first_name: 'Priya', joined: new Date(Date.now() - 12 * 864e5).toISOString(), paying: true },
+        { first_name: 'Marcus', joined: new Date(Date.now() - 3 * 864e5).toISOString(), paying: false },
+      ] });
+      return;
+    }
+    supabase.rpc('tutoring_my_referrals').then(({ data, error }) => {
+      if (gone) return;
+      if (error || !data?.code) setProblem('Your link is not ready yet. Try again in a minute.');
+      else setData(data);
+    }, () => { if (!gone) setProblem('Could not load your link. Check your connection and try again.'); });
+    return () => { gone = true; };
+  }, []);
+
+  const link = data ? `${window.location.origin}/app?ref=${data.code}` : '';
+  const list = data?.referrals || [];
+  const paying = list.filter(r => r.paying).length;
+  const shareText = `I use TutorTally to keep track of lessons and who has paid. It is free for up to 3 students: ${link}`;
+  const stat = (n, label) => (
+    <div style={{flex:1, padding:'12px 14px', border:'1px solid var(--line)', borderRadius:12, background:'var(--card-2)'}}>
+      <div style={{fontSize:'1.5rem', fontWeight:700, letterSpacing:'-0.03em', lineHeight:1.1}}>{n}</div>
+      <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:3}}>{label}</div>
+    </div>
+  );
+
+  return (
+    <>
+      <p style={{marginTop:0, color:'var(--ink-dim)', lineHeight:1.55}}>
+        Know a tutor still doing this in a spreadsheet? Send them your link. We have not decided the thank you yet, but it will be a nice one ;)
+      </p>
+      {problem && <div style={{fontSize:'0.85rem', color:'var(--warn)', lineHeight:1.5}}>{problem}</div>}
+      {!data && !problem && <div style={{fontSize:'0.85rem', color:'var(--muted)'}}>Getting your link…</div>}
+      {data && (
+        <>
+          <div style={{padding:'11px 13px', border:'1px solid var(--line)', borderRadius:12, background:'var(--card-2)', fontSize:'0.88rem', fontWeight:600, wordBreak:'break-all', marginBottom:10}}>{link}</div>
+          <div className="btn-row" style={{marginBottom:18}}>
+            <CopyAction value={link} label="Copy link" />
+            <a className="btn save" style={{textAlign:'center', textDecoration:'none'}}
+              href={`https://wa.me/?text=${encodeURIComponent(shareText)}`} target="_blank" rel="noopener">
+              💬 Share on WhatsApp
+            </a>
+          </div>
+          <div style={{display:'flex', gap:10, marginBottom:16}}>
+            {stat(list.length, list.length === 1 ? 'tutor signed up' : 'tutors signed up')}
+            {stat(paying, 'now paying')}
+          </div>
+          {list.length === 0 ? (
+            <div style={{fontSize:'0.85rem', color:'var(--muted)', lineHeight:1.5}}>
+              Nobody yet. When someone signs up through your link, their first name shows here.
+            </div>
+          ) : (
+            <div className="tools-menu">
+              {list.map((r, i) => (
+                <div key={i} style={{display:'flex', alignItems:'center', justifyContent:'space-between', gap:10, padding:'11px 2px', borderBottom: i < list.length - 1 ? '1px solid var(--line)' : 'none'}}>
+                  <div>
+                    <div style={{fontWeight:600}}>{r.first_name || 'A tutor'}</div>
+                    <div style={{fontSize:'0.76rem', color:'var(--muted)'}}>
+                      Joined {new Date(r.joined).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}
+                    </div>
+                  </div>
+                  <span className={`pill ${r.paying ? 'ok' : 'neutral'}`}>{r.paying ? 'Paying' : 'Signed up'}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </>
   );
 }
 
@@ -10032,7 +10147,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.53.1</div>}
+        {!loading && <div className="version-tag">v6.54.0</div>}
       </div>
 
       {showAddModal && (
