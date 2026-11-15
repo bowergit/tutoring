@@ -2673,7 +2673,7 @@ function WeekStrip({ students, lessons, onJump }) {
 }
 
 // ---------- Summary Widget ----------
-function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
+function SummaryWidget({ students, rateHistory, lessons = [], payments = [], allocations = [] }) {
   const M = useMoney();
   const active = students.filter(s => s.active);
 
@@ -2725,11 +2725,47 @@ function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
     .filter(p => String(p.date_paid || '').slice(0, 7) === monthKey)
     .reduce((sum, p) => sum + parseFloat(p.amount) * moneyScaleFor(p.student_id, rateHistory), 0);
   const monthName = new Date().toLocaleDateString('en-GB', { month: 'long' });
+
+  // This month's work, beside what came in for it. Earned uses the same rules
+  // as every balance: taught, not free, not settled before tracking began,
+  // priced on the day, plus weekly tuition weeks already due.
+  const today = TTWeekly.today();
+  const taughtThisMonth = lessons.filter(l => l.status === 'completed'
+    && String(l.lesson_date).slice(0, 7) === monthKey && l.lesson_date <= today);
+  const earnedThisMonth = taughtThisMonth
+    .filter(l => !l.is_complimentary && !l.pre_settled)
+    .reduce((sum, l) => sum + rateForLesson(l, rateHistory), 0)
+    + students.reduce((sum, s) => sum + TTWeekly.charges(s.id)
+      .filter(c => String(c.charge_date).slice(0, 7) === monthKey && c.charge_date < today && !c.waived)
+      .reduce((t, c) => t + Number(c.amount || 0), 0), 0);
+
+  // How long parents usually take: days from each lesson to the payment that
+  // covered it, over the last three months, weighted by amount. Paying ahead
+  // counts as same day, not as negative days.
+  const lessonDate = new Map(lessons.map(l => [l.id, l.lesson_date]));
+  const paymentDate = new Map(payments.map(p => [p.id, p.date_paid]));
+  const since = new Date(Date.parse(today + 'T12:00:00Z') - 90 * 86400000).toISOString().slice(0, 10);
+  let payWeight = 0, payDays = 0;
+  for (const a of allocations) {
+    const ld = lessonDate.get(a.lesson_id), pd = paymentDate.get(a.payment_id);
+    if (!ld || !pd || pd < since) continue;
+    const amt = Math.abs(Number(a.amount) || 0);
+    if (!amt) continue;
+    payDays += Math.max(0, (Date.parse(pd + 'T12:00:00Z') - Date.parse(ld + 'T12:00:00Z')) / 86400000) * amt;
+    payWeight += amt;
+  }
+  const avgDaysToPay = payWeight ? Math.round(payDays / payWeight) : null;
+
   const stats = [
     { label: 'owed', value: M(owedTotal, 'summary-owed', fmt), note: owing.length ? `From ${owing.length} famil${owing.length === 1 ? 'y' : 'ies'}` : 'Everyone is paid up' },
     { label: 'paid', value: M(paidThisMonth, 'summary-paid', fmt), note: `So far in ${monthName}` },
     { label: 'students', value: active.length, note: null },
+    { label: 'earned', value: M(earnedThisMonth, 'summary-earned', fmt), note: `Lessons taught in ${monthName}` },
+    { label: 'taught', value: taughtThisMonth.length, note: `So far in ${monthName}` },
+    { label: 'days', value: avgDaysToPay == null ? '–' : `${avgDaysToPay} ${avgDaysToPay === 1 ? 'day' : 'days'}`, note: avgDaysToPay == null ? 'No payments yet' : 'Last 3 months' },
   ];
+  const statLabel = { owed: 'Owed to you', paid: 'Paid this month', students: 'Active students',
+    earned: 'Earned this month', taught: 'Lessons taught', days: 'Usual time to get paid' };
 
   return (
     <div className="summary-widget" style={{
@@ -2741,7 +2777,7 @@ function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
       {active.length > 0 && <div className="overview-grid">
         {stats.map(({label, value, note}) => <div key={label}>
           <div className={`overview-value${label === 'owed' && owedTotal > 0.005 ? ' owed' : ''}`}>{value}</div>
-          <div className="overview-label">{label === 'owed' ? 'Owed to you' : label === 'paid' ? 'Paid this month' : 'Active students'}</div>
+          <div className="overview-label">{statLabel[label]}</div>
           {note && <div className="overview-note">{note}</div>}
         </div>)}
       </div>}
@@ -9989,7 +10025,7 @@ function App() {
         )}
 
         {!loading && <div className="dash-top">
-          <SummaryWidget students={students} rateHistory={rateHistory} lessons={lessons} payments={payments} />
+          <SummaryWidget students={students} rateHistory={rateHistory} lessons={lessons} payments={payments} allocations={allocations} />
           <WeekStrip students={students} lessons={lessons} onJump={jumpToStudent} />
         </div>}
 
@@ -10052,7 +10088,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.56.1</div>}
+        {!loading && <div className="version-tag">v6.57.0</div>}
       </div>
 
       {showAddModal && (
