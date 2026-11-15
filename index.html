@@ -2748,11 +2748,9 @@ function SummaryWidget({ students, rateHistory, lessons = [], payments = [], all
   const lastDays = new Date(Date.UTC(ty, tm - 1, 0)).getUTCDate();
   const lastSameDay = new Date(Date.UTC(ty, tm - 2, Math.min(td, lastDays) + 1)).toISOString().slice(0, 10);
   const earnedLastMonth = earnedBetween(lastStart, lastSameDay);
-  const lastMonthShort = new Date(Date.UTC(ty, tm - 2, 1)).toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' });
   const vsLast = earnedThisMonth - earnedLastMonth;
-  const vsLastNote = earnedLastMonth <= 0.005 && earnedThisMonth <= 0.005 ? `Nothing yet, same as ${lastMonthShort}`
-    : Math.abs(vsLast) < 0.5 ? `Same as this time in ${lastMonthShort}`
-    : `${M(Math.abs(vsLast), 'summary-vs-last', fmt)} ${vsLast > 0 ? 'up' : 'down'} on this time in ${lastMonthShort}`;
+  const vsLastNote = Math.abs(vsLast) < 0.5 ? 'Same as this time last month'
+    : `${M(Math.abs(vsLast), 'summary-vs-last', fmt)} ${vsLast > 0 ? 'more' : 'less'} than this time last month`;
 
   // How long parents usually take: days from each lesson to the payment that
   // covered it, over the last three months, weighted by amount. Paying ahead
@@ -10108,7 +10106,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.58.0</div>}
+        {!loading && <div className="version-tag">v6.58.1</div>}
       </div>
 
       {showAddModal && (
