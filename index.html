@@ -607,17 +607,6 @@
   .calc-grid-cell { padding: 7px 4px; border-top: 1px solid var(--line); color: var(--ink-dim); }
   .calc-grid-head { padding: 0 4px 7px; font-size: 0.67rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
 
-  /* ── Perspective items ── */
-  .perspective-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-  .perspective-item {
-    padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line);
-    background: var(--card-2); font-size: 0.82rem;
-  }
-  .perspective-item .emoji { font-size: 1.4rem; display: block; margin-bottom: 4px; }
-  .perspective-item .name { font-weight: 600; color: var(--ink); margin-bottom: 2px; }
-  .perspective-item .count { font-size: 1.8rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; }
-  .perspective-item .per-year { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
-
   /* ── Free lesson button ── */
   .free-btn {
     font-size: 0.65rem; padding: 2px 8px; border-radius: 10px;
@@ -2798,7 +2787,9 @@ function ParentPageActivity({ students, session }) {
   const visitsByStudent = new Map();
   for (const view of views) {
     const student = studentsById.get(view.student_id);
-    if (!student) continue;
+    // Current students only: an archived family opening an old link is not
+    // someone you are tracking any more.
+    if (!student || !student.active) continue;
     const visit = visitsByStudent.get(view.student_id) || { student, count: 0, latest: view.viewed_at };
     visit.count += 1;
     if (view.viewed_at > visit.latest) visit.latest = view.viewed_at;
@@ -2884,8 +2875,7 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
   const setEC = setExtraCash || (() => {});
 
   const currGrossW = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0);
-  // Take-home sets 40% aside for tax on anything not paid in cash, the same
-  // assumption "what it buys you" below has always used.
+  // Take-home sets 40% aside for tax on anything not paid in cash.
   const KEEP = 0.6;
   const currNetW   = active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory) * (s.pays_in_cash ? 1 : KEEP), 0);
   const addGrossW = e * er;
@@ -2898,8 +2888,8 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
     { label: 'Students',  curr: active.length,    add: e,      isCount: true },
     { label: 'Gross/wk', curr: currGrossW,        add: addGrossW  },
     { label: 'Kept/wk',  curr: currNetW,          add: addNetW    },
-    { label: 'Gross/yr', curr: currGrossW * 40,   add: addGrossW * 40 },
-    { label: 'Kept/yr',  curr: currNetW * 40,     add: addNetW * 40   },
+    { label: 'Gross/yr', curr: currGrossW * 52,   add: addGrossW * 52 },
+    { label: 'Kept/yr',  curr: currNetW * 52,     add: addNetW * 52   },
   ];
 
   return (
@@ -2917,7 +2907,7 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
       <div style={{marginBottom:14}}>
         <Toggle checked={ec} onChange={setEC} label="Pay in cash" />
         <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:6, lineHeight:1.45}}>
-          "Kept" sets 40% aside for tax on anything not paid in cash. Years are 40 teaching weeks.
+          "Kept" sets 40% aside for tax on anything not paid in cash. Years are 52 weeks.
         </div>
       </div>
       <div className="calc-grid">
@@ -2933,62 +2923,6 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
             <div className="calc-grid-cell" style={{fontWeight:600}}>{isCount ? curr+add : M(curr+add, `growth-total-${label}`, fmt)}</div>
           </React.Fragment>
         ))}
-      </div>
-    </div>
-  );
-}
-
-// ---------- Perspective Calculator ----------
-function PerspectiveCalculator({ addNetW }) {
-  const addNetY = addNetW * 40;
-
-  const items = [
-    { emoji: '🍫', name: 'Kitkats', price: 0.25 },
-    { emoji: '☕', name: 'Posh coffees (£5)', price: 5 },
-    { emoji: '🥩', name: 'Kosher steaks (£95)', price: 95 },
-    { emoji: '🍾', name: 'Fancy champagne bottles (£60)', price: 60 },
-    { emoji: '🎟️', name: 'Michelin dinners for 2 (£250)', price: 250 },
-    { emoji: '🏨', name: 'Nights at Four Seasons (£500)', price: 500 },
-    { emoji: '✈️', name: 'Economy flights to Tokyo (£800)', price: 800 },
-    { emoji: '🏝️', name: 'Weeks in Maldives (£4k)', price: 4000 },
-    { emoji: '🚗', name: 'Used Range Rovers (£30k)', price: 30000 },
-    { emoji: '✈️🛫', name: 'Private jet flights to Sydney (£120k)', price: 120000 },
-    { emoji: '🏴󠁧󠁢󠁳󠁣󠁴󠁿', name: 'Tiny Scottish islands (£50k)', price: 50000 },
-    { emoji: '🛸', name: 'Virgin Galactic space trips (£450k)', price: 450000 },
-  ];
-
-  const fmt = n => n >= 1000000 ? `£${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
-  const { moneyMode } = usePrivacy();
-
-  if (moneyMode === 'hidden') {
-    return (
-      <div style={{fontSize:'0.9rem', color:'var(--muted)', padding:'8px 0'}}>
-        🎯 Amounts hidden - every count on this screen is derived from the figure above, so hiding one means hiding all of them.
-      </div>
-    );
-  }
-  // Nothing to substitute here: in fake mode the rate this figure is derived
-  // from was already faked at source, so the headline and every count below it
-  // are consistent with each other automatically.
-  const shownNetY = addNetY;
-
-  return (
-    <div>
-      <div style={{fontSize:'0.9rem', color:'var(--ink-dim)', marginBottom:14, lineHeight:1.5}}>
-        With this growth, you'd pocket an extra <span style={{fontWeight:600, color:'var(--ink)'}}>{fmt(shownNetY)}/year</span>. That's:
-      </div>
-      <div className="perspective-grid">
-        {items.map(item => {
-          const count = Math.floor(shownNetY / item.price);
-          return (
-            <div className="perspective-item" key={item.name}>
-              <div className="emoji">{item.emoji}</div>
-              <div className="name">{item.name}</div>
-              <div className="count">{count.toLocaleString('en-GB')}</div>
-              {item.price < 1000 && <div className="per-year">per year</div>}
-            </div>
-          );
-        })}
       </div>
     </div>
   );
@@ -5683,7 +5617,6 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   // Opens straight onto a panel when the walkthrough sent them here, so the
   // step that says "open calendar settings" actually lands on it.
   const [tool, setTool] = useState(initialTool);
-  const [buysOpen, setBuysOpen] = useState(false);
   const privacyOn = moneyMode !== 'normal' || nameMode !== 'normal';
   const archived = students.filter(s => !s.active);
   const danielOnly = isDanielAccount(session);
@@ -5704,7 +5637,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
     return () => { cancelled = true; };
   }, [session?.user?.id]);
 
-  // Growth calculator state (shared with perspective calc)
+  // Growth calculator state, kept here so it survives leaving and reopening the tool
   const active = students.filter(s => s.active);
   const avgRate = active.length > 0
     ? Math.round(active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0) / active.length)
@@ -5718,8 +5651,6 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   // the real average after the switch was flipped, leaking the very figure the
   // switch is meant to hide.
   useEffect(() => { setExtraRate(avgRate); }, [moneyMode]);
-
-  const addNetW = extra * extraRate * (extraCash ? 1 : 0.6);
 
   async function unarchive(id) {
     if (!await saved(() => supabase.from('tutoring_students').update({ active: true }).eq('id', id))) return;
@@ -6017,19 +5948,6 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
               extraCash={extraCash}
               setExtraCash={setExtraCash}
             />
-            <div style={{marginTop:20}}>
-              <div className="month-hdr" onClick={() => setBuysOpen(!buysOpen)}>
-                <span style={{fontSize:'0.9rem', fontWeight:600, color:'var(--ink)'}}>
-                  🎯 Here's what it buys you
-                </span>
-                <span className="month-chevron" style={{transform: buysOpen ? 'rotate(90deg)' : 'none'}}>›</span>
-              </div>
-              {buysOpen && (
-                <div style={{paddingTop:12}}>
-                  <PerspectiveCalculator addNetW={addNetW} />
-                </div>
-              )}
-            </div>
           </>
         )}
         {tool === 'gcal' && (
@@ -10134,7 +10052,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.56.0</div>}
+        {!loading && <div className="version-tag">v6.56.1</div>}
       </div>
 
       {showAddModal && (
