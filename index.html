@@ -2335,34 +2335,54 @@ function recentPaper(student, withinDays = 7) {
 // produced totals that didn't add up to their own rows.
 let PRIVACY_MONEY_MODE = 'normal';
 
+// The tutor's standard price (Settings > Your account), set from App each
+// render. Only a starting value for forms (a new student, the growth
+// calculator, a payment amount). It never prices a lesson: a student with no
+// price at all stays at 90 everywhere, so no existing balance moves.
+let TUTOR_DEFAULT_RATE = null;
+const defaultRate = () => {
+  const r = parseFloat(TUTOR_DEFAULT_RATE);
+  return Number.isFinite(r) && r >= 0 ? r : 90;
+};
+
 // The rate in effect on a given date. Rates dated in the future are ignored
 // until that date arrives, so a September rise doesn't affect today's figures.
 // Ties on effective_from_date are broken by created_at, so the most recent
 // edit always wins rather than whichever row happened to sort first.
-function getRateOnDateReal(studentId, rateHistory, dateStr, fallback = 90) {
-  const rows = (rateHistory || [])
-    .filter(r => r.student_id === studentId && r.effective_from_date <= dateStr)
+//
+// A lesson dated before the student's first price takes that first price: a
+// tutor adding an old lesson for a student set up today means the price they
+// just typed, not some other default. Same order as tutoring_lesson_rate and
+// the parent page: price on the day, then first price, then 90.
+function getRateOnDateReal(studentId, rateHistory, dateStr, fallback) {
+  const mine = (rateHistory || []).filter(r => r.student_id === studentId);
+  const rows = mine
+    .filter(r => r.effective_from_date <= dateStr)
     .sort((a, b) => {
       const byDate = b.effective_from_date.localeCompare(a.effective_from_date);
       if (byDate !== 0) return byDate;
       return String(b.created_at || '').localeCompare(String(a.created_at || ''));
     });
-  return rows.length > 0 ? parseFloat(rows[0].rate) : fallback;
+  if (rows.length > 0) return parseFloat(rows[0].rate);
+  const first = mine.slice().sort((a, b) =>
+    a.effective_from_date.localeCompare(b.effective_from_date) || String(a.created_at || '').localeCompare(String(b.created_at || '')))[0];
+  if (first) return parseFloat(first.rate);
+  return fallback ?? 90;
 }
 
-function getRateOnDate(studentId, rateHistory, dateStr, fallback = 90) {
+function getRateOnDate(studentId, rateHistory, dateStr, fallback) {
   if (PRIVACY_MONEY_MODE === 'dummy') return dummyRateFor(studentId);
   return getRateOnDateReal(studentId, rateHistory, dateStr, fallback);
 }
 
-function getCurrentRate(studentId, rateHistory, fallback = 90) {
+function getCurrentRate(studentId, rateHistory, fallback) {
   return getRateOnDate(studentId, rateHistory, todayISO(), fallback);
 }
 
 // What a lesson is worth. An explicit rate_charged is a manual override and
 // always wins; otherwise it's the rate that applied on the day it was taught,
 // so past lessons keep their old price when you put rates up.
-function rateForLesson(lesson, rateHistory, fallback = 90) {
+function rateForLesson(lesson, rateHistory, fallback) {
   if (TTWeekly.covers(lesson)) return 0;
   if (PRIVACY_MONEY_MODE === 'dummy') return dummyRateFor(lesson.student_id);
   if (lesson.rate_charged !== null && lesson.rate_charged !== undefined && lesson.rate_charged !== '') {
@@ -2903,7 +2923,7 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
   const active = students.filter(s => s.active);
   const avgRate = active.length > 0
     ? Math.round(active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0) / active.length)
-    : 90;
+    : defaultRate();
 
   // Use passed props, or init with defaults if not provided
   const e = extra !== undefined ? extra : 4;
@@ -4085,6 +4105,11 @@ function YourName({ session }) {
   const [email, setEmail] = useState(session?.user?.user_metadata?.contact_email || '');
   const [booking, setBooking] = useState(session?.user?.user_metadata?.booking_url || '');
   const [address, setAddress] = useState(session?.user?.user_metadata?.invoice_address || '');
+  const savedRate = session?.user?.user_metadata?.default_rate;
+  const [rate, setRate] = useState(savedRate != null ? String(savedRate) : '');
+  // A masked price must never be saved over the real one, so the field is
+  // left out of the form, and out of the save, while privacy mode hides money.
+  const rateHidden = PRIVACY_MONEY_MODE !== 'normal';
   const [state, setState] = useState('idle');
 
   const loginEmail = session?.user?.email || '';
@@ -4102,6 +4127,7 @@ function YourName({ session }) {
         contact_email: email.trim(),
         booking_url: bookingUrl(booking),
         invoice_address: address.trim(),
+        ...(rateHidden ? {} : { default_rate: Number.isFinite(parseFloat(rate)) && parseFloat(rate) >= 0 ? parseFloat(rate) : null }),
       },
     });
     setState(error ? 'error' : 'done');
@@ -4131,6 +4157,17 @@ function YourName({ session }) {
         <label>Your phone (for parents' WhatsApp button)</label>
         <input type="text" value={phone} onChange={e => setPhone(e.target.value)} placeholder="e.g. 07787 112345" />
       </div>
+      {!rateHidden && (
+        <div className="field">
+          <label>Standard price per lesson (£)</label>
+          <input type="number" inputMode="decimal" min="0" step="0.01" value={rate}
+                 onChange={e => setRate(e.target.value)} placeholder="e.g. 50" />
+          <div style={{fontSize:'0.76rem', color:'var(--muted)', marginTop:4, lineHeight:1.45}}>
+            Filled in for you when you add a new student. Changing it does not
+            change students you already have: change those on each student's own page.
+          </div>
+        </div>
+      )}
       <div className="field">
         <label>Booking link (optional)</label>
         <input type="url" value={booking} onChange={e => setBooking(e.target.value)}
@@ -5722,7 +5759,7 @@ function GlobalToolsSheet({ students, rateHistory, payments = [], lessons = [], 
   const active = students.filter(s => s.active);
   const avgRate = active.length > 0
     ? Math.round(active.reduce((sum, s) => sum + getCurrentRate(s.id, rateHistory), 0) / active.length)
-    : 90;
+    : defaultRate();
   const [extra, setExtra] = useState(4);
   const [extraRate, setExtraRate] = useState(avgRate);
   const [extraCash, setExtraCash] = useState(false);
@@ -9874,6 +9911,7 @@ function App() {
   // mode is published here for them to read. Set during render, before any
   // child reads it.
   PRIVACY_MONEY_MODE = moneyMode;
+  TUTOR_DEFAULT_RATE = session?.user?.user_metadata?.default_rate ?? null;
 
   // Search matches name or school, so "Hasmonean" finds everyone there.
   // (auth gate is applied at the end of this component, after all hooks have
@@ -10147,7 +10185,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.54.0</div>}
+        {!loading && <div className="version-tag">v6.55.0</div>}
       </div>
 
       {showAddModal && (

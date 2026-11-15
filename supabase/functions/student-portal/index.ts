@@ -17,9 +17,12 @@ const CORS = {
 // nothing else on their row, and nothing about any other student or the
 // tutor's business as a whole. The tutor's own contact details ARE included,
 // since they are the point of the "message the tutor" buttons.
+// Same order as the app and tutoring_lesson_rate: the price on the day, else the
+// student's first price (an old lesson added for a student set up today), else
+// 90. rateHistory is sorted oldest first.
 function rateForLesson(lesson: any, rateHistory: any[]): number {
   if (lesson.rate_charged != null) return Number(lesson.rate_charged)
-  let rate = 90
+  let rate = rateHistory.length ? Number(rateHistory[0].rate) : 90
   for (const rh of rateHistory) {
     if (rh.effective_from_date <= lesson.lesson_date) rate = Number(rh.rate)
     else break
