@@ -2687,15 +2687,6 @@ function WeekStrip({ students, lessons, onJump }) {
 function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
   const M = useMoney();
   const active = students.filter(s => s.active);
-  const readSavedTarget = () => {
-    const n = parseInt(localStorage.getItem('tutortally_full_target') || '', 10);
-    return Number.isFinite(n) && n > 0 ? n : 15;
-  };
-  const [fullTarget, setFullTarget] = useState(readSavedTarget);
-  const [targetSaving, setTargetSaving] = useState('idle');
-  // What is being typed, kept apart from the saved number. Clamping on every
-  // keystroke turned an emptied box into "1", so typing 20 gave 120.
-  const [targetText, setTargetText] = useState(null);
 
   // What the lessons are worth, not what is left after tax. The old figure
   // quietly took 40% off anyone not paying cash, which made this account's
@@ -2705,44 +2696,31 @@ function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
   // slots if set, otherwise the lessons in the calendar over the next 7 days,
   // rather than one lesson at a per-lesson rate they do not have.
   const weekEnd = new Date(Date.parse(TTHourly.today() + 'T12:00:00Z') + 6 * 86400000).toISOString().slice(0, 10);
+  // Lessons a week, read off the diary: the next four weeks if anything is
+  // booked, otherwise the last four. One a week unless they clearly have more,
+  // so a one-off extra lesson does not double someone.
+  const dayOffset = n => new Date(Date.parse(TTHourly.today() + 'T12:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+  const ahead = dayOffset(27), behind = dayOffset(-28);
+  const lessonsPerWeek = s => {
+    const mine = lessons.filter(l => l.student_id === s.id && l.status !== 'cancelled');
+    const next = mine.filter(l => l.lesson_date >= TTHourly.today() && l.lesson_date <= ahead).length;
+    const last = mine.filter(l => l.lesson_date >= behind && l.lesson_date < TTHourly.today()).length;
+    return Math.max(1, Math.round((next || last) / 4));
+  };
   const weeklyValue = s => {
+    const wk = TTWeekly.plans(s.id).find(p => p.status === 'active' && p.acceptance);
+    if (wk) return Number(wk.weekly_fee || 0);
     const hp = TTHourly.currentPlan(s.id);
-    if (!hp) return getCurrentRate(s.id, rateHistory);
+    if (!hp) return getCurrentRate(s.id, rateHistory) * lessonsPerWeek(s);
     if ((hp.slots || []).length) return hp.slots.reduce((t, x) => t + TTHourly.price(hp.hourly_rate, x.minutes), 0);
     const week = lessons.filter(l => l.student_id === s.id && l.status !== 'cancelled' && !l.is_complimentary
       && l.lesson_date >= TTHourly.today() && l.lesson_date <= weekEnd);
     return week.length ? week.reduce((t, l) => t + Number(l.rate_charged || 0), 0) : TTHourly.price(hp.hourly_rate, hp.default_minutes);
   };
   const weeklyGross = active.reduce((sum, s) => sum + weeklyValue(s), 0);
-  const annualGross = weeklyGross * 40;
+  // Potential, so every week of the year counts.
+  const annualGross = weeklyGross * 52;
   const fmt = n => n >= 1000000 ? `£${(n / 1000000).toFixed(1)}M` : n >= 1000 ? `£${(n / 1000).toFixed(1)}k` : `£${Math.round(n)}`;
-
-  useEffect(() => {
-    if (DEMO_MODE) return;
-    let cancelled = false;
-    supabase.auth.getUser().then(({ data }) => {
-      if (cancelled) return;
-      const n = parseInt(data?.user?.user_metadata?.fully_booked_target || '', 10);
-      if (Number.isFinite(n) && n > 0) {
-        setFullTarget(n);
-        localStorage.setItem('tutortally_full_target', String(n));
-      }
-    });
-    return () => { cancelled = true; };
-  }, []);
-
-  async function saveFullTarget(raw) {
-    const next = Math.max(1, Math.min(999, parseInt(raw, 10) || fullTarget));
-    setFullTarget(next);
-    localStorage.setItem('tutortally_full_target', String(next));
-    if (DEMO_MODE) return;
-    setTargetSaving('saving');
-    const { error } = await supabase.auth.updateUser({ data: { fully_booked_target: next } });
-    setTargetSaving(error ? 'error' : 'saved');
-    setTimeout(() => setTargetSaving('idle'), 1800);
-  }
-
-  const awayFromFull = Math.max(0, fullTarget - active.length);
 
   // What is owed now and what came in this month lead, because that is what
   // the app is opened to find out. The "potential" figures moved to a line
@@ -2778,38 +2756,9 @@ function SummaryWidget({ students, rateHistory, lessons = [], payments = [] }) {
           {note && <div className="overview-note">{note}</div>}
         </div>)}
       </div>}
-      <div>
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:5}}>
-          <label htmlFor="fullTarget" style={{fontSize:'0.82rem',color:'var(--ink-dim)',display:'flex',alignItems:'center',gap:6}}>
-            Fully booked at
-            <input
-              id="fullTarget"
-              type="number"
-              min="1"
-              max="999"
-              value={targetText ?? fullTarget}
-              onChange={e => setTargetText(e.target.value)}
-              onBlur={e => { setTargetText(null); if (parseInt(e.target.value, 10) !== fullTarget) saveFullTarget(e.target.value); }}
-              onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
-              style={{width:54,padding:'3px 6px',border:'1px solid var(--line)',borderRadius:6,background:'var(--card)',color:'var(--ink)',font:'inherit',fontSize:'0.82rem'}}
-            />
-          </label>
-          <span style={{fontSize:'0.78rem',fontWeight:600,color:awayFromFull===0?'var(--gold)':'var(--muted)'}}>
-            {awayFromFull===0?'fully booked':`${active.length} / ${fullTarget}`}
-          </span>
-        </div>
-        <div style={{background:'var(--card-2)',borderRadius:4,height:5,border:'1px solid var(--line)'}}>
-          <div style={{background:'var(--accent-fill)',opacity:1,width:`${Math.min(active.length/fullTarget,1)*100}%`,height:'100%',borderRadius:4,transition:'width 0.6s cubic-bezier(0.4,0,0.2,1)'}}></div>
-        </div>
-        {active.length > 0 && <div className="overview-potential">
-          Weekly potential {M(weeklyGross, 'summary-week', fmt)} · yearly {M(annualGross, 'summary-year', fmt)} (40 teaching weeks)
-        </div>}
-        {targetSaving !== 'idle' && (
-          <div style={{fontSize:'0.72rem',color:targetSaving==='error'?'var(--warn)':'var(--muted)',marginTop:6}}>
-            {targetSaving === 'saving' ? 'Saving target...' : targetSaving === 'saved' ? 'Target saved' : 'Could not save target'}
-          </div>
-        )}
-      </div>
+      {active.length > 0 && <div className="overview-potential">
+        Weekly potential {M(weeklyGross, 'summary-week', fmt)} · yearly {M(annualGross, 'summary-year', fmt)}
+      </div>}
     </div>
   );
 }
@@ -10185,7 +10134,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.55.0</div>}
+        {!loading && <div className="version-tag">v6.56.0</div>}
       </div>
 
       {showAddModal && (
