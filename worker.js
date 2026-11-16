@@ -9,8 +9,18 @@ const PREVIEW = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1/student-p
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+// Google's OAuth callback. Google only returns people to a domain the app owner
+// has verified, and nobody can verify supabase.co, so the callback address is
+// tutortally.co.uk/auth/google (the GOOGLE_REDIRECT_URI secret) and this passes
+// it straight on to the edge function that does the real work, query intact.
+const GOOGLE_AUTH = 'https://uilytgubukiinyrqrltj.supabase.co/functions/v1/google-calendar-auth';
+
 export default {
   async fetch(request, env) {
+    const here = new URL(request.url);
+    if (here.pathname === '/auth/google') {
+      return Response.redirect(GOOGLE_AUTH + here.search, 302);
+    }
     const res = await env.ASSETS.fetch(request);
     try {
       const token = new URL(request.url).searchParams.get('t') || '';

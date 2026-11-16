@@ -18,7 +18,7 @@ get accounts, admin SQL), `GOOGLE_CALENDAR_SETUP.md`. `DJAVHAN_SETUP.md`,
 | `admin.html` | `/admin`, plain JS. Data from the `admin-portal` edge function. Has its own `const VERSION`. |
 | `app.html` | `/app` marketing page with a scripted demo. Not the real app. |
 | `student.html`, `lessons.html` | Parent page and pupil page. Read through the `student-portal` edge function by link token, no login. |
-| `worker.js` | Cloudflare Worker in front of the parent/pupil pages only, to put the student's name in link previews. Everything else is static. |
+| `worker.js` | Cloudflare Worker in front of the parent/pupil pages only, to put the student's name in link previews, plus `/auth/google`, the Google OAuth callback it forwards to `google-calendar-auth`. Everything else is static. |
 | `weekly-billing.js`, `hourly-billing.js` | Pure helpers shared by the app and the tests (`TTWeekly`, `TTHourly`). |
 | `tokens.css`, `ux.css` | Design tokens and shared component CSS. |
 | `glide.js` | `TTGlide.toggle(el)` and auto-gliding `<details>` for the parent, pupil and /app pages. Anything that opens must glide, never flick: use this there, and the grid 0fr to 1fr pattern in `index.html`. Bump its `?v=` when changed. |
