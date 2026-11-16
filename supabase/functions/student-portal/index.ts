@@ -517,6 +517,9 @@ Deno.serve(async (req) => {
         .map(shapePupil),
       progress,
       grade,
+      // The pupil's own tracker. The chart above is a summary of it, not a
+      // replacement, so the link stays even when the chart is showing.
+      spreadsheet_url: safeBookingUrl(student.spreadsheet_url),
     })
   }
 
@@ -697,9 +700,9 @@ Deno.serve(async (req) => {
     // Monzo settle up is deliberately limited to Daniel's own tutoring account.
     // Cash students never get a bank transfer button.
     can_settle_up: student.owner_id === MONZO_SETTLE_OWNER && !student.pays_in_cash && !weeklyPlans.some(p=>p.review_required),
-    // Still sent when there is no progress view, so those students keep the
-    // plain link to their tracker rather than losing it.
-    spreadsheet_url: progress ? null : (student.spreadsheet_url || null),
+    // Always sent, chart or not: the chart summarises the tracker, it does not
+    // replace it. Plain https only, since a tutor typed it and it becomes a link.
+    spreadsheet_url: safeBookingUrl(student.spreadsheet_url),
     tutor: {
       name: tutorMeta.display_name || null,
       email: tutorMeta.contact_email || tutor?.email || null,

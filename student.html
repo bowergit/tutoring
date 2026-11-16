@@ -1014,7 +1014,7 @@
   const actions = [
     waLink ? `<a class="action-btn" aria-label="Message ${esc(tutorName)} on WhatsApp" href="${waLink}" target="_blank" rel="noopener"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-1 1v-9.5A8.5 8.5 0 0 1 11.5 3h1A8.5 8.5 0 0 1 21 11.5z M7 10h10 M7 14h6"/></svg><span>WhatsApp</span></a>` : '',
     mailLink ? `<a class="action-btn" aria-label="Email ${esc(tutorName)}" href="${mailLink}"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M3 5h18v14H3z M3 5l9 8 9-8"/></svg><span>Email</span></a>` : '',
-    data.spreadsheet_url ? `<a class="action-btn" aria-label="View ${esc(firstName)}'s progress" href="${esc(data.spreadsheet_url)}" target="_blank" rel="noopener"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 3v17h17 M8 15l4-5 4 3 4-7"/></svg><span>Progress</span></a>` : '',
+    data.spreadsheet_url ? `<a class="action-btn" aria-label="Open ${esc(firstName)}'s spreadsheet" href="${esc(data.spreadsheet_url)}" target="_blank" rel="noopener"><svg class="app-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4 3v17h17 M8 15l4-5 4 3 4-7"/></svg><span>Spreadsheet</span></a>` : '',
   ].join('');
   const actionCount = (actions.match(/class="action-btn"/g) || []).length;
 
@@ -1035,7 +1035,7 @@
     ${pupilView ? '' : renderHourly(data.hourly)}
     ${renderProgress(data.progress)}
     ${renderGrade(data.grade)}
-    ${pupilView || !actions ? '' : `<div class="contact-row" style="--n:${actionCount}">${actions}</div>`}
+    ${!actions ? '' : `<div class="contact-row" style="--n:${actionCount}">${actions}</div>`}
     <div class="section-label">Upcoming</div>
     <div id="upcoming-section"></div>
     <div class="section-label">${pupilView ? 'Lessons so far' : 'Recent'}</div>
