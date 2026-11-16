@@ -94,7 +94,7 @@
   <tr><th>About parents</th><td>Name, phone number, and address if you enter one.</td></tr>
   <tr><th>Lessons</th><td>Date, time, whether it happened, the rate charged, and any notes you add.</td></tr>
   <tr><th>Payments</th><td>Amount, date, and method. No card numbers or bank details are ever stored, because payments from parents do not go through TutorTally.</td></tr>
-  <tr><th>Calendar</th><td>If you connect Google Calendar, an access token for the one calendar you pick, plus the event IDs of lessons it has matched. Events from Apple Calendar may be read if you sync them into that Google calendar.</td></tr>
+  <tr><th>Calendar</th><td>If you connect Google Calendar, the access tokens Google issues, which calendar you picked, and the event IDs of lessons it has matched. Events from Apple Calendar may be read if you sync them into that Google calendar.</td></tr>
   <tr><th>How you open it</th><td>Each time you open TutorTally (at most every half hour): the time, whether it was the installed app or a browser tab, and whether it was a phone, tablet or computer. Nothing about what you do inside it. It tells me which of those to make work best.</td></tr>
   <tr><th>Demo visitors</th><td>If you try the demo and enter your mobile number, the number and when you visited, so I can ask how you found it. If you tick the box saying you don't want to be contacted, your number stays on your own device. Ask me to stop at any time and the number is deleted.</td></tr>
 </table>
@@ -124,6 +124,26 @@
 </div>
 <p>
   Nobody buys your data from me, because it is not for sale, and it never will be.
+</p>
+
+<h2>Google Calendar</h2>
+<p>
+  Connecting a calendar asks Google for read-only access to your calendars. TutorTally
+  never creates, changes or deletes anything in your calendar. It only reads the one
+  calendar you pick, and from that it only uses each event's title, date and time, to
+  spot lessons and match them to your students.
+</p>
+<ul>
+  <li>Calendar data is used only to show and track your lessons inside TutorTally.</li>
+  <li>It is never sold, never used for advertising, and never shared with anyone else.</li>
+  <li>It is never used to train AI or machine learning models.</li>
+  <li>Nobody reads it by hand, except with your permission to fix a problem you have asked about, or where the law requires it.</li>
+  <li>Disconnecting in the app deletes the stored access tokens and tells Google to cancel the access. You can also remove access at any time from your <a href="https://myaccount.google.com/permissions" rel="noopener">Google account permissions</a>.</li>
+</ul>
+<p>
+  TutorTally's use and transfer of information received from Google APIs will adhere to
+  the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>,
+  including the Limited Use requirements.
 </p>
 
 <h2>Can I see your students?</h2>
