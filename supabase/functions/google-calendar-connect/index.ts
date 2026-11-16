@@ -6,15 +6,14 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 // Google only sends people back to a domain the app owner has verified, and
-// nobody can verify supabase.co, which is what blocks OAuth verification and
-// keeps the "Google hasn't verified this app" warning on screen. Setting
-// GOOGLE_REDIRECT_URI to a page on our own domain moves the callback there.
-// Unset it and everything behaves exactly as it did, so this can be switched
-// on only once the new address is registered in the Google console.
-// google-calendar-auth reads the same variable, and the two MUST agree:
-// Google checks the value again during the token exchange.
+// nobody can verify supabase.co, so the callback lives on our own domain:
+// tutortally.co.uk/auth/google, which worker.js forwards to
+// google-calendar-auth. It must be listed under the OAuth client's redirect
+// URIs in the Google console. GOOGLE_REDIRECT_URI can override it.
+// google-calendar-auth uses the same value, and the two MUST agree:
+// Google checks it again during the token exchange.
 const REDIRECT_URI = Deno.env.get('GOOGLE_REDIRECT_URI') ??
-  `${SUPABASE_URL}/functions/v1/google-calendar-auth`
+  'https://tutortally.co.uk/auth/google'
 const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly'
 
 // Every origin the app is allowed to be served from and returned to. An
@@ -23,11 +22,12 @@ const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly'
 // them on a site of their choosing - so the browser's value is only ever
 // honoured if its origin appears here.
 const ALLOWED_ORIGINS = [
+  'https://tutortally.co.uk',
   'https://tutoring.bowermaths.co.uk',
   'https://bowermaths.co.uk',
   'https://bowergit.github.io',
 ]
-const DEFAULT_RETURN = 'https://tutoring.bowermaths.co.uk/'
+const DEFAULT_RETURN = 'https://tutortally.co.uk/'
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 

@@ -11,11 +11,11 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 // variable so they cannot drift apart. See that function for why the callback
 // moves onto our own domain.
 const REDIRECT_URI = Deno.env.get('GOOGLE_REDIRECT_URI') ??
-  `${SUPABASE_URL}/functions/v1/google-calendar-auth`
+  'https://tutortally.co.uk/auth/google'
 // Only used when a connection predates return_to being recorded, or if the
 // row somehow lacks one. The live value comes from the state row, so the app
 // can move domain without this function being redeployed.
-const FALLBACK_APP_URL = 'https://tutoring.bowermaths.co.uk/'
+const FALLBACK_APP_URL = 'https://tutortally.co.uk/'
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
