@@ -437,7 +437,7 @@
 // page itself has no privileges: signing in here as an ordinary tutor loads a
 // "not an admin" message, because the endpoint answers 404 to anyone who is not
 // on that table. Nothing is gated in the browser, where gating means nothing.
-const VERSION = 'v6.53.1';
+const VERSION = 'v6.59.0';
 const SUPABASE_URL = 'https://uilytgubukiinyrqrltj.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_WK5p8tUAsNLEqnmxVT7Eag_2EVNbi7V';
 const FN_BASE = SUPABASE_URL + '/functions/v1';
@@ -956,8 +956,28 @@ function pillsHTML(a) {
   if (wouldNeedPro(a) && (a.segment === 'tester' || !freeActive(a))) {
     out.push(`<span class="pill accent">${a.over_limit_by} over limit</span>`);
   }
+  if (a.app_use?.installed_ever) out.push('<span class="pill muted">Installed app</span>');
   if (a.is_admin) out.push('<span class="pill muted">Admin</span>');
   return out.join('');
+}
+
+// How they open TutorTally, from the app's own open log (last 30 days).
+// "Mostly" is whichever of installed app, phone browser, tablet browser or
+// computer has the most opens.
+function appUseLine(a) {
+  const u = a.app_use;
+  if (!u) return 'How they open it: not seen yet';
+  const ways = [
+    ['the installed app', u.app_30d],
+    ['a phone browser', u.browser_phone_30d],
+    ['a tablet browser', u.browser_tablet_30d],
+    ['a computer browser', u.desktop_30d],
+  ].filter(([, n]) => n > 0).sort((x, y) => y[1] - x[1]);
+  const installed = u.installed_ever ? 'Installed as an app' : 'Not installed as an app';
+  if (!ways.length) return `${installed} · no opens in the last 30 days`;
+  const [top, topN] = ways[0];
+  const share = Math.round(topN / u.opens_30d * 100);
+  return `${installed} · mostly opens it in ${top} (${share}% of ${plural(u.opens_30d, 'open')} in 30 days)`;
 }
 
 // ---- Income -------------------------------------------------------------
@@ -1358,6 +1378,7 @@ function metaHTML(a) {
   const lines = [];
   lines.push(`Joined ${esc(fmtDate(a.joined) || '?')} · last used <b>${esc(agoLabel(a.last_seen))}</b>${
     a.last_entry ? ' · last added something ' + esc(agoLabel(a.last_entry)) : ''}`);
+  lines.push(esc(appUseLine(a)));
 
   const calName = calendarName(a);
   if (calName) {

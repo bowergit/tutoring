@@ -7617,6 +7617,35 @@ function isRunningAsWebApp() {
 function homeScreenTipRelevant() {
   return isAppleMobile() && !isRunningAsWebApp();
 }
+
+// ---------- App opens (admin only sees these) ----------
+// One small row each time a tutor opens TutorTally: installed app or browser
+// tab, and phone, tablet or computer. Nothing else. At most every 30 minutes
+// per device, and never allowed to get in the way: a failed write is ignored.
+const APP_OPEN_KEY = 'tt_app_open_logged';
+function deviceKind() {
+  const ua = navigator.userAgent || '';
+  if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)
+      || (/Android/.test(ua) && !/Mobile/.test(ua))) return 'tablet';
+  if (/iPhone|iPod|Android|Mobile/.test(ua)) return 'phone';
+  return 'desktop';
+}
+function launchedAsApp() {
+  if (isRunningAsWebApp()) return true;
+  return !!window.matchMedia && ['fullscreen', 'minimal-ui', 'window-controls-overlay']
+    .some(m => window.matchMedia(`(display-mode: ${m})`).matches);
+}
+function noteAppOpen() {
+  if (DEMO_MODE || document.visibilityState === 'hidden') return;
+  try {
+    const last = Number(localStorage.getItem(APP_OPEN_KEY) || 0);
+    if (Date.now() - last < 30 * 60000) return;
+    localStorage.setItem(APP_OPEN_KEY, String(Date.now()));
+  } catch { /* storage blocked: log anyway, the 30 minutes is a courtesy */ }
+  supabase.from('tutoring_app_opens')
+    .insert({ mode: launchedAsApp() ? 'app' : 'browser', device: deviceKind() })
+    .then(() => {}, () => {});
+}
 // Counts distinct days the app was opened, so "used for a while" means a few
 // separate days rather than lots of taps in the first sitting.
 function noteDayUsed() {
@@ -9536,6 +9565,15 @@ function App() {
   const [homeTipOpen, setHomeTipOpen] = useState(false);
   const signedInId = session?.user?.id;
   useEffect(() => { if (signedInId) noteDayUsed(); }, [signedInId]);
+  // Counted on open and again when they come back to it later, since an
+  // installed app is usually resumed rather than reloaded.
+  useEffect(() => {
+    if (!signedInId) return;
+    noteAppOpen();
+    const onVisible = () => { if (document.visibilityState === 'visible') noteAppOpen(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [signedInId]);
   useEffect(() => {
     if (!signedInId || loading || walkthroughOpen || !students.some(s => s.active)) return;
     if (!homeScreenTipDue()) return;
@@ -10106,7 +10144,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.58.1</div>}
+        {!loading && <div className="version-tag">v6.59.0</div>}
       </div>
 
       {showAddModal && (

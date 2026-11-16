@@ -299,7 +299,7 @@ Deno.serve(async (req) => {
     // version would have started under-reporting usage for everyone, silently,
     // as soon as there were a few thousand lessons across all tenants.
     const stripeP = fetchStripe()
-    const [{ data: rows, error: rowsErr }, { data: notes }, { data: leadRows }, { data: feedRows }] = await Promise.all([
+    const [{ data: rows, error: rowsErr }, { data: notes }, { data: leadRows }, { data: feedRows }, { data: appUseRows }] = await Promise.all([
       supabase.rpc('tutoring_admin_accounts'),
       supabase.from('tutoring_account_notes')
         .select('owner_id,body,created_at,author_id')
@@ -314,8 +314,23 @@ Deno.serve(async (req) => {
       // Read only to say whose calendar it is (Apple, Outlook...). The link
       // itself is a password to their whole calendar, so it never leaves here.
       supabase.from('tutoring_calendar_feeds').select('owner_id,url'),
+      // Installed app or browser, and on what. Optional like the leads: if it
+      // errors the cards just say nothing about it.
+      supabase.rpc('tutoring_admin_app_use'),
     ])
     if (rowsErr) return json({ ok: false, problem: 'list_failed', detail: rowsErr.message })
+
+    const appUseOf = new Map<string, any>((appUseRows ?? []).map((u: any) => [u.owner_id, {
+      installed_ever: !!u.installed_ever,
+      opens_30d: Number(u.opens_30d),
+      app_30d: Number(u.app_30d),
+      browser_phone_30d: Number(u.browser_phone_30d),
+      browser_tablet_30d: Number(u.browser_tablet_30d),
+      desktop_30d: Number(u.desktop_30d),
+      last_mode: u.last_mode,
+      last_device: u.last_device,
+      last_open: u.last_open,
+    }]))
 
     const feedKindOf = new Map<string, string>(
       (feedRows ?? []).map((f: any) => [f.owner_id, calendarFeedKind(f.url)]),
@@ -423,6 +438,7 @@ Deno.serve(async (req) => {
         parent_days_30d: Number(r.parent_days_30d),
         parent_views_ever: Number(r.parent_views_ever),
         last_parent_view: r.last_parent_view,
+        app_use: appUseOf.get(r.owner_id) ?? null,
         notes: notesByOwner.get(r.owner_id) ?? [],
       }
     })
