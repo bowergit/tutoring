@@ -14,7 +14,16 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 // Google checks it again during the token exchange.
 const REDIRECT_URI = Deno.env.get('GOOGLE_REDIRECT_URI') ??
   'https://tutortally.co.uk/auth/google'
-const SCOPE = 'https://www.googleapis.com/auth/calendar.readonly'
+// The narrowest scopes that cover what TutorTally does, and nothing else
+// (Google's verification insists on least privilege): list the tutor's
+// calendars so they can pick one, and read events. calendar.readonly also
+// grants settings, sharing and free/busy, none of which is used. Connections
+// made before the switch hold calendar.readonly, which covers both calls, so
+// they keep working. google-calendar-auth refuses a grant missing either one.
+const SCOPE = [
+  'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+  'https://www.googleapis.com/auth/calendar.events.readonly',
+].join(' ')
 
 // Every origin the app is allowed to be served from and returned to. An
 // unchecked return_to would turn the OAuth callback into an open redirect -

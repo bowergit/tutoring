@@ -70,7 +70,7 @@
 <div class="wrap">
 
 <h1>Privacy</h1>
-<p class="updated">Last updated 16 November 2026.</p>
+<p class="updated">Last updated 17 November 2026.</p>
 
 <p>
   TutorTally holds information about children, because that is what a tutor's records
@@ -128,17 +128,40 @@
 
 <h2>Google Calendar</h2>
 <p>
-  Connecting a calendar asks Google for read-only access to your calendars. TutorTally
-  never creates, changes or deletes anything in your calendar. It only reads the one
-  calendar you pick, and from that it only uses each event's title, date and time, to
-  spot lessons and match them to your students.
+  This part covers the data TutorTally gets from Google if you connect Google Calendar.
+  TutorTally never creates, changes or deletes anything in your Google account.
 </p>
+
+<p><strong>What it accesses.</strong> Google is asked for two read-only permissions:</p>
 <ul>
-  <li>Calendar data is used only to show and track your lessons inside TutorTally.</li>
-  <li>It is never sold, never used for advertising, and never shared with anyone else.</li>
-  <li>It is never used to train AI or machine learning models.</li>
-  <li>Nobody reads it by hand, except with your permission to fix a problem you have asked about, or where the law requires it.</li>
-  <li>Disconnecting in the app deletes the stored access tokens and tells Google to cancel the access. You can also remove access at any time from your <a href="https://myaccount.google.com/permissions" rel="noopener">Google account permissions</a>.</li>
+  <li><strong>Your list of calendars</strong> (each calendar's name and ID), so you can pick the one with your lessons in it. The list is shown to you once and not stored, apart from the name and ID of the calendar you pick.</li>
+  <li><strong>Events</strong>, read only from the calendar you picked, from 7 days ago to 90 days ahead. From each event TutorTally uses only the title, start and end time, and Google's event ID. Descriptions, locations, attendees and attachments are never used or kept, and your other calendars are never read.</li>
+</ul>
+
+<p><strong>How it is used.</strong> Only to keep your lesson records up to date:</p>
+<ul>
+  <li>Event titles are matched against your students' names. A match becomes a lesson with its date, time and length. The event's title is kept as the lesson's note, and the event ID is kept so the same lesson is not added twice.</li>
+  <li>Titles that repeat but match nobody are listed for you in Settings, in case they are students you have not added yet.</li>
+  <li>Nothing else is done with it. There is no aggregated or anonymised use of Google data: it is not combined across tutors, analysed, or used for advertising, profiling or credit decisions, and it is never used to train AI or machine learning models.</li>
+</ul>
+
+<p><strong>Who it is shared with.</strong> Nobody. Google data is never sold or passed to third parties. It is stored with Supabase, the database host listed above, purely to run TutorTally. Your parent and pupil pages show lesson dates and times, because that is what you send them, but never event titles or anything else from your calendar.</p>
+<p><strong>Other calendars.</strong> If you paste an Apple or Outlook calendar link instead, TutorTally reads that link the same way and uses the same fields. That is not Google data, but it is handled under the same rules.</p>
+
+<p><strong>How it is protected.</strong></p>
+<ul>
+  <li>Everything travels over encrypted HTTPS connections, and the database is encrypted at rest in the UK.</li>
+  <li>Google's access tokens are held only on the server. The database lets no signed-in user read them, not even you, and they are never sent to a browser.</li>
+  <li>Each tutor can only ever read their own lessons, enforced by the database itself (see below).</li>
+  <li>Nobody reads your calendar data by hand, except with your permission to fix a problem you have asked about, or where the law requires it.</li>
+</ul>
+
+<p><strong>How long it is kept, and deleting it.</strong></p>
+<ul>
+  <li>Access tokens are kept while you are connected. Disconnecting in the app deletes them straight away and tells Google to cancel the access. You can also remove access from your <a href="https://myaccount.google.com/permissions" rel="noopener">Google account permissions</a>.</li>
+  <li>Lessons made from your calendar are your records, so they stay after you disconnect, until you delete them or your account.</li>
+  <li>Unmatched titles are cleared when they stop appearing in your calendar.</li>
+  <li>Closing your account deletes all of it, as described under "How long it is kept".</li>
 </ul>
 <p>
   TutorTally's use and transfer of information received from Google APIs will adhere to

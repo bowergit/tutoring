@@ -9990,7 +9990,9 @@ function App() {
           background: googleStatus === 'connected' ? 'var(--good-fill)' : 'var(--danger-fill)',
           color:'#fff', boxShadow:'0 4px 20px rgba(0,0,0,0.25)'
         }}>
-          {googleStatus === 'connected' ? '📅 Google Calendar connected - pick a calendar in Settings to finish' : 'Google Calendar connection was cancelled or denied'}
+          {googleStatus === 'connected' ? '📅 Google Calendar connected - pick a calendar in Settings to finish'
+            : googleStatus === 'scopes' ? 'Not connected. Tick both boxes on Google\'s screen so TutorTally can see your calendars and their events.'
+            : 'Google Calendar connection was cancelled or denied'}
         </div>
       )}
       <div className="app-header">
@@ -10144,7 +10146,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.59.1</div>}
+        {!loading && <div className="version-tag">v6.60.0</div>}
       </div>
 
       {showAddModal && (

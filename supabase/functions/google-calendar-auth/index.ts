@@ -81,6 +81,20 @@ Deno.serve(async (req) => {
   }
 
   const tokenData = await tokenRes.json()
+
+  // Google shows one tick box per scope and lets people untick some. Without
+  // the calendar list the tutor cannot pick a calendar, and without events
+  // nothing syncs, so a partial grant is refused up front with its own
+  // message rather than stored as a connection that quietly half-works.
+  // Not revoked: revoking cancels the whole grant, including an earlier
+  // working connection; the unstored token simply expires within the hour.
+  const granted = String(tokenData.scope || '').split(' ')
+  const has = (s: string) => granted.includes(`https://www.googleapis.com/auth/${s}`) ||
+    granted.includes('https://www.googleapis.com/auth/calendar.readonly')
+  if (!has('calendar.calendarlist.readonly') || !has('calendar.events.readonly')) {
+    console.error('Partial Google grant, not stored. Granted:', tokenData.scope)
+    return back(APP_URL, 'scopes')
+  }
   // { access_token, refresh_token?, expires_in, scope, token_type }
   // refresh_token is only issued when prompt=consent forced a fresh grant
   // (which google-calendar-connect always sets) - absent on some retries if
