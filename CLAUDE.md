@@ -95,7 +95,10 @@ then `function App()` near the end.
   everywhere balances are computed, including `student-portal`.
 - `pre_settled` comes from a per-account `reset_date` on the calendar
   connection. Only the owner's account has one. Other tutors count everything
-  from when they joined; do not add global cut-off dates.
+  from when they joined; do not add global cut-off dates. The sync makes this
+  true: a lesson it first imports dated before the tutor's sign-up day (UK
+  date) arrives `pre_settled`. Existing lessons are never flipped, since some
+  tutors record payments against that first week.
 - A lesson with a payment attached is never deleted by the calendar sync.
 
 **Calendar sync** (`google-calendar-sync`, live only)

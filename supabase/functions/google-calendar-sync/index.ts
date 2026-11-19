@@ -206,6 +206,19 @@ function eventMinutes_(item: any): number | null {
   return m != null && Number.isFinite(m) && m >= 5 && m <= 600 ? m : null
 }
 
+/** The day the tutor signed up, as a UK calendar date, or null if unknown. */
+async function joinDate_(ownerId: string): Promise<string | null> {
+  try {
+    const { data } = await supabase.auth.admin.getUserById(ownerId)
+    const created = data?.user?.created_at
+    if (!created) return null
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .format(new Date(created))
+  } catch {
+    return null
+  }
+}
+
 async function upsertLesson_(l: any) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/tutoring_lessons?on_conflict=google_event_id`, {
     method: 'POST',
@@ -432,6 +445,24 @@ async function runSync_(opts: {
     }
   }
 
+  // A tutor starts from nothing owed. The window reaches a week back, so a
+  // brand new account's first sync would otherwise import last week's lessons
+  // as taught and unpaid, and greet them with money "overdue" from before they
+  // ever signed up. Lessons dated before the sign-up day arrive as settled.
+  // Only on arrival: one that already exists keeps whatever it has, because
+  // some tutors do go back and record payments for that week, and turning
+  // those lessons settled would turn the payments into credit.
+  const joinDate = await joinDate_(ownerId)
+  const preJoinKeys = new Set<string>()
+  if (joinDate && joinDate > reconcileFrom.toISOString().slice(0, 10)) {
+    const { data: existing } = await supabase.from('tutoring_lessons')
+      .select('google_event_id')
+      .eq('owner_id', ownerId)
+      .lt('lesson_date', joinDate)
+      .not('google_event_id', 'is', null)
+    for (const r of existing ?? []) preJoinKeys.add(r.google_event_id)
+  }
+
   const seenKeys = new Set<string>()
   // Distinct unmatched event titles, with how many events carry each one -
   // surfaced to the frontend so a tutor can turn a recurring lesson nobody's
@@ -468,7 +499,7 @@ async function runSync_(opts: {
       continue
     }
 
-    const ok = await upsertLesson_({
+    const lesson: any = {
       student_id: match.studentId,
       owner_id: ownerId,
       lesson_date: local.date,
@@ -478,7 +509,13 @@ async function runSync_(opts: {
       start_time: local.time,
       calendar_minutes: eventMinutes_(item),
       pre_settled: resetDate ? local.date < resetDate : false,
-    })
+    }
+    if (!resetDate && joinDate && local.date < joinDate) {
+      // Left out entirely for an existing lesson, so the upsert keeps its value.
+      if (preJoinKeys.has(item.id)) delete lesson.pre_settled
+      else lesson.pre_settled = true
+    }
+    const ok = await upsertLesson_(lesson)
     if (ok) synced++
     else failed++
   }
