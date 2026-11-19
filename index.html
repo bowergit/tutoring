@@ -485,7 +485,14 @@
      every Add button and most Save buttons. Rather than fight over z-index,
      the walkthrough shrinks to a bar and the sheet is lifted clear of it. */
   body[data-wt-bar="1"] .overlay { padding-bottom: var(--wt-bar-h, 96px); }
-  body[data-wt-bar="1"] .sheet { max-height: calc(94vh - var(--wt-bar-h, 96px)); }
+  body[data-wt-bar="1"] .sheet { max-height: calc(94vh - var(--wt-bar-h, 96px)); max-height: calc(94dvh - var(--wt-bar-h, 96px)); }
+  /* Room under the page for the setup card, so nothing is stuck behind it. */
+  body[data-wt-card="1"] { padding-bottom: var(--wt-card-h, 0px); }
+  /* dvh where the browser has it: on a phone, vh is measured with the address
+     bar hidden, so a card sized in vh ran off the bottom of the visible screen
+     and took its Next button with it. */
+  .wt-card { max-height: 62vh; max-height: 62dvh; }
+  .wt-card.wt-card-over-sheet { max-height: 46vh; max-height: 46dvh; }
   .sheet h2 { font-size: 1.05rem; margin: 0 0 16px; color: var(--ink); font-weight: 700; }
   .field { margin-bottom: 14px; }
   .field label {
@@ -2334,6 +2341,23 @@ const defaultRate = () => {
   return Number.isFinite(r) && r >= 0 ? r : 90;
 };
 
+// A student added straight from the calendar ("Is their name ...? Yes") has
+// no form to type a price into, and was saved with none at all, so every
+// lesson fell back to 90. A tutor who charges 70 was shown 90 a lesson owed.
+// They now start at the tutor's standard price, the same figure the Add
+// student form would have filled in. Nothing is saved when there is no
+// standard price, so the old behaviour stands for those tutors.
+async function giveStandardPrice(studentId, ownerId) {
+  const r = parseFloat(TUTOR_DEFAULT_RATE);
+  if (!studentId || !Number.isFinite(r) || r < 0) return;
+  await saved(() => supabase.from('tutoring_rate_history').upsert({
+    student_id: studentId,
+    rate: r,
+    effective_from_date: new Date().toLocaleDateString('en-CA'),
+    owner_id: ownerId,
+  }, { onConflict: 'student_id,effective_from_date' }));
+}
+
 // The rate in effect on a given date. Rates dated in the future are ignored
 // until that date arrives, so a September rise doesn't affect today's figures.
 // Ties on effective_from_date are broken by created_at, so the most recent
@@ -3039,6 +3063,13 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState(null);
   const [unmatched, setUnmatched] = useState([]);
+  // Names being saved right now, names already turned into students this
+  // session (so a sync that started before the add cannot put them back on the
+  // list), and the one sync that several quick adds share.
+  const adding = React.useRef(new Set());
+  const addedTitles = React.useRef(new Set());
+  const syncSoon = React.useRef(null);
+  useEffect(() => () => clearTimeout(syncSoon.current), []);
   // A subscribed calendar link, for tutors with no Google account.
   const [feed, setFeed] = useState(null);
   const [feedUrl, setFeedUrl] = useState('');
@@ -3183,7 +3214,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
     setMsg(r.ok && mine?.ok
       ? `Synced ${mine.synced} lesson${mine.synced === 1 ? '' : 's'}, matched against ${mine.students_matched} student${mine.students_matched === 1 ? '' : 's'}.`
       : `Problem: ${mine?.problem || r.problem || 'unknown'}`);
-    setUnmatched(mine?.unmatched_titles || []);
+    setUnmatched((mine?.unmatched_titles || []).filter(u => !addedTitles.current.has(u.title)));
     refresh();
     // A sync writes lessons, and everything on the dashboard is derived from
     // those: who needs chasing, who has nothing booked, the upcoming lists.
@@ -3197,18 +3228,35 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
   // claimed yet straight into a student, using the event title itself as
   // both the name and the match pattern, then re-sync so their lessons
   // land immediately instead of waiting for the next tap of "Sync now".
-  async function addStudentFromTitle(title) {
-    setBusy(true);
+  //
+  // The row leaves the list as soon as the student is saved and the next name
+  // can be added straight away. This used to wait for a whole re-sync with
+  // every button locked, which on an iCloud link meant 20 to 30 seconds per
+  // student while setting up. Several adds in a row share one sync, run once
+  // they stop.
+  async function addStudentFromTitle(title, rowTitle = title) {
+    const name = title.trim().slice(0, 80);
+    if (!name || adding.current.has(rowTitle)) return;
+    adding.current.add(rowTitle);
+    setUnmatched(list => list.filter(u => u.title !== rowTitle));
     const ownerId = (await supabase.auth.getUser()).data.user?.id;
-    await supabase.from('tutoring_students').insert({
-      name: title.trim().slice(0, 80),
+    const { data: added, error } = await supabase.from('tutoring_students').insert({
+      name,
       calendar_title_pattern: title,
       active: true,
       lesson_location: 'tutor_home',
       owner_id: ownerId,
-    });
+    }).select('id').single();
+    adding.current.delete(rowTitle);
+    if (error) {
+      setMsg(`Could not add ${name}: ${error.message}`);
+      return;
+    }
+    addedTitles.current.add(rowTitle);
+    await giveStandardPrice(added?.id, ownerId);
     onDataChanged?.();
-    await syncNow();
+    clearTimeout(syncSoon.current);
+    syncSoon.current = setTimeout(() => { syncNow(); }, 1500);
   }
 
   async function disconnect() {
@@ -3416,7 +3464,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
                           onChange={e => setEditedNames({...editedNames, [u.title]: e.target.value})}
                           style={{flex:1, fontSize:'0.85rem', padding:'6px 8px', borderRadius:8, border:'1px solid var(--line)', fontFamily:'inherit'}} />
                         <button className="btn save" style={{padding:'6px 10px', fontSize:'0.8rem', flexShrink:0}}
-                          disabled={busy} onClick={() => addStudentFromTitle((editedNames[u.title] ?? guess).trim())}>
+                          onClick={() => addStudentFromTitle((editedNames[u.title] ?? guess).trim(), u.title)}>
                           + Add
                         </button>
                       </div>
@@ -3426,7 +3474,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
                           Is their name <b>{guess}</b>? <span style={{color:'var(--muted)'}}>× {u.count}</span>
                         </span>
                         <button className="btn save" style={{padding:'6px 10px', fontSize:'0.8rem', flexShrink:0}}
-                          disabled={busy} onClick={() => addStudentFromTitle(guess)}>
+                          onClick={() => addStudentFromTitle(guess, u.title)}>
                           Yes
                         </button>
                         <button className="btn cancel" style={{padding:'6px 10px', fontSize:'0.8rem', flexShrink:0, minWidth:'auto'}}
@@ -3440,7 +3488,7 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
                           {u.title} <span style={{color:'var(--muted)'}}>× {u.count}</span>
                         </span>
                         <button className="btn save" style={{padding:'6px 10px', fontSize:'0.8rem', flexShrink:0}}
-                          disabled={busy} onClick={() => setConfirmingTitles({...confirmingTitles, [u.title]: true})}>
+                          onClick={() => setConfirmingTitles({...confirmingTitles, [u.title]: true})}>
                           Add student
                         </button>
                       </div>
@@ -3772,7 +3820,7 @@ function LoginGate() {
 
   return (
     <div style={{
-      minHeight:'100dvh', display:'flex', alignItems:'center', justifyContent:'center',
+      minHeight:'100dvh', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
       padding:'24px 18px'
     }}>
       <div style={{
@@ -3893,6 +3941,14 @@ function LoginGate() {
           </form>
         )}
       </div>
+      {/* tutortally.co.uk opens straight onto this form, so someone sent the
+          address to find out what TutorTally is had no way to the page that
+          explains it. */}
+      <a href="/app" style={{
+        marginTop:16, fontSize:'0.82rem', color:'var(--muted)', textDecoration:'none',
+      }}>
+        New to TutorTally? <span style={{color:'var(--accent)', fontWeight:650}}>See what it does →</span>
+      </a>
     </div>
   );
 }
@@ -5297,6 +5353,7 @@ function CalendarCandidates({ session, students, atLimit, onDataChanged, onAdded
     setRows(list => list.filter(x => x.id !== r.id));
     setEditing(null);
     setBusy(null);
+    await giveStandardPrice(added?.id, session?.user?.id);
 
     // No "added" message. The student's own card, lit up on the page, says it
     // better: scroll to it once the reload has given it a card to scroll to.
@@ -9129,12 +9186,14 @@ const WT_STEPS = [
 function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPausedChange }) {
   const meta = session?.user?.user_metadata || {};
 
-  // Someone who already told us their name and number does not need to be
-  // asked again on their way through, so that step is dropped rather than
-  // shown pre-filled. Fixed at mount: the list must not shorten underneath
-  // them the moment they type into it.
+  // Someone who already told us their name, number and fee does not need to
+  // be asked again on their way through, so that step is dropped rather than
+  // shown pre-filled. The fee counts too: sign-up asks for a name and number
+  // but never a price, so dropping the step on those two alone left a tutor
+  // who charges 70 with no way to say so, and every lesson priced at 90.
+  // Fixed at mount: the list must not shorten underneath them as they type.
   const [steps] = useState(() => WT_STEPS.filter(st => (
-    st.key !== 'you' || !(meta.display_name && meta.contact_phone)
+    st.key !== 'you' || !(meta.display_name && meta.contact_phone && meta.default_rate != null)
   )));
 
   const startAt = typeof meta.wt_step === 'number' && meta.wt_step > 0
@@ -9181,11 +9240,24 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
       delete document.body.dataset.wtBar;
       document.body.style.removeProperty('--wt-bar-h');
     }
+    // The full card covers the bottom of the page, up to most of a phone
+    // screen, and the page had no room beneath it. Whatever sat under the card
+    // could not be scrolled into view, which is exactly where the student
+    // cards a step points at end up. The page now gets that much extra room.
+    if (!paused && !sheetOpen && barRef.current) {
+      document.body.dataset.wtCard = '1';
+      document.body.style.setProperty('--wt-card-h', barRef.current.offsetHeight + 'px');
+    } else {
+      delete document.body.dataset.wtCard;
+      document.body.style.removeProperty('--wt-card-h');
+    }
   });
 
   useEffect(() => () => {
     delete document.body.dataset.wtBar;
     document.body.style.removeProperty('--wt-bar-h');
+    delete document.body.dataset.wtCard;
+    document.body.style.removeProperty('--wt-card-h');
   }, []);
 
   const [name, setName]   = useState(meta.display_name || '');
@@ -9296,11 +9368,11 @@ function Walkthrough({ session, students, onOpenTool, onAddStudent, onDone, onPa
   return ReactDOM.createPortal(
     <>
     {s.anchor && <Spotlight anchor={s.anchor} />}
-    <div ref={barRef} style={{
+    <div ref={barRef} className={sheetOpen ? 'wt-card wt-card-over-sheet' : 'wt-card'} style={{
       position:'fixed', left:0, right:0, bottom:0, zIndex:150,
       background:'var(--card)', borderTop:'1px solid var(--line)',
       boxShadow:'var(--sh-3)', padding:'16px 16px calc(16px + env(safe-area-inset-bottom))',
-      maxHeight: sheetOpen ? '46vh' : '72vh', overflowY:'auto', overflowX:'hidden',
+      overflowY:'auto', overflowX:'hidden', overscrollBehavior:'contain',
     }}>
       <div style={{maxWidth:680, margin:'0 auto'}}>
         <div style={{display:'flex', alignItems:'center', gap:8, marginBottom:7}}>

@@ -233,6 +233,41 @@ async function upsertLesson_(l: any) {
   return res.ok
 }
 
+const UPSERT_BATCH = 200
+
+/**
+ * Every lesson in a handful of requests rather than one request each. One at
+ * a time, a term of weekly lessons for a few students was dozens of round
+ * trips, and the app waits for the sync after a calendar link is pasted and
+ * after each student is added, so setting up took 20 to 30 seconds a step.
+ *
+ * A batch only works if every row carries the same columns, so rows are
+ * grouped by their set of keys (a lesson from before sign-up that already
+ * exists leaves pre_settled out). If a batch is refused, its rows are retried
+ * one by one, so one bad row costs that row and not the whole sync, and the
+ * failure count stays as honest as it was.
+ */
+async function upsertLessons_(lessons: any[]): Promise<{ ok: number; failed: number }> {
+  const groups = new Map<string, any[]>()
+  for (const l of lessons) {
+    const shape = Object.keys(l).sort().join(',')
+    if (!groups.has(shape)) groups.set(shape, [])
+    groups.get(shape)!.push(l)
+  }
+  let ok = 0, failed = 0
+  for (const rows of groups.values()) {
+    for (let i = 0; i < rows.length; i += UPSERT_BATCH) {
+      const chunk = rows.slice(i, i + UPSERT_BATCH)
+      if (await upsertLesson_(chunk)) { ok += chunk.length; continue }
+      for (const one of chunk) {
+        if (await upsertLesson_(one)) ok++
+        else failed++
+      }
+    }
+  }
+  return { ok, failed }
+}
+
 /**
  * Remembers which unmatched names keep turning up, so the home screen can say
  * "new student in your calendar" after the overnight sync, not only after
@@ -477,6 +512,7 @@ async function runSync_(opts: {
   // function cannot see, and reporting success while silently dropping lessons
   // is the worst of the available behaviours.
   let failed = 0
+  const pending = new Map<string, any>()
 
   for (const item of events) {
     const start = eventStart_(item)
@@ -515,10 +551,14 @@ async function runSync_(opts: {
       if (preJoinKeys.has(item.id)) delete lesson.pre_settled
       else lesson.pre_settled = true
     }
-    const ok = await upsertLesson_(lesson)
-    if (ok) synced++
-    else failed++
+    // Last one wins if a calendar ever hands back the same event twice, since
+    // one batch cannot touch the same row twice.
+    pending.set(item.id, lesson)
   }
+
+  const written = await upsertLessons_([...pending.values()])
+  synced = written.ok
+  failed = written.failed
 
   // If lessons would not save, do not then go looking for lessons to remove.
   // Whatever is refusing the writes will refuse the deletes too, and a half
