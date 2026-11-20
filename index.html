@@ -3003,6 +3003,15 @@ function GrowthCalculator({ students, rateHistory, extra, setExtra, extraRate, s
 
 // ---------- Calendar ----------
 
+// The Apple link steps, each with a real screenshot (brand/guide) that has the
+// button to tap ringed. Other calendar names and the link itself are blurred.
+const APPLE_LINK_STEPS = [
+  ['ical-1.jpg', <>Open the <b>Calendar</b> app on your iPhone and tap the calendars button at the bottom.</>],
+  ['ical-2.jpg', <>Tap the <b>i</b> next to the calendar your lessons are in.</>],
+  ['ical-3.jpg', <>Turn on <b>Public Calendar</b>, then tap <b>Share Link</b>.</>],
+  ['ical-4.jpg', <>Tap <b>Copy</b>.</>],
+];
+
 // Asked first, so a tutor only ever reads the instructions for the calendar
 // they actually own.
 const CALENDAR_PROVIDERS = [
@@ -3098,8 +3107,31 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
     if (data?.url) setFeedUrl(data.url);
   }
 
-  async function saveFeed() {
-    const url = feedUrl.trim();
+  // Copying in one app and pasting into a small box in another is the fiddly
+  // part on a phone, so one button reads what they just copied and connects.
+  // Safari shows its own small Paste bubble first; that tap is the permission.
+  const canReadClipboard = typeof navigator !== 'undefined' && !!navigator.clipboard?.readText;
+  const feedInput = React.useRef(null);
+  async function pasteAndConnect() {
+    let text = '';
+    try { text = (await navigator.clipboard.readText()).trim(); }
+    catch {
+      setMsg('Could not read what you copied. Press and hold the box below, then tap Paste.');
+      feedInput.current?.focus();
+      return;
+    }
+    if (!/^(webcal|https?):\/\/\S+$/i.test(text)) {
+      setMsg(text
+        ? "What you copied isn't a calendar link. Go back to the Calendar app, tap Share Link, then Copy, and try again."
+        : 'Nothing has been copied yet. Follow the steps above, tap Copy, then come back.');
+      return;
+    }
+    setFeedUrl(text);
+    await saveFeed(text);
+  }
+
+  async function saveFeed(given) {
+    const url = (typeof given === 'string' ? given : feedUrl).trim();
     if (!url) return;
     setBusy(true); setMsg(null);
     const ownerId = (await supabase.auth.getUser()).data.user?.id;
@@ -3364,16 +3396,36 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
                 : ''}
             </div>
           ) : provider === 'apple' ? (
-            <ol style={{
-              fontSize:'0.8rem', color:'var(--ink-dim)', lineHeight:1.6,
-              paddingLeft:20, margin:'0 0 12px',
-            }}>
-              <li>On your iPhone, open the <b>Calendar</b> app and tap <b>Calendars</b> at the bottom.</li>
-              <li>Tap the <b>i</b> in a circle next to the calendar your lessons are in.</li>
-              <li>Turn on <b>Public Calendar</b>.</li>
-              <li>Tap <b>Share Link</b>, then <b>Copy</b>.</li>
-              <li>Paste it in the box below.</li>
-            </ol>
+            // Pictures, not just words: the written steps alone were not
+            // enough for a tutor setting up on her phone. Each picture is the
+            // real screen with the thing to tap ringed.
+            <div style={{margin:'0 0 12px'}}>
+              {APPLE_LINK_STEPS.map(([img, text], i) => (
+                <div key={img} style={{marginBottom:14}}>
+                  <div style={{display:'flex', gap:9, alignItems:'baseline', fontSize:'0.84rem',
+                    color:'var(--ink)', lineHeight:1.5, marginBottom:7}}>
+                    <span style={{
+                      flexShrink:0, width:22, height:22, borderRadius:'50%', display:'inline-grid',
+                      placeItems:'center', fontSize:'0.72rem', fontWeight:700,
+                      background:'var(--accent-light)', color:'var(--accent)',
+                    }}>{i + 1}</span>
+                    <span>{text}</span>
+                  </div>
+                  <img src={`brand/guide/${img}?v=1`} alt="" loading="lazy" style={{
+                    display:'block', width:'100%', maxWidth:340, height:'auto',
+                    borderRadius:12, border:'1px solid var(--line)',
+                  }} />
+                </div>
+              ))}
+              <div style={{display:'flex', gap:9, alignItems:'baseline', fontSize:'0.84rem', color:'var(--ink)', lineHeight:1.5}}>
+                <span style={{
+                  flexShrink:0, width:22, height:22, borderRadius:'50%', display:'inline-grid',
+                  placeItems:'center', fontSize:'0.72rem', fontWeight:700,
+                  background:'var(--accent-light)', color:'var(--accent)',
+                }}>{APPLE_LINK_STEPS.length + 1}</span>
+                <span>Come back here and tap <b>Paste link</b>.</span>
+              </div>
+            </div>
           ) : (
             <ol style={{
               fontSize:'0.8rem', color:'var(--ink-dim)', lineHeight:1.6,
@@ -3387,12 +3439,24 @@ function GoogleCalendarPanel({ session, onDataChanged }) {
             </ol>
           )}
 
+          {!feed && canReadClipboard && (
+            <button className="btn save" style={{width:'100%', marginBottom:10}} disabled={busy} onClick={pasteAndConnect}>
+              {busy ? 'Checking...' : 'Paste link'}
+            </button>
+          )}
+          {/* The usual message line only exists once something is connected,
+              so before that a problem with the link would never be seen. */}
+          {!feed && msg && (
+            <div role="status" style={{fontSize:'0.8rem', color:'var(--warn)', marginBottom:10, lineHeight:1.45}}>{msg}</div>
+          )}
           <input
+            ref={feedInput}
             type="url"
             value={feedUrl}
             onChange={e => setFeedUrl(e.target.value)}
             placeholder={provider === 'other'
               ? 'https://outlook.office365.com/owa/calendar/.../calendar.ics'
+              : !feed && canReadClipboard ? 'Or paste it here yourself'
               : 'webcal://p01-calendars.icloud.com/published/...'}
             style={{width:'100%', marginBottom:8}}
           />
@@ -10218,7 +10282,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.60.0</div>}
+        {!loading && <div className="version-tag">v6.61.0</div>}
       </div>
 
       {showAddModal && (
