@@ -7298,6 +7298,10 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
   // has to be safe to hand to the pupil, and a shared token would let anyone
   // holding it edit the URL and read the balance.
   const pupilLink = new URL(`lessons?t=${student.student_token}`, window.location.href).toString();
+  // Opening a page from here is the tutor checking it, so it is marked as a
+  // preview and left out of the parent and pupil visit counts. Only the Open
+  // buttons add it; every link that is copied or sent stays plain.
+  const asPreview = link => link + '&preview=1';
 
   function copyStudentLink() {
     navigator.clipboard.writeText(studentLink).then(() => {
@@ -7358,7 +7362,7 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
               <ToolsRow
                 title="Open"
                 subtitle="Preview the parent page"
-                onClick={() => window.open(studentLink, '_blank', 'noopener')}
+                onClick={() => window.open(asPreview(studentLink), '_blank', 'noopener')}
                 end="↗"
               />
             </div>
@@ -7375,7 +7379,7 @@ function MoreToolsSheet({ student, onClose, onTrackCash, onStatement, onArchive,
               <ToolsRow
                 title="Open"
                 subtitle="Preview what they see"
-                onClick={() => window.open(pupilLink, '_blank', 'noopener')}
+                onClick={() => window.open(asPreview(pupilLink), '_blank', 'noopener')}
                 end="↗"
               />
             </div>
@@ -10282,7 +10286,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.61.0</div>}
+        {!loading && <div className="version-tag">v6.61.1</div>}
       </div>
 
       {showAddModal && (

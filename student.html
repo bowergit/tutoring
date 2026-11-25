@@ -264,6 +264,22 @@
   const UPCOMING_SHOWN = 8;
   const app = document.getElementById('app');
   const token = new URLSearchParams(window.location.search).get('t');
+  // The tutor opening this from the app to see what the parent sees is not a
+  // parent visit, and counting it would make the "are parents using it"
+  // figures say yes when nobody else has looked. The app adds ?preview=1; it
+  // is taken out of the address bar straight away, so a link copied from here
+  // is the plain one, and remembered for this tab so a refresh stays a preview.
+  const previewKey = 'tt_preview_' + token;
+  let tutorPreview = false;
+  try {
+    tutorPreview = new URLSearchParams(window.location.search).get('preview') === '1'
+      || sessionStorage.getItem(previewKey) === '1';
+    if (tutorPreview) sessionStorage.setItem(previewKey, '1');
+  } catch (e) { /* storage blocked: the URL flag alone still works */ }
+  if (new URLSearchParams(window.location.search).has('preview') && token) {
+    history.replaceState(null, '', window.location.pathname + '?t=' + encodeURIComponent(token) + window.location.hash);
+  }
+  const previewQuery = tutorPreview ? '&preview=1' : '';
 
   let portalData = null;
   let upcomingExpanded = false;
@@ -894,7 +910,7 @@
   } else {
     let status = 0;
     try {
-      const res = await fetch(`${FN_BASE}/student-portal?t=${encodeURIComponent(token)}`);
+      const res = await fetch(`${FN_BASE}/student-portal?t=${encodeURIComponent(token)}${previewQuery}`);
       status = res.status;
       data = await res.json();
     } catch (e) {
@@ -1043,7 +1059,7 @@
     ${pupilView ? '' : renderBooking(data.tutor?.booking_url)}
   `;
   renderUpcoming();
-  if (!pupilView) wireWeekly(data.weekly, `${FN_BASE}/student-portal?t=${encodeURIComponent(token)}`);
+  if (!pupilView) wireWeekly(data.weekly, `${FN_BASE}/student-portal?t=${encodeURIComponent(token)}${previewQuery}`);
   wireChart(data.progress);
   wireGrade(data.grade);
   if (!pupilView) wireBooking(data.tutor?.booking_url);

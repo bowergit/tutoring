@@ -244,6 +244,20 @@
   const UPCOMING_SHOWN = 8;
   const app = document.getElementById('app');
   const token = new URLSearchParams(window.location.search).get('t');
+  // The tutor opening this from the app to check it is not the pupil looking,
+  // so it is not counted. Same handling as student.html: ?preview=1 from the
+  // app, removed from the address bar at once, remembered for this tab.
+  const previewKey = 'tt_preview_' + token;
+  let tutorPreview = false;
+  try {
+    tutorPreview = new URLSearchParams(window.location.search).get('preview') === '1'
+      || sessionStorage.getItem(previewKey) === '1';
+    if (tutorPreview) sessionStorage.setItem(previewKey, '1');
+  } catch (e) { /* storage blocked: the URL flag alone still works */ }
+  if (new URLSearchParams(window.location.search).has('preview') && token) {
+    history.replaceState(null, '', window.location.pathname + '?t=' + encodeURIComponent(token) + window.location.hash);
+  }
+  const previewQuery = tutorPreview ? '&preview=1' : '';
 
   let portalData = null;
   let upcomingExpanded = false;
@@ -850,7 +864,7 @@
   } else {
     let status = 0;
     try {
-      const res = await fetch(`${FN_BASE}/student-portal?t=${encodeURIComponent(token)}`);
+      const res = await fetch(`${FN_BASE}/student-portal?t=${encodeURIComponent(token)}${previewQuery}`);
       status = res.status;
       data = await res.json();
     } catch (e) {

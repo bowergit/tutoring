@@ -442,6 +442,10 @@ Deno.serve(async (req) => {
   if (studentErr || !student) return json({ ok: false, problem: 'not_found' }, 404)
 
   const pupilView = student.student_token === token
+  // The tutor checking the page from the app's Open button, not a visit.
+  // Everything else about the response is identical, so the tutor sees exactly
+  // what the parent or pupil sees.
+  const tutorPreview = url.searchParams.get('preview') === '1'
   if (!['GET','POST'].includes(req.method)) return json({ok:false,problem:'method_not_allowed'},405)
   if (req.method === 'POST') {
     if (pupilView || student.owner_id !== MONZO_SETTLE_OWNER) return json({ok:false,problem:'forbidden'},403)
@@ -502,7 +506,7 @@ Deno.serve(async (req) => {
     // business.
     const shapePupil = (l: any) => ({ date: l.lesson_date, time: l.start_time, status: l.status })
     const { progress, grade } = await loadProgress(student)
-    logView_(student.id, student.owner_id, 'pupil')
+    if (!tutorPreview) logView_(student.id, student.owner_id, 'pupil')
     return json({
       ok: true,
       view: 'student',
@@ -685,7 +689,7 @@ Deno.serve(async (req) => {
       .map((p: any) => ({ date: p.date_paid, amount: Number(p.amount), payer: p.payer ?? null })),
   } : null
 
-  logView_(student.id, student.owner_id, 'parent')
+  if (!tutorPreview) logView_(student.id, student.owner_id, 'parent')
 
   return json({
     ok: true,
