@@ -8933,7 +8933,12 @@ function StudentCard({ student, lessons, payments, bundles, allocations = [], al
                     </span>
                     <span style={{display:'flex',alignItems:'center'}}>
                       <span style={{fontSize:'0.72rem',color:'var(--muted)',marginRight:8}}>
-                        {n > 0 ? `${n} lesson${n !== 1 ? 's' : ''}` : 'unlinked'}
+                        {/* A weekly plan is paid week by week, not lesson by
+                            lesson, so its payments are never tied to a lesson.
+                            "Unlinked" read as something gone wrong. */}
+                        {n > 0 ? `${n} lesson${n !== 1 ? 's' : ''}`
+                          : TTWeekly.plans(student.id).some(pl => pl.status !== 'proposed' && pl.acceptance) ? 'weekly'
+                          : 'unlinked'}
                       </span>
                       <span style={{fontWeight:600,color:'var(--ink)'}}>{M(parseFloat(p.amount) * moneyScale, p.id)}</span>
                       <span className="chev">›</span>
@@ -10286,7 +10291,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.61.1</div>}
+        {!loading && <div className="version-tag">v6.61.2</div>}
       </div>
 
       {showAddModal && (
