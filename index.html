@@ -4158,6 +4158,18 @@ function YourName({ session }) {
   const [booking, setBooking] = useState(session?.user?.user_metadata?.booking_url || '');
   const [address, setAddress] = useState(session?.user?.user_metadata?.invoice_address || '');
   const [invoiceName, setInvoiceName] = useState(session?.user?.user_metadata?.invoice_name || '');
+  // The session's copy can predate a name set elsewhere, and saving this form
+  // with it would blank the name on every invoice. Filled from the current
+  // details if the box is still empty.
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let live = true;
+    supabase.auth.getUser().then(({ data }) => {
+      const n = data?.user?.user_metadata?.invoice_name;
+      if (live && n) setInvoiceName(v => v || n);
+    }).catch(() => {});
+    return () => { live = false; };
+  }, []);
   const savedRate = session?.user?.user_metadata?.default_rate;
   const [rate, setRate] = useState(savedRate != null ? String(savedRate) : '');
   // A masked price must never be saved over the real one, so the field is
@@ -8258,7 +8270,17 @@ function HourlyTuitionSheet({ student, lessons, session, onChanged, onClose }) {
   const plan = H.currentPlan(student.id);
   const history = H.plans(student.id);
   const weeklyOpen = TTWeekly.plans(student.id).some(p => p.status !== 'ended');
-  const meta = session?.user?.user_metadata || {};
+  // The session's copy of the tutor's details is the one saved at sign-in, so
+  // a name or address changed since then (on another device, say) would not
+  // reach the invoice. The current details are fetched when this opens.
+  const [freshMeta, setFreshMeta] = useState(null);
+  useEffect(() => {
+    if (DEMO_MODE) return;
+    let live = true;
+    supabase.auth.getUser().then(({ data }) => { if (live && data?.user) setFreshMeta(data.user.user_metadata || {}); }).catch(() => {});
+    return () => { live = false; };
+  }, []);
+  const meta = freshMeta || session?.user?.user_metadata || {};
   const today = H.today();
 
   const [view, setView] = useState('main');   // main | setup | rate | invoices | term
@@ -10317,7 +10339,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.62.0</div>}
+        {!loading && <div className="version-tag">v6.62.1</div>}
       </div>
 
       {showAddModal && (
