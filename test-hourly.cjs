@@ -63,7 +63,15 @@ const inv = H.invoiceHTML({ number: 'INV-1', issued_at: '2026-12-01T10:00:00Z', 
 assert(inv.includes('&lt;b&gt;Zachy&lt;/b&gt;') && !inv.includes('<b>Zachy</b>'), 'student name escaped');
 assert(inv.includes('Barnet &lt;Council&gt;') && inv.includes('Ref: EHCP 123'), 'payer and reference shown, escaped');
 assert(inv.includes('Daniel<br>Flat 7<br>Cornwall Works<br>London &lt;N3&gt;'), 'tutor address split into lines, escaped');
-assert(inv.includes('£300.00') && inv.includes('£150.00') && inv.includes('90 min'), 'totals, charges and lengths shown');
+assert(inv.includes('£300.00') && inv.includes('£150.00'), 'totals and charges shown');
+assert(inv.includes('>1.5<') && inv.includes('Length (hours)') && !inv.includes('90 min'), 'length shown in hours');
+assert(inv.includes('>£100<') && !inv.includes('/hr'), 'rate shown as £100, no decimals or /hr');
+
+// The whole month, booked lessons included, for seeing an invoice before the month ends.
+const full = H.invoiceLines(lessons, 's', start, end, { upcoming: true });
+assert.deepEqual(full.map(l => [l.date, l.amount, l.upcoming]),
+  [['2026-11-03', 150, false], ['2026-11-05', 100, false], ['2026-11-10', 50, false], ['2026-11-26', 150, true]],
+  'booked lessons join the list, flagged; missed with no agreed charge still left out');
 const term = H.termHTML({ student_name: 'Zachy', start: '2026-10-01', end: '2026-11-30', summary: t });
 assert(term.includes('Fractions, good progress') && term.includes('3.5 hours'));
 

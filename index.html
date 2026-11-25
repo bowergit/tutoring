@@ -1074,7 +1074,7 @@
 <body>
 <div id="root"></div>
 <script src="weekly-billing.js?v=6.45.0"></script>
-<script src="hourly-billing.js"></script>
+<script src="hourly-billing.js?v=6.62.0"></script>
 <script type="text/babel">
 const { useState, useEffect } = React;
 
@@ -4157,6 +4157,7 @@ function YourName({ session }) {
   const [email, setEmail] = useState(session?.user?.user_metadata?.contact_email || '');
   const [booking, setBooking] = useState(session?.user?.user_metadata?.booking_url || '');
   const [address, setAddress] = useState(session?.user?.user_metadata?.invoice_address || '');
+  const [invoiceName, setInvoiceName] = useState(session?.user?.user_metadata?.invoice_name || '');
   const savedRate = session?.user?.user_metadata?.default_rate;
   const [rate, setRate] = useState(savedRate != null ? String(savedRate) : '');
   // A masked price must never be saved over the real one, so the field is
@@ -4179,6 +4180,7 @@ function YourName({ session }) {
         contact_email: email.trim(),
         booking_url: bookingUrl(booking),
         invoice_address: address.trim(),
+        invoice_name: invoiceName.trim(),
         ...(rateHidden ? {} : { default_rate: Number.isFinite(parseFloat(rate)) && parseFloat(rate) >= 0 ? parseFloat(rate) : null }),
       },
     });
@@ -4230,6 +4232,15 @@ function YourName({ session }) {
           anything else becomes a button. Leave blank to hide it.
         </div>
       </div>
+      {hourlyEnabled(session) && (
+        // The first name above is what the app calls you. An invoice needs
+        // the full name, so it gets its own field.
+        <div className="field">
+          <label>Your full name on invoices</label>
+          <input type="text" value={invoiceName} onChange={e => setInvoiceName(e.target.value)}
+                 placeholder={`e.g. ${name.trim() || 'Sam'} Smith`} />
+        </div>
+      )}
       {hourlyEnabled(session) && (
         <div className="field">
           <label>Address on invoices</label>
@@ -8278,7 +8289,7 @@ function HourlyTuitionSheet({ student, lessons, session, onChanged, onClose }) {
   const must = r => { if (r?.error) throw r.error; return r; };
   const reprice = from => supabase.rpc('tutoring_hourly_reprice', { p_student_id: student.id, p_from: from }).then(must);
   const payerLabel = p => (PAYERS.find(([k]) => k === p) || [p, p])[1];
-  const tutor = { tutor_name: meta.display_name || session?.user?.email || '', tutor_email: meta.contact_email || session?.user?.email || '', tutor_phone: meta.contact_phone || '', tutor_address: meta.invoice_address || '' };
+  const tutor = { tutor_name: meta.invoice_name || meta.display_name || session?.user?.email || '', tutor_email: meta.contact_email || session?.user?.email || '', tutor_phone: meta.contact_phone || '', tutor_address: meta.invoice_address || '' };
 
   function startEdit() {
     setForm(plan ? { hourly_rate: String(plan.hourly_rate), default_minutes: plan.default_minutes, slots: plan.slots || [], starts_on: plan.starts_on,
@@ -8329,7 +8340,10 @@ function HourlyTuitionSheet({ student, lessons, session, onChanged, onClose }) {
 
   // Invoices
   const range = H.monthRange(month);
-  const lines = H.invoiceLines(lessons, student.id, range.start, range.end);
+  // The whole month, lessons still to come included, so an invoice can be seen
+  // (and sent in advance) before the month's last lesson has happened.
+  const lines = H.invoiceLines(lessons, student.id, range.start, range.end, { upcoming: true });
+  const upcomingCount = lines.filter(l => l.upcoming).length;
   const total = Math.round(lines.reduce((s, l) => s + l.amount, 0) * 100) / 100;
   const invoices = H.invoices(student.id);
   const printable = inv => H.invoiceHTML({ ...inv, ...tutor, student_name: student.name,
@@ -8351,6 +8365,14 @@ function HourlyTuitionSheet({ student, lessons, session, onChanged, onClose }) {
       must(await supabase.from('tutoring_invoices').insert(inv));
       if (w) { w.document.open(); w.document.write(printable({ ...inv, status: 'issued' })); w.document.close(); }
     });
+  }
+  // The month's invoice as it stands, opened to look at. Nothing is saved and
+  // no number is used up, so it can be checked as often as needed.
+  function viewInvoice() {
+    const p = H.planFor(student.id, range.start) || plan;
+    openPrint(printable({ number: 'Draft', period_start: range.start, period_end: range.end,
+      payer: p?.payer || 'parent', payer_name: p?.payer_name || null, payer_reference: p?.payer_reference || null,
+      lines, total, issued_at: new Date().toISOString(), status: 'draft' }));
   }
   const setInvoiceStatus = (inv, status) => run(async () => must(await supabase.from('tutoring_invoices').update({ status }).eq('id', inv.id)));
 
@@ -8437,18 +8459,22 @@ function HourlyTuitionSheet({ student, lessons, session, onChanged, onClose }) {
           {view === 'invoices' && <>
             <div className="wk-row">
               <div className="field"><label>Month</label>
-                <input type="month" value={month} max={today.slice(0, 7)} onChange={e => e.target.value && setMonth(e.target.value)} /></div>
+                <input type="month" value={month} onChange={e => e.target.value && setMonth(e.target.value)} /></div>
               <div className="field"><label>Total</label><div className="wk-price" style={{fontSize:'1.3rem', paddingTop:6}}>{moneyText(total)}</div></div>
             </div>
             {lines.length ? <div style={{overflowX:'auto'}}><table className="wk-table"><thead><tr><th>Lesson</th><th>Length</th><th>Charge</th></tr></thead><tbody>
-              {lines.map((l, i) => <tr key={i}><td>{TTHourly.dateLabel(l.date)}{l.start ? ` · ${TTHourly.timeLabel(l.start)}` : ''}</td><td>{TTHourly.minutesLabel(l.minutes) || '-'}</td><td>{moneyText(l.amount)}{l.note ? ` · ${l.note}` : ''}</td></tr>)}
-            </tbody></table></div> : <p className="wk-note">No taught lessons in this month yet.</p>}
+              {lines.map((l, i) => <tr key={i}><td>{TTHourly.dateLabel(l.date)}{l.start ? ` · ${TTHourly.timeLabel(l.start)}` : ''}{l.upcoming ? <span style={{color:'var(--muted)'}}> · still to come</span> : ''}</td><td>{TTHourly.minutesLabel(l.minutes) || '-'}</td><td>{moneyText(l.amount)}{l.note ? ` · ${l.note}` : ''}</td></tr>)}
+            </tbody></table></div> : <p className="wk-note">No lessons in this month.</p>}
+            {upcomingCount > 0 && <p className="wk-note" style={{marginTop:8}}>
+              Includes {upcomingCount} lesson{upcomingCount === 1 ? '' : 's'} still to come this month. If one is cancelled or moved, view the invoice again before sending it.
+            </p>}
             {error && <p className="wk-error" role="alert">{error}</p>}
             <div className="btn-row">
               <button type="button" className="btn cancel" onClick={() => go('main')}>Back</button>
+              <button type="button" className="btn edit" disabled={!lines.length} onClick={viewInvoice}>View</button>
               <button type="button" className="btn save" disabled={busy || !lines.length} onClick={createInvoice}>Create invoice</button>
             </div>
-            <p className="wk-note" style={{marginTop:10}}>Creating an invoice saves a copy here and opens it to print or save as a PDF. Nothing is sent automatically.</p>
+            <p className="wk-note" style={{marginTop:10}}>View opens the month's invoice to check, without saving it. Create invoice saves a copy here and opens it to print or save as a PDF. Nothing is sent automatically.</p>
             {invoices.length > 0 && <div className="tools-menu"><ToolsSection title="Invoices">
               {invoices.map(inv => (
                 <div key={inv.id} className="tools-row" style={{cursor:'default', display:'flex', flexWrap:'wrap', gap:8, alignItems:'center'}}>
@@ -10291,7 +10317,7 @@ function App() {
           ))}
         </div>
 
-        {!loading && <div className="version-tag">v6.61.2</div>}
+        {!loading && <div className="version-tag">v6.62.0</div>}
       </div>
 
       {showAddModal && (

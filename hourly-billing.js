@@ -61,11 +61,17 @@
 
   // Every lesson in the period that an hourly plan priced, in date order. Taught lessons
   // are charged; a complimentary one is listed at £0 so the record shows it happened.
-  function invoiceLines(lessons, studentId, start, end) {
+  //
+  // With { upcoming: true } the month's booked lessons are included too, each
+  // flagged, so a monthly invoice can be seen whole before its last lesson is
+  // taught. They are priced like any other: the price is set when they are booked.
+  function invoiceLines(lessons, studentId, start, end, opts) {
+    const upcoming = !!(opts && opts.upcoming);
     return lessons
       .filter(l => l.student_id === studentId && l.lesson_date >= start && l.lesson_date <= end)
       .filter(l => l.hourly_plan_id || l.charge_overridden)
-      .filter(l => l.status === 'completed' || (l.status === 'missed' && l.charge_overridden && Number(l.rate_charged) > 0))
+      .filter(l => l.status === 'completed' || (upcoming && l.status === 'scheduled')
+        || (l.status === 'missed' && l.charge_overridden && Number(l.rate_charged) > 0))
       .sort((a, b) => (a.lesson_date + (a.start_time || '')).localeCompare(b.lesson_date + (b.start_time || '')))
       .map(l => {
         const plan = plans.find(p => p.id === l.hourly_plan_id) || null;
@@ -77,6 +83,7 @@
           rate: plan ? Number(plan.hourly_rate) : null,
           amount: free ? 0 : round2(l.rate_charged || 0),
           note: free ? 'Complimentary' : l.charge_overridden ? 'Agreed price' : (l.status === 'missed' ? 'Missed lesson' : ''),
+          upcoming: l.status === 'scheduled',
         };
       });
   }
@@ -119,9 +126,14 @@
     .notes{white-space:pre-wrap}.actions{margin:24px 0}.actions button{font:inherit;font-weight:700;padding:10px 18px;border-radius:10px;border:0;background:#ffa500;cursor:pointer}
     @media print{.actions{display:none}main{padding:0}}`;
 
+  // Invoice figures the way a person writes them: "£100", not "£100.00/hr"
+  // (the column heading says it is per hour), and "1.5" hours, not "90 min".
+  const wholeMoney = n => Number.isInteger(Number(n)) ? '£' + Number(n) : money(n);
+  const hours = m => (m ? String(round2(Number(m) / 60)) : '');
+
   function invoiceHTML(inv) {
     const rows = (inv.lines || []).map(l => `<tr><td>${esc(dateLabel(l.date))}${l.start ? ' · ' + esc(timeLabel(l.start)) : ''}</td>
-      <td>${esc(minutesLabel(l.minutes) || '-')}</td><td class="num">${l.rate != null ? esc(money(l.rate)) + '/hr' : '-'}</td>
+      <td class="num">${esc(hours(l.minutes) || '-')}</td><td class="num">${l.rate != null ? esc(wholeMoney(l.rate)) : '-'}</td>
       <td>${esc(l.note || '')}</td><td class="num">${esc(money(l.amount))}</td></tr>`).join('');
     // The address is one line in Settings; on the invoice each part gets its own line.
     const address = String(inv.tutor_address || '').split(/[\n,]/).map(x => x.trim()).filter(Boolean);
@@ -129,11 +141,11 @@
     const billTo = [inv.payer_name || (inv.payer === 'council' ? 'Local authority' : 'Parent or guardian'),
       inv.payer_reference ? 'Ref: ' + inv.payer_reference : ''].filter(Boolean).map(esc).join('<br>');
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Invoice ${esc(inv.number)}</title><style>${PRINT_CSS}</style></head>
-      <body><main><div class="bar"></div><div class="top"><div><h1>Invoice</h1><div class="muted">${esc(inv.number)} · issued ${esc(dateLabel(String(inv.issued_at).slice(0, 10)))}</div>
+      <body><main><div class="bar"></div><div class="top"><div><h1>Invoice</h1><div class="muted">${inv.status === 'draft' ? 'Draft, not yet issued' : `${esc(inv.number)} · issued ${esc(dateLabel(String(inv.issued_at).slice(0, 10)))}`}</div>
       <div class="muted">Tuition for ${esc(inv.student_name)}, ${esc(dateLabel(inv.period_start))} to ${esc(dateLabel(inv.period_end))}</div></div>
       <div class="box"><div class="label">From</div>${payTo || '&nbsp;'}</div></div>
       <div class="box" style="display:inline-block"><div class="label">Bill to</div>${billTo}</div>
-      <table><thead><tr><th>Lesson</th><th>Length</th><th class="num">Rate</th><th></th><th class="num">Charge</th></tr></thead>
+      <table><thead><tr><th>Lesson</th><th class="num">Length (hours)</th><th class="num">Rate per hour</th><th></th><th class="num">Charge</th></tr></thead>
       <tbody>${rows || '<tr><td colspan="5" class="muted">No lessons in this period.</td></tr>'}
       <tr class="total"><td colspan="4">Total due</td><td class="num">${esc(money(inv.total))}</td></tr></tbody></table>
       ${inv.invoice_notes ? `<div class="label">Payment details</div><div class="notes">${esc(inv.invoice_notes)}</div>` : ''}
